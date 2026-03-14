@@ -1,0 +1,37 @@
+﻿@inherits LayoutComponentBase
+
+<div class="aethon-shell">
+    <input id="aethon-nav-toggle" type="checkbox" class="aethon-nav-toggle" />
+
+    <aside class="aethon-sidebar">
+        <div class="aethon-sidebar-header">
+            <a href="/login" class="aethon-brand text-decoration-none">
+                <div class="aethon-brand-mark">A</div>
+                <div class="aethon-brand-text">
+                    <span class="aethon-brand-title">Aethon</span>
+                    <span class="aethon-brand-subtitle">Hiring intelligence platform</span>
+                </div>
+            </a>
+        </div>
+
+        <div class="aethon-sidebar-nav">
+            <NavMenu />
+        </div>
+    </aside>
+
+    <main class="aethon-main">
+        <div class="aethon-mobile-topbar">
+            <label for="aethon-nav-toggle" class="aethon-hamburger btn btn-outline-dark btn-sm mb-0" aria-label="Toggle navigation">
+                ☰
+            </label>
+
+            <div class="fw-semibold text-dark">Aethon</div>
+        </div>
+
+        <section class="aethon-content">
+            @Body
+        </section>
+    </main>
+
+    <label for="aethon-nav-toggle" class="aethon-sidebar-backdrop"></label>
+</div>
