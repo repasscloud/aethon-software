@@ -8,3 +8,11 @@ dotnet ef migrations add InitialIdentity \
 dotnet ef database update \
   --project src/Aethon.Data/Aethon.Data.csproj \
   --startup-project src/Aethon.Api/Aethon.Api.csproj
+
+mkdir -p db/sql
+
+dotnet ef migrations script \
+  --idempotent \
+  --project src/Aethon.Data/Aethon.Data.csproj \
+  --startup-project src/Aethon.Api/Aethon.Api.csproj \
+  --output db/sql/001_initial_identity.sql

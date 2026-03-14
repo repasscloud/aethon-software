@@ -1,11 +1,43 @@
 ﻿@page "/"
-@inject NavigationManager NavigationManager
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Aethon</PageTitle>
 
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <h1 class="h3 fw-bold mb-2">Aethon</h1>
+        <p class="text-secondary mb-4">You are signed in.</p>
+
+        @if (_user is not null)
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div class="border rounded-4 p-3 bg-white">
+                        <div class="small text-secondary mb-1">User</div>
+                        <div class="fw-semibold">@(_user.Identity?.Name ?? "Unknown")</div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <div class="border rounded-4 p-3 bg-white">
+                        <div class="small text-secondary mb-1">Authenticated</div>
+                        <div class="fw-semibold">@(_user.Identity?.IsAuthenticated == true ? "Yes" : "No")</div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
 @code {
-    protected override void OnInitialized()
+    private System.Security.Claims.ClaimsPrincipal? _user;
+
+    protected override async Task OnInitializedAsync()
     {
-        NavigationManager.NavigateTo("/login", forceLoad: false);
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _user = authState.User;
     }
 }

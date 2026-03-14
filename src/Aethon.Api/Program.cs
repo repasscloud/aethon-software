@@ -5,13 +5,20 @@ using Aethon.Data.Tenancy;
 using Aethon.Shared.Auth;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        builder.Configuration["DataProtection:KeysPath"] ?? "/keys"))
+    .SetApplicationName(builder.Configuration["DataProtection:ApplicationName"] ?? "Aethon");
 
 builder.Services.AddDbContext<AethonDbContext>(options =>
 {
@@ -38,13 +45,11 @@ builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
-
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequiredLength = 12;
-
         options.SignIn.RequireConfirmedEmail = false;
     })
     .AddRoles<ApplicationRole>()
@@ -57,33 +62,50 @@ builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppUser
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = "__Host-Aethon.Auth";
+    options.Cookie.Name = "Aethon.Auth";
     options.Cookie.HttpOnly = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.Path = "/";
+    options.LoginPath = "/login";
+    options.AccessDeniedPath = "/access-denied";
 
     options.Events = new CookieAuthenticationEvents
     {
         OnRedirectToLogin = context =>
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            if (IsApiRequest(context.Request))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
             return Task.CompletedTask;
         },
         OnRedirectToAccessDenied = context =>
         {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            if (IsApiRequest(context.Request))
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            }
+
+            context.Response.Redirect(context.RedirectUri);
             return Task.CompletedTask;
         }
     };
 });
 
+var corsOrigins =
+    builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+    ?? ["http://localhost:5101", "https://localhost:7101", "https://app.aethon.software"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins(
-                "https://localhost:7101",
-                "https://app.aethon.software")
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -97,7 +119,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (builder.Configuration.GetValue("EnableHttpsRedirection", app.Environment.IsDevelopment()))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("Frontend");
 
@@ -105,6 +130,59 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapIdentityApi<ApplicationUser>();
+
+app.MapPost("/auth/browser-login", async (
+    HttpContext httpContext,
+    SignInManager<ApplicationUser> signInManager,
+    UserManager<ApplicationUser> userManager,
+    IConfiguration configuration) =>
+{
+    var form = await httpContext.Request.ReadFormAsync();
+
+    var email = form["email"].ToString().Trim();
+    var password = form["password"].ToString();
+    var rememberMe = string.Equals(form["rememberMe"], "on", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(form["rememberMe"], "true", StringComparison.OrdinalIgnoreCase);
+
+    var webBaseUrl = (configuration["Web:BaseUrl"] ?? "http://localhost:5101").TrimEnd('/');
+    var returnPath = NormaliseReturnPath(form["returnPath"].ToString());
+
+    if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+    {
+        return Results.Redirect(BuildLoginRedirect(webBaseUrl, returnPath, "Please enter your email and password."));
+    }
+
+    var user = await userManager.FindByEmailAsync(email);
+    if (user is null || !user.IsEnabled)
+    {
+        return Results.Redirect(BuildLoginRedirect(webBaseUrl, returnPath, "Invalid email or password."));
+    }
+
+    var result = await signInManager.PasswordSignInAsync(user, password, rememberMe, lockoutOnFailure: true);
+    if (!result.Succeeded)
+    {
+        return Results.Redirect(BuildLoginRedirect(webBaseUrl, returnPath, "Invalid email or password."));
+    }
+
+    return Results.Redirect($"{webBaseUrl}{returnPath}");
+})
+.DisableAntiforgery();
+
+app.MapPost("/auth/browser-logout", async (
+    HttpContext httpContext,
+    SignInManager<ApplicationUser> signInManager,
+    IConfiguration configuration) =>
+{
+    var form = await httpContext.Request.ReadFormAsync();
+
+    var webBaseUrl = (configuration["Web:BaseUrl"] ?? "http://localhost:5101").TrimEnd('/');
+    var returnPath = NormaliseReturnPath(form["returnPath"].ToString(), "/login");
+
+    await signInManager.SignOutAsync();
+
+    return Results.Redirect($"{webBaseUrl}{returnPath}");
+})
+.DisableAntiforgery();
 
 app.MapGet("/auth/me", [Authorize] (ClaimsPrincipal user) =>
 {
@@ -120,17 +198,58 @@ app.MapGet("/auth/me", [Authorize] (ClaimsPrincipal user) =>
     });
 });
 
-app.MapPost("/auth/logout-cookie", [Authorize] async (SignInManager<ApplicationUser> signInManager) =>
-{
-    await signInManager.SignOutAsync();
-    return Results.NoContent();
-});
-
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 await InitialiseDatabaseAsync(app);
 
 app.Run();
+
+static bool IsApiRequest(HttpRequest request)
+{
+    return request.Path.StartsWithSegments("/auth")
+           || request.Path.StartsWithSegments("/login")
+           || request.Path.StartsWithSegments("/register")
+           || request.Path.StartsWithSegments("/manage")
+           || request.Path.StartsWithSegments("/health");
+}
+
+static string NormaliseReturnPath(string? value, string fallback = "/")
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return fallback;
+    }
+
+    if (!value.StartsWith('/'))
+    {
+        value = "/" + value;
+    }
+
+    if (value.StartsWith("//"))
+    {
+        return fallback;
+    }
+
+    if (Uri.TryCreate(value, UriKind.Absolute, out _))
+    {
+        return fallback;
+    }
+
+    return value;
+}
+
+static string BuildLoginRedirect(string webBaseUrl, string returnPath, string error)
+{
+    var loginUrl = $"{webBaseUrl}/login";
+
+    var query = new Dictionary<string, string?>
+    {
+        ["ReturnUrl"] = returnPath,
+        ["error"] = error
+    };
+
+    return QueryHelpers.AddQueryString(loginUrl, query);
+}
 
 static async Task InitialiseDatabaseAsync(WebApplication app)
 {
@@ -138,14 +257,21 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
 
     var db = scope.ServiceProvider.GetRequiredService<AethonDbContext>();
 
-    if (app.Environment.IsDevelopment())
+    var shouldApplyMigrations = app.Configuration.GetValue("ApplyMigrationsOnStartup", app.Environment.IsDevelopment());
+    var shouldSeed = app.Configuration.GetValue("SeedOnStartup", app.Environment.IsDevelopment());
+
+    if (shouldApplyMigrations)
     {
         await db.Database.MigrateAsync();
-        await SeedDevelopmentDataAsync(scope.ServiceProvider);
+    }
+
+    if (shouldSeed)
+    {
+        await SeedInitialDataAsync(scope.ServiceProvider);
     }
 }
 
-static async Task SeedDevelopmentDataAsync(IServiceProvider services)
+static async Task SeedInitialDataAsync(IServiceProvider services)
 {
     var db = services.GetRequiredService<AethonDbContext>();
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();

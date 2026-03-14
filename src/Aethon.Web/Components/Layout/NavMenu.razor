@@ -6,8 +6,11 @@
         <span>Home</span>
     </NavLink>
 
-    <NavLink class="nav-link aethon-nav-link" href="/login">
-        <span class="aethon-nav-icon">→</span>
-        <span>Login</span>
-    </NavLink>
+    <form method="post" action="http://localhost:5201/auth/browser-logout" class="mt-2">
+        <input type="hidden" name="returnPath" value="/login" />
+        <button type="submit" class="nav-link aethon-nav-link w-100 border-0 bg-transparent text-start">
+            <span class="aethon-nav-icon">×</span>
+            <span>Logout</span>
+        </button>
+    </form>
 </nav>

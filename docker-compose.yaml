@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgres:17
+    container_name: aethon-db
+    environment:
+      POSTGRES_DB: aethon
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - aethon-postgres-data:/var/lib/postgresql/data
+      - ./db/sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d aethon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Aethon.Api/Dockerfile
+    container_name: aethon-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      EnableHttpsRedirection: "false"
+      ApplyMigrationsOnStartup: "false"
+      SeedOnStartup: "true"
+      DataProtection__KeysPath: /keys
+      DataProtection__ApplicationName: Aethon
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=aethon;Username=postgres;Password=postgres
+      Cors__Origins__0: http://localhost:5101
+      Cors__Origins__1: https://localhost:7101
+      Cors__Origins__2: https://app.aethon.software
+      Web__BaseUrl: http://localhost:5101
+    ports:
+      - "5201:8080"
+    volumes:
+      - aethon-dpkeys:/keys
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Aethon.Web/Dockerfile
+    container_name: aethon-web
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      EnableHttpsRedirection: "false"
+      DataProtection__KeysPath: /keys
+      DataProtection__ApplicationName: Aethon
+    ports:
+      - "5101:8080"
+    volumes:
+      - aethon-dpkeys:/keys
+
+volumes:
+  aethon-postgres-data:
+  aethon-dpkeys:

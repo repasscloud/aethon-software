@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Aethon.Shared\Aethon.Shared.csproj" />
+    <ProjectReference Include="..\Aethon.Data\Aethon.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>
