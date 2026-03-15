@@ -8,56 +8,60 @@
 
     @if (_ready)
     {
-        @if (_appType == "employer")
+        @if (_isEmployer)
         {
-            <NavLink class="nav-link aethon-nav-link" href="/app/employer" Match="NavLinkMatch.All">
+            <NavLink class="nav-link aethon-nav-link" href="/app/employer" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon">⌂</span>
                 <span>Employer dashboard</span>
             </NavLink>
 
-            <NavLink class="nav-link aethon-nav-link" href="/app/jobs">
+            <NavLink class="nav-link aethon-nav-link" href="/app/jobs" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon">▣</span>
                 <span>Jobs</span>
             </NavLink>
-        }
-        else if (_appType == "recruiter")
-        {
-            <NavLink class="nav-link aethon-nav-link" href="/app/recruiter" Match="NavLinkMatch.All">
-                <span class="aethon-nav-icon">⌂</span>
-                <span>Recruiter dashboard</span>
-            </NavLink>
-        }
-        else if (_appType == "jobseeker")
-        {
-            <NavLink class="nav-link aethon-nav-link" href="/app/jobseeker" Match="NavLinkMatch.All">
-                <span class="aethon-nav-icon">⌂</span>
-                <span>Job seeker dashboard</span>
-            </NavLink>
 
-            <NavLink class="nav-link aethon-nav-link" href="/app/applications">
-                <span class="aethon-nav-icon">▣</span>
-                <span>My applications</span>
-            </NavLink>
-        }
-
-        @if (_appType is "employer" or "recruiter")
-        {
-            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team">
-                <span class="aethon-nav-icon">👥</span>
-                <span>Organisation team</span>
-            </NavLink>
-        }
-
-        @if (_appType is "employer" or "recruiter")
-        {
-            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/profile">
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/profile" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon">⌘</span>
                 <span>Organisation profile</span>
             </NavLink>
 
-            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team">
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon">👥</span>
                 <span>Organisation team</span>
+            </NavLink>
+        }
+        else if (_isRecruiter)
+        {
+            <NavLink class="nav-link aethon-nav-link" href="/app/recruiter" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">⌂</span>
+                <span>Recruiter dashboard</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/jobs" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">▣</span>
+                <span>Jobs</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/profile" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">⌘</span>
+                <span>Organisation profile</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">👥</span>
+                <span>Organisation team</span>
+            </NavLink>
+        }
+        else if (_isJobSeeker)
+        {
+            <NavLink class="nav-link aethon-nav-link" href="/app/jobseeker" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">⌂</span>
+                <span>Job seeker dashboard</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/applications" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">▣</span>
+                <span>My applications</span>
             </NavLink>
         }
 
@@ -69,9 +73,15 @@
         <div class="mt-3 px-2">
             <div class="small text-secondary mb-1">Signed in as</div>
             <div class="fw-semibold text-dark">@_displayName</div>
+
             @if (!string.IsNullOrWhiteSpace(_organisationName))
             {
                 <div class="small text-secondary mt-1">@_organisationName</div>
+            }
+
+            @if (!_isEmployer && !_isRecruiter && !_isJobSeeker)
+            {
+                <div class="small text-danger mt-1">No app type resolved</div>
             }
         </div>
     }
@@ -91,14 +101,23 @@
     private string _displayName = "";
     private string _organisationName = "";
 
+    private bool _isEmployer;
+    private bool _isRecruiter;
+    private bool _isJobSeeker;
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        _appType = user.FindFirstValue(AppClaimTypes.AppType) ?? "";
+        _appType = (user.FindFirstValue(AppClaimTypes.AppType) ?? "").Trim().ToLowerInvariant();
         _displayName = user.FindFirstValue(AppClaimTypes.DisplayName) ?? user.Identity?.Name ?? "Unknown";
         _organisationName = user.FindFirstValue(AppClaimTypes.OrganisationName) ?? "";
+
+        _isEmployer = _appType == "employer";
+        _isRecruiter = _appType == "recruiter";
+        _isJobSeeker = _appType == "jobseeker";
+
         _ready = true;
     }
 }
