@@ -108,6 +108,217 @@ public sealed class JobsController : ControllerBase
             return ValidationProblem(validationErrors);
         }
 
+        var access = await GetEmployerAccessAsync();
+        if (!access.Succeeded)
+        {
+            return access.ForbiddenResult!;
+        }
+
+        var status = request.Status ?? JobStatus.Draft;
+        var workplaceType = request.WorkplaceType ?? WorkplaceType.OnSite;
+        var employmentType = request.EmploymentType ?? EmploymentType.FullTime;
+
+        var job = new Job
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            OwnedByOrganisationId = access.OrganisationId!,
+            ManagedByOrganisationId = null,
+            CompanyRecruiterRelationshipId = null,
+            CreatedByIdentityUserId = access.UserId!.Value,
+            CreatedByType = JobCreatedByType.CompanyUser,
+            Status = status,
+            Visibility = status == JobStatus.Published ? JobVisibility.Public : JobVisibility.Private,
+            Title = request.Title.Trim(),
+            Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim(),
+            LocationText = string.IsNullOrWhiteSpace(request.LocationText) ? null : request.LocationText.Trim(),
+            WorkplaceType = workplaceType,
+            EmploymentType = employmentType,
+            Description = request.Description.Trim(),
+            Requirements = string.IsNullOrWhiteSpace(request.Requirements) ? null : request.Requirements.Trim(),
+            Benefits = string.IsNullOrWhiteSpace(request.Benefits) ? null : request.Benefits.Trim(),
+            SalaryFrom = request.SalaryFrom,
+            SalaryTo = request.SalaryTo,
+            SalaryCurrency = request.SalaryCurrency,
+            PublishedUtc = status == JobStatus.Published ? DateTime.UtcNow : null,
+            ClosedUtc = status == JobStatus.Closed ? DateTime.UtcNow : null,
+            CreatedForUnclaimedCompany = false,
+            CreatedUtc = DateTime.UtcNow,
+            CreatedByUserId = access.UserId.Value.ToString()
+        };
+
+        _dbContext.Jobs.Add(job);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateJob([FromRoute] string id, [FromBody] UpdateJobRequestDto request)
+    {
+        var validationErrors = ApiValidationHelper.Validate(request);
+        if (validationErrors.Count > 0)
+        {
+            return ValidationProblem(validationErrors);
+        }
+
+        var access = await GetEmployerAccessAsync();
+        if (!access.Succeeded)
+        {
+            return access.ForbiddenResult!;
+        }
+
+        var job = await _dbContext.Jobs
+            .FirstOrDefaultAsync(x => x.Id == id && x.OwnedByOrganisationId == access.OrganisationId);
+
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        job.Title = request.Title.Trim();
+        job.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
+        job.LocationText = string.IsNullOrWhiteSpace(request.LocationText) ? null : request.LocationText.Trim();
+        job.WorkplaceType = request.WorkplaceType ?? WorkplaceType.OnSite;
+        job.EmploymentType = request.EmploymentType ?? EmploymentType.FullTime;
+        job.Description = request.Description.Trim();
+        job.Requirements = string.IsNullOrWhiteSpace(request.Requirements) ? null : request.Requirements.Trim();
+        job.Benefits = string.IsNullOrWhiteSpace(request.Benefits) ? null : request.Benefits.Trim();
+        job.SalaryFrom = request.SalaryFrom;
+        job.SalaryTo = request.SalaryTo;
+        job.SalaryCurrency = request.SalaryCurrency;
+        job.UpdatedUtc = DateTime.UtcNow;
+        job.UpdatedByUserId = access.UserId!.Value.ToString();
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+    }
+
+    [HttpPost("{id}/publish")]
+    public async Task<IActionResult> PublishJob([FromRoute] string id)
+    {
+        var access = await GetEmployerAccessAsync();
+        if (!access.Succeeded)
+        {
+            return access.ForbiddenResult!;
+        }
+
+        var job = await _dbContext.Jobs
+            .FirstOrDefaultAsync(x => x.Id == id && x.OwnedByOrganisationId == access.OrganisationId);
+
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        if (job.Status == JobStatus.Closed)
+        {
+            return ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["Status"] = ["Closed jobs must be returned to draft before publishing."]
+            });
+        }
+
+        job.Status = JobStatus.Published;
+        job.Visibility = JobVisibility.Public;
+        job.PublishedUtc ??= DateTime.UtcNow;
+        job.ClosedUtc = null;
+        job.UpdatedUtc = DateTime.UtcNow;
+        job.UpdatedByUserId = access.UserId!.Value.ToString();
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+    }
+
+    [HttpPost("{id}/close")]
+    public async Task<IActionResult> CloseJob([FromRoute] string id)
+    {
+        var access = await GetEmployerAccessAsync();
+        if (!access.Succeeded)
+        {
+            return access.ForbiddenResult!;
+        }
+
+        var job = await _dbContext.Jobs
+            .FirstOrDefaultAsync(x => x.Id == id && x.OwnedByOrganisationId == access.OrganisationId);
+
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        job.Status = JobStatus.Closed;
+        job.Visibility = JobVisibility.Private;
+        job.ClosedUtc = DateTime.UtcNow;
+        job.UpdatedUtc = DateTime.UtcNow;
+        job.UpdatedByUserId = access.UserId!.Value.ToString();
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+    }
+
+    [HttpPost("{id}/return-to-draft")]
+    public async Task<IActionResult> ReturnToDraft([FromRoute] string id)
+    {
+        var access = await GetEmployerAccessAsync();
+        if (!access.Succeeded)
+        {
+            return access.ForbiddenResult!;
+        }
+
+        var job = await _dbContext.Jobs
+            .FirstOrDefaultAsync(x => x.Id == id && x.OwnedByOrganisationId == access.OrganisationId);
+
+        if (job is null)
+        {
+            return NotFound();
+        }
+
+        job.Status = JobStatus.Draft;
+        job.Visibility = JobVisibility.Private;
+        job.ClosedUtc = null;
+        job.UpdatedUtc = DateTime.UtcNow;
+        job.UpdatedByUserId = access.UserId!.Value.ToString();
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+    }
+
+    private async Task<JobDetailDto> BuildJobDetailAsync(string jobId, string organisationId)
+    {
+        return await _dbContext.Jobs
+            .AsNoTracking()
+            .Where(x => x.Id == jobId && x.OwnedByOrganisationId == organisationId)
+            .Select(x => new JobDetailDto
+            {
+                Id = x.Id,
+                OrganisationId = x.OwnedByOrganisationId,
+                OrganisationName = x.OwnedByOrganisation.Name,
+                Title = x.Title,
+                Department = x.Department,
+                LocationText = x.LocationText,
+                WorkplaceType = x.WorkplaceType,
+                EmploymentType = x.EmploymentType,
+                Status = x.Status,
+                Description = x.Description,
+                Requirements = x.Requirements,
+                Benefits = x.Benefits,
+                SalaryFrom = x.SalaryFrom,
+                SalaryTo = x.SalaryTo,
+                SalaryCurrency = x.SalaryCurrency,
+                CreatedByUserId = x.CreatedByIdentityUserId.ToString(),
+                CreatedUtc = x.CreatedUtc,
+                PublishedUtc = x.PublishedUtc,
+                ClosedUtc = x.ClosedUtc
+            })
+            .SingleAsync();
+    }
+
+    private async Task<EmployerAccessResult> GetEmployerAccessAsync()
+    {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
         var organisationType = User.FindFirstValue(AppClaimTypes.OrganisationType);
@@ -116,7 +327,7 @@ public sealed class JobsController : ControllerBase
             string.IsNullOrWhiteSpace(organisationId) ||
             !string.Equals(organisationType, "company", StringComparison.OrdinalIgnoreCase))
         {
-            return Forbid();
+            return EmployerAccessResult.Forbidden();
         }
 
         var membership = await _dbContext.OrganisationMemberships
@@ -126,64 +337,9 @@ public sealed class JobsController : ControllerBase
                 x.UserId == userId &&
                 x.Status == MembershipStatus.Active);
 
-        if (membership is null)
-        {
-            return Forbid();
-        }
-
-        var job = new Job
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            OwnedByOrganisationId = organisationId,
-            ManagedByOrganisationId = null,
-            CompanyRecruiterRelationshipId = null,
-            CreatedByIdentityUserId = userId,
-            CreatedByType = JobCreatedByType.CompanyUser,
-            Status = request.Status!.Value,
-            Visibility = request.Status.Value == JobStatus.Published ? JobVisibility.Public : JobVisibility.Private,
-            Title = request.Title.Trim(),
-            Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim(),
-            LocationText = string.IsNullOrWhiteSpace(request.LocationText) ? null : request.LocationText.Trim(),
-            WorkplaceType = request.WorkplaceType!.Value,
-            EmploymentType = request.EmploymentType!.Value,
-            Description = request.Description.Trim(),
-            Requirements = string.IsNullOrWhiteSpace(request.Requirements) ? null : request.Requirements.Trim(),
-            Benefits = string.IsNullOrWhiteSpace(request.Benefits) ? null : request.Benefits.Trim(),
-            SalaryFrom = request.SalaryFrom,
-            SalaryTo = request.SalaryTo,
-            SalaryCurrency = request.SalaryCurrency,
-            PublishedUtc = request.Status.Value == JobStatus.Published ? DateTime.UtcNow : null,
-            ClosedUtc = request.Status.Value == JobStatus.Closed ? DateTime.UtcNow : null,
-            CreatedForUnclaimedCompany = false,
-            CreatedUtc = DateTime.UtcNow,
-            CreatedByUserId = userId.ToString()
-        };
-
-        _dbContext.Jobs.Add(job);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(new JobDetailDto
-        {
-            Id = job.Id,
-            OrganisationId = organisationId,
-            OrganisationName = User.FindFirstValue(AppClaimTypes.OrganisationName) ?? "",
-            Title = job.Title,
-            Department = job.Department,
-            LocationText = job.LocationText,
-            WorkplaceType = job.WorkplaceType,
-            EmploymentType = job.EmploymentType,
-            Status = job.Status,
-            Description = job.Description,
-            Requirements = job.Requirements,
-            Benefits = job.Benefits,
-            SalaryFrom = job.SalaryFrom,
-            SalaryTo = job.SalaryTo,
-            SalaryCurrency = job.SalaryCurrency,
-            CreatedByUserId = userId.ToString(),
-            CreatedUtc = job.CreatedUtc,
-            PublishedUtc = job.PublishedUtc,
-            ClosedUtc = job.ClosedUtc
-        });
+        return membership is null
+            ? EmployerAccessResult.Forbidden()
+            : EmployerAccessResult.Success(userId, organisationId);
     }
 
     private ObjectResult ValidationProblem(Dictionary<string, string[]> errors)
@@ -194,5 +350,28 @@ public sealed class JobsController : ControllerBase
         }
 
         return (ObjectResult)ValidationProblem(ModelState);
+    }
+
+    private sealed class EmployerAccessResult
+    {
+        public bool Succeeded { get; init; }
+        public Guid? UserId { get; init; }
+        public string? OrganisationId { get; init; }
+        public IActionResult? ForbiddenResult { get; init; }
+
+        public static EmployerAccessResult Success(Guid userId, string organisationId) =>
+            new()
+            {
+                Succeeded = true,
+                UserId = userId,
+                OrganisationId = organisationId
+            };
+
+        public static EmployerAccessResult Forbidden() =>
+            new()
+            {
+                Succeeded = false,
+                ForbiddenResult = new ForbidResult()
+            };
     }
 }

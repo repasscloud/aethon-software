@@ -1,0 +1,240 @@
+@page "/app/jobs/{Id}/edit"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit job | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h4 fw-bold mb-2">Loading job</h1>
+            <p class="text-secondary mb-0">Fetching job details for editing.</p>
+        </div>
+    </div>
+}
+else if (_notFound)
+{
+    <div class="alert alert-danger rounded-4 mb-0">Job not found.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h1 class="h3 fw-bold mb-2">Edit job</h1>
+                <p class="text-secondary mb-0">Update the draft or published job details.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_pageError))
+        {
+            <div class="alert alert-danger rounded-4 mb-0">@_pageError</div>
+        }
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-8">
+                            <label class="form-label fw-semibold">Title</label>
+                            <InputText @bind-Value="_model.Title" class="form-control rounded-4" />
+                            <ValidationMessage For="@(() => _model.Title)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Department</label>
+                            <InputText @bind-Value="_model.Department" class="form-control rounded-4" />
+                            <ValidationMessage For="@(() => _model.Department)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Location</label>
+                            <InputText @bind-Value="_model.LocationText" class="form-control rounded-4" />
+                            <ValidationMessage For="@(() => _model.LocationText)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Workplace type</label>
+                            <InputSelect @bind-Value="_model.WorkplaceType" class="form-select rounded-4">
+                                <option value="">Select workplace type</option>
+                                <option value="@WorkplaceType.OnSite">OnSite</option>
+                                <option value="@WorkplaceType.Hybrid">Hybrid</option>
+                                <option value="@WorkplaceType.Remote">Remote</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _model.WorkplaceType)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Employment type</label>
+                            <InputSelect @bind-Value="_model.EmploymentType" class="form-select rounded-4">
+                                <option value="">Select employment type</option>
+                                <option value="@EmploymentType.FullTime">FullTime</option>
+                                <option value="@EmploymentType.PartTime">PartTime</option>
+                                <option value="@EmploymentType.Contract">Contract</option>
+                                <option value="@EmploymentType.Temporary">Temporary</option>
+                                <option value="@EmploymentType.Casual">Casual</option>
+                                <option value="@EmploymentType.Internship">Internship</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _model.EmploymentType)" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description</label>
+                            <InputTextArea @bind-Value="_model.Description" class="form-control rounded-4" rows="6" />
+                            <ValidationMessage For="@(() => _model.Description)" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Requirements</label>
+                            <InputTextArea @bind-Value="_model.Requirements" class="form-control rounded-4" rows="5" />
+                            <ValidationMessage For="@(() => _model.Requirements)" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Benefits</label>
+                            <InputTextArea @bind-Value="_model.Benefits" class="form-control rounded-4" rows="5" />
+                            <ValidationMessage For="@(() => _model.Benefits)" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Salary from</label>
+                            <InputNumber @bind-Value="_model.SalaryFrom" class="form-control rounded-4" />
+                            <ValidationMessage For="@(() => _model.SalaryFrom)" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Salary to</label>
+                            <InputNumber @bind-Value="_model.SalaryTo" class="form-control rounded-4" />
+                            <ValidationMessage For="@(() => _model.SalaryTo)" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Currency</label>
+                            <InputSelect @bind-Value="_model.SalaryCurrency" class="form-select rounded-4">
+                                <option value="">Select currency</option>
+                                <option value="@CurrencyCode.AUD">AUD</option>
+                                <option value="@CurrencyCode.USD">USD</option>
+                                <option value="@CurrencyCode.EUR">EUR</option>
+                                <option value="@CurrencyCode.GBP">GBP</option>
+                                <option value="@CurrencyCode.NZD">NZD</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _model.SalaryCurrency)" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                            @(_saving ? "Saving..." : "Save changes")
+                        </button>
+                        <a class="btn btn-outline-secondary rounded-4 px-4" href="/app/jobs/@Id">Back</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private readonly UpdateJobRequestDto _model = new();
+    private bool _loaded;
+    private bool _notFound;
+    private bool _saving;
+    private string? _pageError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _notFound = false;
+        _pageError = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.GetAsync($"/jobs/{Id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _notFound = true;
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = "Could not load job.";
+                return;
+            }
+
+            var job = await response.Content.ReadFromJsonAsync<JobDetailDto>();
+            if (job is null)
+            {
+                _notFound = true;
+                return;
+            }
+
+            _model.Title = job.Title;
+            _model.Department = job.Department;
+            _model.LocationText = job.LocationText;
+            _model.WorkplaceType = job.WorkplaceType;
+            _model.EmploymentType = job.EmploymentType;
+            _model.Description = job.Description;
+            _model.Requirements = job.Requirements;
+            _model.Benefits = job.Benefits;
+            _model.SalaryFrom = job.SalaryFrom;
+            _model.SalaryTo = job.SalaryTo;
+            _model.SalaryCurrency = job.SalaryCurrency;
+        }
+        catch
+        {
+            _pageError = "Could not load job.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _pageError = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PutAsJsonAsync($"/jobs/{Id}", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                NavigationManager.NavigateTo($"/app/jobs/{Id}", forceLoad: false);
+                return;
+            }
+
+            _pageError = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_pageError))
+            {
+                _pageError = "Job could not be updated.";
+            }
+        }
+        catch
+        {
+            _pageError = "Job could not be updated.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

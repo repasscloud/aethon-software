@@ -30,20 +30,20 @@ public sealed class AppUserClaimsPrincipalFactory
 
         identity.AddClaim(new Claim(AppClaimTypes.DisplayName, user.DisplayName ?? string.Empty));
 
-        var membership = await _dbContext.UserTenantMemberships
+        var tenantMembership = await _dbContext.UserTenantMemberships
             .Where(x => x.UserId == user.Id && x.IsDefault)
             .Join(
                 _dbContext.Tenants,
-                userTenantMembership => userTenantMembership.TenantId,
+                membership => membership.TenantId,
                 tenant => tenant.Id,
-                (userTenantMembership, tenant) => new { userTenantMembership, tenant })
+                (membership, tenant) => new { membership, tenant })
             .FirstOrDefaultAsync();
 
-        if (membership is not null)
+        if (tenantMembership is not null)
         {
-            identity.AddClaim(new Claim(AppClaimTypes.TenantId, membership.tenant.Id.ToString()));
-            identity.AddClaim(new Claim(AppClaimTypes.TenantSlug, membership.tenant.Slug));
-            identity.AddClaim(new Claim(ClaimTypes.Role, membership.userTenantMembership.RoleCode));
+            identity.AddClaim(new Claim(AppClaimTypes.TenantId, tenantMembership.tenant.Id.ToString()));
+            identity.AddClaim(new Claim(AppClaimTypes.TenantSlug, tenantMembership.tenant.Slug));
+            identity.AddClaim(new Claim(ClaimTypes.Role, tenantMembership.membership.RoleCode));
         }
 
         var organisationMembership = await _dbContext.OrganisationMemberships
