@@ -1,5 +1,5 @@
-using Aethon.Data.Enums;
 using Aethon.Data.Identity;
+using Aethon.Shared.Enums;
 
 namespace Aethon.Data.Entities;
 

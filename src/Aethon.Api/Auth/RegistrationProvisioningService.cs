@@ -1,9 +1,9 @@
 using Aethon.Data;
 using Aethon.Data.Entities;
-using Aethon.Data.Enums;
 using Aethon.Data.Identity;
 using Aethon.Data.Tenancy;
 using Aethon.Shared.Auth;
+using Aethon.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Auth;

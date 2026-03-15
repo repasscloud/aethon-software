@@ -1,0 +1,154 @@
+@page "/app/jobs/{Id}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Job details | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h4 fw-bold mb-2">Loading job</h1>
+            <p class="text-secondary mb-0">Fetching job details.</p>
+        </div>
+    </div>
+}
+else if (_job is null)
+{
+    <div class="alert alert-danger rounded-4 mb-0">@(_pageError ?? "Job not found.")</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-lg-between gap-3">
+                    <div>
+                        <h1 class="h3 fw-bold mb-2">@_job.Title</h1>
+                        <p class="text-secondary mb-0">@_job.OrganisationName</p>
+                    </div>
+                    <div class="text-lg-end">
+                        <div class="fw-semibold">@_job.Status</div>
+                        <div class="text-secondary small">Created @_job.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Department</div>
+                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(_job.Department) ? "-" : _job.Department)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Location</div>
+                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(_job.LocationText) ? "-" : _job.LocationText)</div>
+                        <div class="text-secondary mt-2">@_job.WorkplaceType</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Employment</div>
+                        <div class="fw-semibold">@_job.EmploymentType</div>
+                        <div class="text-secondary mt-2">
+                            @if (_job.SalaryFrom.HasValue || _job.SalaryTo.HasValue)
+                            {
+                                <span>@_job.SalaryCurrency @(_job.SalaryFrom?.ToString("0.##") ?? "0") - @(_job.SalaryTo?.ToString("0.##") ?? "0")</span>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Description</h2>
+                <div style="white-space: pre-wrap;">@_job.Description</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Requirements</h2>
+                <div style="white-space: pre-wrap;">@(!string.IsNullOrWhiteSpace(_job.Requirements) ? _job.Requirements : "-")</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Benefits</h2>
+                <div style="white-space: pre-wrap;">@(!string.IsNullOrWhiteSpace(_job.Benefits) ? _job.Benefits : "-")</div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private bool _loaded;
+    private string? _pageError;
+    private JobDetailDto? _job;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _pageError = null;
+        _job = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.GetAsync($"/jobs/{Id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _pageError = "Job not found.";
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _pageError = "You do not have access to this job.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = "Could not load job.";
+                return;
+            }
+
+            _job = await response.Content.ReadFromJsonAsync<JobDetailDto>();
+        }
+        catch
+        {
+            _pageError = "Could not load job.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+}

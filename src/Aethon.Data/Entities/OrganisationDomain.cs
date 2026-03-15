@@ -1,4 +1,4 @@
-using Aethon.Data.Enums;
+using Aethon.Shared.Enums;
 
 namespace Aethon.Data.Entities;
 
