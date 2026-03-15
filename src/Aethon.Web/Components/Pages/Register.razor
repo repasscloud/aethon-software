@@ -339,26 +339,41 @@
                 return;
             }
 
-            var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetailsResponse>();
-
-            if (problem?.Errors is { Count: > 0 })
+            if (response.Content.Headers.ContentType?.MediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true)
             {
-                _messageStore.Clear();
+                var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetailsResponse>();
 
-                foreach (var error in problem.Errors)
+                if (problem?.Errors is { Count: > 0 })
                 {
-                    foreach (var message in error.Value)
-                    {
-                        _messageStore.Add(new FieldIdentifier(Model, ToModelPropertyName(error.Key)), message);
-                    }
-                }
+                    _messageStore.Clear();
 
-                _editContext.NotifyValidationStateChanged();
+                    foreach (var error in problem.Errors)
+                    {
+                        foreach (var message in error.Value)
+                        {
+                            var propertyName = ToModelPropertyName(error.Key);
+
+                            if (!string.IsNullOrWhiteSpace(propertyName))
+                            {
+                                _messageStore.Add(new FieldIdentifier(Model, propertyName), message);
+                            }
+                            else
+                            {
+                                FormError ??= message;
+                            }
+                        }
+                    }
+
+                    _editContext.NotifyValidationStateChanged();
+                    return;
+                }
             }
-            else
-            {
-                FormError = "Registration could not be completed.";
-            }
+
+            var rawError = await response.Content.ReadAsStringAsync();
+
+            FormError = !string.IsNullOrWhiteSpace(rawError)
+                ? $"Registration could not be completed. {rawError}"
+                : "Registration could not be completed.";
         }
         catch (HttpRequestException)
         {

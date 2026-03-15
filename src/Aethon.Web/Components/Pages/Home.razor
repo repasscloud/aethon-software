@@ -1,43 +1,51 @@
-﻿@page "/"
+@page "/"
 @attribute [Authorize]
+@using System.Security.Claims
+@using Aethon.Shared.Auth
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
 
 <PageTitle>Aethon</PageTitle>
 
 <div class="card border-0 shadow-sm rounded-4">
     <div class="card-body p-4">
-        <h1 class="h3 fw-bold mb-2">Aethon</h1>
-        <p class="text-secondary mb-4">You are signed in.</p>
-
-        @if (_user is not null)
-        {
-            <div class="row g-3">
-                <div class="col-12 col-md-6">
-                    <div class="border rounded-4 p-3 bg-white">
-                        <div class="small text-secondary mb-1">User</div>
-                        <div class="fw-semibold">@(_user.Identity?.Name ?? "Unknown")</div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-6">
-                    <div class="border rounded-4 p-3 bg-white">
-                        <div class="small text-secondary mb-1">Authenticated</div>
-                        <div class="fw-semibold">@(_user.Identity?.IsAuthenticated == true ? "Yes" : "No")</div>
-                    </div>
-                </div>
-            </div>
-        }
+        <h1 class="h3 fw-bold mb-2">Loading your workspace</h1>
+        <p class="text-secondary mb-0">Routing you to the correct Aethon dashboard.</p>
     </div>
 </div>
 
 @code {
-    private System.Security.Claims.ClaimsPrincipal? _user;
-
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _user = authState.User;
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var appType = user.FindFirstValue(AppClaimTypes.AppType);
+
+        if (string.Equals(appType, "recruiter", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/recruiter", forceLoad: false);
+            return;
+        }
+
+        if (string.Equals(appType, "employer", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/employer", forceLoad: false);
+            return;
+        }
+
+        if (string.Equals(appType, "jobseeker", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/jobseeker", forceLoad: false);
+            return;
+        }
     }
 }

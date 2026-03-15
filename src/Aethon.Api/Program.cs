@@ -1,9 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using Aethon.Api.Auth;
 using Aethon.Data;
+using Aethon.Data.Entities;
+using Aethon.Data.Enums;
 using Aethon.Data.Identity;
 using Aethon.Data.Tenancy;
 using Aethon.Shared.Auth;
+using Aethon.Shared.Organisations;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -61,6 +65,7 @@ builder.Services
     .AddDefaultTokenProviders();
 
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppUserClaimsPrincipalFactory>();
+builder.Services.AddScoped<IRegistrationProvisioningService, RegistrationProvisioningService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -136,6 +141,7 @@ app.MapIdentityApi<ApplicationUser>();
 app.MapPost("/auth/register", async (
     RegisterRequestDto request,
     UserManager<ApplicationUser> userManager,
+    IRegistrationProvisioningService registrationProvisioningService,
     IConfiguration configuration,
     ILoggerFactory loggerFactory) =>
 {
@@ -181,11 +187,16 @@ app.MapPost("/auth/register", async (
                 x => x.Select(e => e.Description).ToArray()));
     }
 
+    var provisioningResult = await registrationProvisioningService.ProvisionAsync(user, request);
+    if (!provisioningResult.Succeeded)
+    {
+        await userManager.DeleteAsync(user);
+        return Results.ValidationProblem(provisioningResult.Errors);
+    }
+
     var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
 
     var apiBaseUrl = (configuration["Api:BaseUrl"] ?? configuration["ASPNETCORE_URLS"]?.Split(';').FirstOrDefault() ?? "http://localhost:5201").TrimEnd('/');
-    var webBaseUrl = (configuration["Web:BaseUrl"] ?? "http://localhost:5101").TrimEnd('/');
-
     var confirmationUrl = QueryHelpers.AddQueryString(
         $"{apiBaseUrl}/auth/confirm-email",
         new Dictionary<string, string?>
@@ -202,7 +213,8 @@ app.MapPost("/auth/register", async (
         Succeeded = true,
         RequiresEmailConfirmation = true,
         Email = email,
-        DisplayName = displayName
+        DisplayName = displayName,
+        RegistrationType = request.RegistrationType.Trim().ToLowerInvariant()
     });
 })
 .AllowAnonymous();
@@ -305,8 +317,314 @@ app.MapGet("/auth/me", [Authorize] (ClaimsPrincipal user) =>
         DisplayName = user.FindFirstValue(AppClaimTypes.DisplayName),
         TenantId = user.FindFirstValue(AppClaimTypes.TenantId),
         TenantSlug = user.FindFirstValue(AppClaimTypes.TenantSlug),
+        AppType = user.FindFirstValue(AppClaimTypes.AppType),
+        OrganisationId = user.FindFirstValue(AppClaimTypes.OrganisationId),
+        OrganisationName = user.FindFirstValue(AppClaimTypes.OrganisationName),
+        OrganisationType = user.FindFirstValue(AppClaimTypes.OrganisationType),
+        IsOrganisationOwner = string.Equals(
+            user.FindFirstValue(AppClaimTypes.IsOrganisationOwner),
+            "true",
+            StringComparison.OrdinalIgnoreCase),
+        CompanyRole = user.FindFirstValue(AppClaimTypes.CompanyRole),
+        RecruiterRole = user.FindFirstValue(AppClaimTypes.RecruiterRole),
+        HasJobSeekerProfile = string.Equals(
+            user.FindFirstValue(AppClaimTypes.HasJobSeekerProfile),
+            "true",
+            StringComparison.OrdinalIgnoreCase),
         Roles = user.FindAll(ClaimTypes.Role).Select(x => x.Value).ToList()
     });
+});
+
+app.MapGet("/org/me/members", [Authorize] async (
+    ClaimsPrincipal user,
+    AethonDbContext dbContext) =>
+{
+    var userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    var organisationId = user.FindFirstValue(AppClaimTypes.OrganisationId);
+
+    if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+    {
+        return Results.BadRequest();
+    }
+
+    var organisation = await dbContext.Organisations
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == organisationId);
+
+    if (organisation is null)
+    {
+        return Results.NotFound();
+    }
+
+    var currentMembership = await dbContext.OrganisationMemberships
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x =>
+            x.OrganisationId == organisationId &&
+            x.UserId == userId &&
+            x.Status == MembershipStatus.Active);
+
+    if (currentMembership is null)
+    {
+        return Results.Forbid();
+    }
+
+    var members = await dbContext.OrganisationMemberships
+        .AsNoTracking()
+        .Where(x => x.OrganisationId == organisationId)
+        .OrderByDescending(x => x.IsOwner)
+        .ThenBy(x => x.JoinedUtc)
+        .Select(x => new OrganisationMemberDto
+        {
+            UserId = x.UserId.ToString(),
+            DisplayName = x.User.DisplayName,
+            Email = x.User.Email ?? "",
+            IsOwner = x.IsOwner,
+            MembershipStatus = x.Status.ToString(),
+            CompanyRole = x.CompanyRole != null ? x.CompanyRole.Value.ToString() : null,
+            RecruiterRole = x.RecruiterRole != null ? x.RecruiterRole.Value.ToString() : null,
+            JoinedUtc = x.JoinedUtc
+        })
+        .ToListAsync();
+
+    var pendingInvites = await dbContext.OrganisationInvitations
+        .AsNoTracking()
+        .Where(x =>
+            x.OrganisationId == organisationId &&
+            x.Status == InvitationStatus.Pending)
+        .OrderBy(x => x.Email)
+        .Select(x => new OrganisationInviteDto
+        {
+            InvitationId = x.Id,
+            Email = x.Email,
+            InvitationType = x.Type.ToString(),
+            InvitationStatus = x.Status.ToString(),
+            CompanyRole = x.CompanyRole != null ? x.CompanyRole.Value.ToString() : null,
+            RecruiterRole = x.RecruiterRole != null ? x.RecruiterRole.Value.ToString() : null,
+            AllowClaimAsOwner = x.AllowClaimAsOwner,
+            ExpiresUtc = x.ExpiresUtc,
+            Token = x.Token
+        })
+        .ToListAsync();
+
+    return Results.Ok(new OrganisationMembersResponseDto
+    {
+        OrganisationId = organisation.Id,
+        OrganisationName = organisation.Name,
+        OrganisationType = organisation.Type == OrganisationType.RecruiterAgency ? "recruiter" : "company",
+        IsOwner = currentMembership.IsOwner,
+        CanInvite = currentMembership.IsOwner,
+        Members = members,
+        PendingInvites = pendingInvites
+    });
+});
+
+app.MapPost("/org/me/invites", [Authorize] async (
+    ClaimsPrincipal user,
+    CreateOrganisationInviteRequestDto request,
+    AethonDbContext dbContext) =>
+{
+    var userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    var organisationId = user.FindFirstValue(AppClaimTypes.OrganisationId);
+
+    if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+    {
+        return Results.BadRequest();
+    }
+
+    var validationErrors = ValidateInviteRequest(request);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var membership = await dbContext.OrganisationMemberships
+        .AsNoTracking()
+        .Include(x => x.Organisation)
+        .FirstOrDefaultAsync(x =>
+            x.OrganisationId == organisationId &&
+            x.UserId == userId &&
+            x.Status == MembershipStatus.Active);
+
+    if (membership is null || !membership.IsOwner)
+    {
+        return Results.Forbid();
+    }
+
+    var inviteEmail = request.Email.Trim();
+    var normalizedEmail = inviteEmail.ToUpperInvariant();
+    var emailDomain = inviteEmail[(inviteEmail.LastIndexOf('@') + 1)..].Trim().ToLowerInvariant();
+
+    var existingPendingInvite = await dbContext.OrganisationInvitations
+        .FirstOrDefaultAsync(x =>
+            x.OrganisationId == organisationId &&
+            x.NormalizedEmail == normalizedEmail &&
+            x.Status == InvitationStatus.Pending);
+
+    if (existingPendingInvite is not null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(CreateOrganisationInviteRequestDto.Email)] = ["A pending invite already exists for this email address."]
+        });
+    }
+
+    var existingMembership = await dbContext.OrganisationMemberships
+        .AnyAsync(x =>
+            x.OrganisationId == organisationId &&
+            x.User.Email != null &&
+            x.User.NormalizedEmail == normalizedEmail &&
+            x.Status == MembershipStatus.Active);
+
+    if (existingMembership)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(CreateOrganisationInviteRequestDto.Email)] = ["This user is already an active member of the organisation."]
+        });
+    }
+
+    CompanyRole? companyRole = null;
+    RecruiterRole? recruiterRole = null;
+
+    if (membership.Organisation.Type == OrganisationType.Company)
+    {
+        if (!Enum.TryParse<CompanyRole>(request.CompanyRole, true, out var parsedCompanyRole))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(CreateOrganisationInviteRequestDto.CompanyRole)] = ["A valid company role is required."]
+            });
+        }
+
+        companyRole = parsedCompanyRole;
+    }
+    else
+    {
+        if (!Enum.TryParse<RecruiterRole>(request.RecruiterRole, true, out var parsedRecruiterRole))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(CreateOrganisationInviteRequestDto.RecruiterRole)] = ["A valid recruiter role is required."]
+            });
+        }
+
+        recruiterRole = parsedRecruiterRole;
+    }
+
+    var invite = new OrganisationInvitation
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Type = InvitationType.JoinOrganisation,
+        Status = InvitationStatus.Pending,
+        OrganisationId = organisationId,
+        Email = inviteEmail,
+        NormalizedEmail = normalizedEmail,
+        EmailDomain = emailDomain,
+        Token = Guid.NewGuid().ToString("N"),
+        ExpiresUtc = DateTime.UtcNow.AddDays(7),
+        CompanyRole = companyRole,
+        RecruiterRole = recruiterRole,
+        AllowClaimAsOwner = false,
+        CreatedUtc = DateTime.UtcNow,
+        CreatedByUserId = userId.ToString()
+    };
+
+    dbContext.OrganisationInvitations.Add(invite);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new OrganisationInviteDto
+    {
+        InvitationId = invite.Id,
+        Email = invite.Email,
+        InvitationType = invite.Type.ToString(),
+        InvitationStatus = invite.Status.ToString(),
+        CompanyRole = invite.CompanyRole?.ToString(),
+        RecruiterRole = invite.RecruiterRole?.ToString(),
+        AllowClaimAsOwner = invite.AllowClaimAsOwner,
+        ExpiresUtc = invite.ExpiresUtc,
+        Token = invite.Token
+    });
+});
+
+app.MapPost("/org/invites/accept", [Authorize] async (
+    ClaimsPrincipal user,
+    AcceptOrganisationInviteRequestDto request,
+    AethonDbContext dbContext) =>
+{
+    var userIdValue = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    var email = user.FindFirstValue(ClaimTypes.Email);
+
+    if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(email))
+    {
+        return Results.BadRequest();
+    }
+
+    var normalizedEmail = email.ToUpperInvariant();
+
+    var invite = await dbContext.OrganisationInvitations
+        .FirstOrDefaultAsync(x =>
+            x.Token == request.Token &&
+            x.Status == InvitationStatus.Pending);
+
+    if (invite is null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(AcceptOrganisationInviteRequestDto.Token)] = ["Invitation was not found."]
+        });
+    }
+
+    if (invite.ExpiresUtc < DateTime.UtcNow)
+    {
+        invite.Status = InvitationStatus.Expired;
+        invite.UpdatedUtc = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(AcceptOrganisationInviteRequestDto.Token)] = ["Invitation has expired."]
+        });
+    }
+
+    if (!string.Equals(invite.NormalizedEmail, normalizedEmail, StringComparison.Ordinal))
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(AcceptOrganisationInviteRequestDto.Token)] = ["This invitation does not belong to your signed-in account."]
+        });
+    }
+
+    var alreadyMember = await dbContext.OrganisationMemberships
+        .AnyAsync(x =>
+            x.OrganisationId == invite.OrganisationId &&
+            x.UserId == userId &&
+            x.Status == MembershipStatus.Active);
+
+    if (!alreadyMember)
+    {
+        dbContext.OrganisationMemberships.Add(new OrganisationMembership
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            OrganisationId = invite.OrganisationId,
+            UserId = userId,
+            Status = MembershipStatus.Active,
+            CompanyRole = invite.CompanyRole,
+            RecruiterRole = invite.RecruiterRole,
+            IsOwner = false,
+            JoinedUtc = DateTime.UtcNow,
+            CreatedUtc = DateTime.UtcNow,
+            CreatedByUserId = invite.CreatedByUserId
+        });
+    }
+
+    invite.Status = InvitationStatus.Accepted;
+    invite.AcceptedByUserId = userId.ToString();
+    invite.AcceptedUtc = DateTime.UtcNow;
+    invite.UpdatedUtc = DateTime.UtcNow;
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok();
 });
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
@@ -314,6 +632,29 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 await InitialiseDatabaseAsync(app);
 
 app.Run();
+
+static Dictionary<string, string[]> ValidateInviteRequest(CreateOrganisationInviteRequestDto request)
+{
+    var context = new ValidationContext(request);
+    var results = new List<ValidationResult>();
+
+    Validator.TryValidateObject(request, context, results, validateAllProperties: true);
+
+    return results
+        .SelectMany(x =>
+        {
+            var memberNames = x.MemberNames.Any() ? x.MemberNames : [string.Empty];
+            return memberNames.Select(memberName => new
+            {
+                Key = memberName,
+                Message = x.ErrorMessage ?? "Validation error."
+            });
+        })
+        .GroupBy(x => x.Key)
+        .ToDictionary(
+            x => x.Key,
+            x => x.Select(y => y.Message).Distinct().ToArray());
+}
 
 static Dictionary<string, string[]> ValidateRegisterRequest(RegisterRequestDto request)
 {
@@ -523,18 +864,77 @@ public sealed class AppUserClaimsPrincipalFactory
             .Where(x => x.UserId == user.Id && x.IsDefault)
             .Join(
                 _dbContext.Tenants,
-                membership => membership.TenantId,
+                userTenantMembership => userTenantMembership.TenantId,
                 tenant => tenant.Id,
-                (membership, tenant) => new { membership, tenant })
+                (userTenantMembership, tenant) => new { userTenantMembership, tenant })
             .FirstOrDefaultAsync();
 
         if (membership is not null)
         {
             identity.AddClaim(new Claim(AppClaimTypes.TenantId, membership.tenant.Id.ToString()));
             identity.AddClaim(new Claim(AppClaimTypes.TenantSlug, membership.tenant.Slug));
-            identity.AddClaim(new Claim(ClaimTypes.Role, membership.membership.RoleCode));
+            identity.AddClaim(new Claim(ClaimTypes.Role, membership.userTenantMembership.RoleCode));
+        }
+
+        var organisationMembership = await _dbContext.OrganisationMemberships
+            .Where(x => x.UserId == user.Id && x.Status == MembershipStatus.Active)
+            .Select(x => new
+            {
+                x.OrganisationId,
+                x.IsOwner,
+                x.CompanyRole,
+                x.RecruiterRole,
+                x.JoinedUtc,
+                OrganisationName = x.Organisation.Name,
+                OrganisationType = x.Organisation.Type
+            })
+            .OrderByDescending(x => x.IsOwner)
+            .ThenBy(x => x.JoinedUtc)
+            .FirstOrDefaultAsync();
+
+        var hasJobSeekerProfile = await _dbContext.JobSeekerProfiles
+            .AnyAsync(x => x.UserId == user.Id);
+
+        identity.AddClaim(new Claim(
+            AppClaimTypes.HasJobSeekerProfile,
+            hasJobSeekerProfile ? "true" : "false"));
+
+        if (organisationMembership is not null)
+        {
+            var appType = organisationMembership.OrganisationType == OrganisationType.RecruiterAgency
+                ? "recruiter"
+                : "employer";
+
+            identity.AddClaim(new Claim(AppClaimTypes.AppType, appType));
+            identity.AddClaim(new Claim(AppClaimTypes.OrganisationId, organisationMembership.OrganisationId));
+            identity.AddClaim(new Claim(AppClaimTypes.OrganisationName, organisationMembership.OrganisationName));
+            identity.AddClaim(new Claim(
+                AppClaimTypes.OrganisationType,
+                organisationMembership.OrganisationType == OrganisationType.RecruiterAgency ? "recruiter" : "company"));
+            identity.AddClaim(new Claim(
+                AppClaimTypes.IsOrganisationOwner,
+                organisationMembership.IsOwner ? "true" : "false"));
+
+            if (organisationMembership.CompanyRole is not null)
+            {
+                identity.AddClaim(new Claim(
+                    AppClaimTypes.CompanyRole,
+                    organisationMembership.CompanyRole.Value.ToString()));
+            }
+
+            if (organisationMembership.RecruiterRole is not null)
+            {
+                identity.AddClaim(new Claim(
+                    AppClaimTypes.RecruiterRole,
+                    organisationMembership.RecruiterRole.Value.ToString()));
+            }
+        }
+        else if (hasJobSeekerProfile)
+        {
+            identity.AddClaim(new Claim(AppClaimTypes.AppType, "jobseeker"));
         }
 
         return identity;
     }
 }
+

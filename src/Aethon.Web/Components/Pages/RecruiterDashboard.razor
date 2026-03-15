@@ -1,0 +1,76 @@
+@page "/app/recruiter"
+@attribute [Authorize]
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Recruiter dashboard | Aethon</PageTitle>
+
+@if (_ready)
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h1 class="h3 fw-bold mb-2">Recruiter dashboard</h1>
+                <p class="text-secondary mb-0">Signed in as @_displayName</p>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Organisation</div>
+                        <div class="fw-semibold fs-5">@_organisationName</div>
+                        <div class="text-secondary mt-2">Type: Recruiter</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Your role</div>
+                        <div class="fw-semibold fs-5">@_recruiterRole</div>
+                        <div class="text-secondary mt-2">Owner: @(_isOwner ? "Yes" : "No")</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Next build items</div>
+                        <div class="text-secondary">Client companies, submitted jobs, candidate pipelines, recruiter assignments.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _ready;
+    private string _displayName = "";
+    private string _organisationName = "";
+    private string _recruiterRole = "";
+    private bool _isOwner;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        _displayName = user.FindFirstValue(AppClaimTypes.DisplayName) ?? user.Identity?.Name ?? "Unknown";
+        _organisationName = user.FindFirstValue(AppClaimTypes.OrganisationName) ?? "Unknown organisation";
+        _recruiterRole = user.FindFirstValue(AppClaimTypes.RecruiterRole) ?? "RecruiterUser";
+        _isOwner = string.Equals(
+            user.FindFirstValue(AppClaimTypes.IsOrganisationOwner),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+        _ready = true;
+    }
+}
