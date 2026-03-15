@@ -11,6 +11,7 @@ public sealed class EmployerJobApplicationDetailDto
     public string Status { get; set; } = "";
     public string? CoverLetter { get; set; }
     public string? ResumeFileId { get; set; }
+    public string? ResumeDownloadUrl { get; set; }
     public string? Source { get; set; }
     public string? Notes { get; set; }
     public DateTime SubmittedUtc { get; set; }

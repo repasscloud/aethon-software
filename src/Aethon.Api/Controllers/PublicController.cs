@@ -150,10 +150,11 @@ public sealed class PublicController : ControllerBase
             return NotFound();
         }
 
-        var hasProfile = await _dbContext.JobSeekerProfiles
-            .AnyAsync(x => x.UserId == userId);
+        var profile = await _dbContext.JobSeekerProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId);
 
-        if (!hasProfile)
+        if (profile is null)
         {
             return ValidationProblemResult(new Dictionary<string, string[]>
             {
@@ -180,7 +181,7 @@ public sealed class PublicController : ControllerBase
             UserId = userId,
             Status = ApplicationStatus.Submitted,
             CoverLetter = string.IsNullOrWhiteSpace(request.CoverLetter) ? null : request.CoverLetter.Trim(),
-            ResumeFileId = null,
+            ResumeFileId = profile.ResumeFileId,
             SubmittedUtc = DateTime.UtcNow,
             LastStatusChangedUtc = DateTime.UtcNow,
             Source = string.IsNullOrWhiteSpace(request.Source) ? "AethonJobBoard" : request.Source.Trim(),

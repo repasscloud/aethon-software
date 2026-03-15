@@ -178,6 +178,7 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
                 return Failure(nameof(RegisterRequestDto.RegistrationType), "Registration type is invalid.");
         }
 
+        await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         return new RegistrationProvisioningResult

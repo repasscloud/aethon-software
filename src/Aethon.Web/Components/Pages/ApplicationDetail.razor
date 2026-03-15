@@ -88,6 +88,21 @@ else
 
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Resume</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_item.ResumeDownloadUrl))
+                {
+                    <a class="btn btn-outline-dark rounded-4 px-4" href="@_item.ResumeDownloadUrl" target="_blank">Download resume</a>
+                }
+                else
+                {
+                    <div class="text-secondary">No resume attached.</div>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
                 <h2 class="h5 fw-bold mb-3">Metadata</h2>
                 <div class="small text-secondary">Submitted: @_item.SubmittedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
                 <div class="small text-secondary">Source: @(_item.Source ?? "-")</div>

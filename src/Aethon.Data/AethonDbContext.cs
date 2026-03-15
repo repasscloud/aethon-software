@@ -26,6 +26,7 @@ public sealed class AethonDbContext
     public DbSet<CompanyRecruiterRelationship> CompanyRecruiterRelationships => Set<CompanyRecruiterRelationship>();
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobApplication> JobApplications => Set<JobApplication>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

@@ -1,4 +1,5 @@
 using Aethon.Api.Auth;
+using Aethon.Api.Files;
 using Aethon.Api.Infrastructure;
 using Aethon.Data;
 using Aethon.Data.Identity;
@@ -57,6 +58,7 @@ builder.Services
 
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppUserClaimsPrincipalFactory>();
 builder.Services.AddScoped<IRegistrationProvisioningService, RegistrationProvisioningService>();
+builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {

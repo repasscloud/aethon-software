@@ -1,0 +1,289 @@
+@page "/app/jobseeker/profile"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Files
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Job seeker profile | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading profile…</div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h1 class="h3 fw-bold mb-2">Job seeker profile</h1>
+                <p class="text-secondary mb-0">Manage your profile and resume.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_message))
+        {
+            <div class="alert alert-success rounded-4 mb-0">@_message</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+        }
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Headline</label>
+                            <InputText @bind-Value="_model.Headline" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Summary</label>
+                            <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="5" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Current location</label>
+                            <InputText @bind-Value="_model.CurrentLocation" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Preferred location</label>
+                            <InputText @bind-Value="_model.PreferredLocation" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">LinkedIn URL</label>
+                            <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_model.OpenToWork" class="form-check-input" />
+                                <label class="form-check-label">Open to work</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Desired salary from</label>
+                            <InputNumber @bind-Value="_model.DesiredSalaryFrom" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Desired salary to</label>
+                            <InputNumber @bind-Value="_model.DesiredSalaryTo" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Currency</label>
+                            <InputSelect @bind-Value="_model.DesiredSalaryCurrency" class="form-select rounded-4">
+                                <option value="">Select currency</option>
+                                <option value="@CurrencyCode.AUD">AUD</option>
+                                <option value="@CurrencyCode.USD">USD</option>
+                                <option value="@CurrencyCode.EUR">EUR</option>
+                                <option value="@CurrencyCode.GBP">GBP</option>
+                                <option value="@CurrencyCode.NZD">NZD</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_savingProfile">
+                            @(_savingProfile ? "Saving..." : "Save profile")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Resume</h2>
+
+                @if (_resumeFile is not null)
+                {
+                    <div class="mb-3">
+                        <div class="fw-semibold">@_resumeFile.OriginalFileName</div>
+                        <a href="@_resumeFile.DownloadUrl" target="_blank">Download current resume</a>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <InputFile OnChange="HandleResumeSelected" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                </div>
+
+                <button class="btn btn-outline-dark rounded-4 px-4" @onclick="UploadResumeAsync" disabled="@(_selectedResume is null || _uploadingResume)">
+                    @(_uploadingResume ? "Uploading..." : "Upload resume")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loaded;
+    private bool _savingProfile;
+    private bool _uploadingResume;
+    private string? _message;
+    private string? _error;
+    private JobSeekerProfileDto? _profile;
+    private UpdateJobSeekerProfileRequestDto _model = new();
+    private StoredFileDto? _resumeFile;
+    private IBrowserFile? _selectedResume;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            _profile = await client.GetFromJsonAsync<JobSeekerProfileDto>("/jobseeker/profile");
+
+            if (_profile is not null)
+            {
+                _model = new UpdateJobSeekerProfileRequestDto
+                {
+                    Headline = _profile.Headline,
+                    Summary = _profile.Summary,
+                    CurrentLocation = _profile.CurrentLocation,
+                    PreferredLocation = _profile.PreferredLocation,
+                    LinkedInUrl = _profile.LinkedInUrl,
+                    OpenToWork = _profile.OpenToWork,
+                    DesiredSalaryFrom = _profile.DesiredSalaryFrom,
+                    DesiredSalaryTo = _profile.DesiredSalaryTo,
+                    DesiredSalaryCurrency = _profile.DesiredSalaryCurrency
+                };
+
+                _resumeFile = _profile.ResumeFile;
+            }
+        }
+        catch
+        {
+            _error = "Could not load job seeker profile.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _savingProfile = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PutAsJsonAsync("/jobseeker/profile", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Profile saved.";
+                return;
+            }
+
+            _error = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_error))
+            {
+                _error = "Could not save profile.";
+            }
+        }
+        catch
+        {
+            _error = "Could not save profile.";
+        }
+        finally
+        {
+            _savingProfile = false;
+        }
+    }
+
+    private void HandleResumeSelected(InputFileChangeEventArgs e)
+    {
+        _selectedResume = e.File;
+        _message = null;
+        _error = null;
+    }
+
+    private async Task UploadResumeAsync()
+    {
+        if (_selectedResume is null)
+        {
+            return;
+        }
+
+        _uploadingResume = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = _selectedResume.OpenReadStream(10_000_000);
+            using var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(_selectedResume.ContentType);
+            content.Add(fileContent, "file", _selectedResume.Name);
+
+            var uploadResponse = await client.PostAsync("/files/resume", content);
+            if (!uploadResponse.IsSuccessStatusCode)
+            {
+                _error = "Resume upload failed.";
+                return;
+            }
+
+            var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadFileResultDto>();
+            if (uploaded is null)
+            {
+                _error = "Resume upload failed.";
+                return;
+            }
+
+            var linkResponse = await client.PostAsync($"/jobseeker/profile/resume/{uploaded.Id}", null);
+            if (!linkResponse.IsSuccessStatusCode)
+            {
+                _error = "Resume uploaded but could not be linked to your profile.";
+                return;
+            }
+
+            _resumeFile = new StoredFileDto
+            {
+                Id = uploaded.Id,
+                OriginalFileName = uploaded.OriginalFileName,
+                ContentType = uploaded.ContentType,
+                LengthBytes = uploaded.LengthBytes,
+                DownloadUrl = uploaded.DownloadUrl
+            };
+
+            _message = "Resume uploaded.";
+            _selectedResume = null;
+        }
+        catch
+        {
+            _error = "Resume upload failed.";
+        }
+        finally
+        {
+            _uploadingResume = false;
+        }
+    }
+}
