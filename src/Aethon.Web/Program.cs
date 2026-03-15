@@ -1,4 +1,5 @@
 using Aethon.Web.Components;
+using Aethon.Web.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
@@ -30,10 +31,13 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddBlazorBootstrap();
 
+builder.Services.AddTransient<ApiAuthCookieHandler>();
+
 builder.Services.AddHttpClient("AethonApi", client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5201");
-});
+    {
+        client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5201");
+    })
+    .AddHttpMessageHandler<ApiAuthCookieHandler>();
 
 var app = builder.Build();
 
