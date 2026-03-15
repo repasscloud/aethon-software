@@ -1,0 +1,79 @@
+@page "/jobs"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Jobs | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-2">Open jobs</h1>
+            <p class="text-secondary mb-0">Browse published roles from companies and recruiters on Aethon.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
+
+    <div class="row g-3">
+        @foreach (var job in _jobs)
+        {
+            <div class="col-12 col-lg-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        @if (!string.IsNullOrWhiteSpace(job.OrganisationLogoUrl))
+                        {
+                            <img src="@job.OrganisationLogoUrl" alt="@job.OrganisationName" style="max-height:48px; max-width:160px;" class="mb-3" />
+                        }
+
+                        <h2 class="h5 fw-bold mb-2">
+                            <a class="text-decoration-none" href="/jobs/@job.Id">@job.Title</a>
+                        </h2>
+
+                        <div class="text-secondary mb-2">
+                            @if (!string.IsNullOrWhiteSpace(job.OrganisationSlug))
+                            {
+                                <a class="text-decoration-none" href="/organisations/@job.OrganisationSlug">@job.OrganisationName</a>
+                            }
+                            else
+                            {
+                                @job.OrganisationName
+                            }
+                        </div>
+
+                        <div class="small text-secondary mb-2">@job.LocationText · @job.WorkplaceType · @job.EmploymentType</div>
+
+                        @if (job.SalaryFrom.HasValue || job.SalaryTo.HasValue)
+                        {
+                            <div class="fw-semibold">@job.SalaryCurrency @job.SalaryFrom - @job.SalaryTo</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<PublicJobListItemDto> _jobs = [];
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            _jobs = await client.GetFromJsonAsync<List<PublicJobListItemDto>>("/public/jobs") ?? [];
+        }
+        catch
+        {
+            _error = "Could not load public jobs.";
+        }
+    }
+}

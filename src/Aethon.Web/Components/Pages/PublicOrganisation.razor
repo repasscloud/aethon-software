@@ -1,0 +1,89 @@
+@page "/organisations/{Slug}"
+@page "/companies/{Slug}"
+@page "/recruiters/{Slug}"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Organisations
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Organisation | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading organisation…</div>
+    </div>
+}
+else if (_org is null)
+{
+    <div class="alert alert-danger rounded-4 mb-0">@(_error ?? "Organisation not found.")</div>
+}
+else
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            @if (!string.IsNullOrWhiteSpace(_org.LogoUrl))
+            {
+                <img src="@_org.LogoUrl" alt="@_org.Name" style="max-height:64px; max-width:220px;" class="mb-3" />
+            }
+
+            <h1 class="h3 fw-bold mb-2">@_org.Name</h1>
+            <div class="text-secondary mb-3">@_org.PublicLocationText</div>
+
+            @if (!string.IsNullOrWhiteSpace(_org.Summary))
+            {
+                <div style="white-space: pre-wrap;">@_org.Summary</div>
+            }
+
+            <div class="mt-4 d-flex flex-column gap-2">
+                @if (!string.IsNullOrWhiteSpace(_org.WebsiteUrl))
+                {
+                    <div><a href="@_org.WebsiteUrl" target="_blank">@_org.WebsiteUrl</a></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_org.PublicContactEmail))
+                {
+                    <div>@_org.PublicContactEmail</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_org.PublicContactPhone))
+                {
+                    <div>@_org.PublicContactPhone</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+    private bool _loaded;
+    private string? _error;
+    private PublicOrganisationProfileDto? _org;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.GetAsync($"/public/organisations/{Slug}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _error = "Organisation not found.";
+                return;
+            }
+
+            _org = await response.Content.ReadFromJsonAsync<PublicOrganisationProfileDto>();
+        }
+        catch
+        {
+            _error = "Could not load organisation.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+}

@@ -316,6 +316,127 @@ public sealed class OrganisationController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("me/profile")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+
+        if (string.IsNullOrWhiteSpace(organisationId))
+        {
+            return BadRequest();
+        }
+
+        var organisation = await _dbContext.Organisations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == organisationId);
+
+        if (organisation is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new OrganisationProfileDto
+        {
+            OrganisationId = organisation.Id,
+            OrganisationType = organisation.Type.ToString(),
+            Name = organisation.Name,
+            LegalName = organisation.LegalName,
+            WebsiteUrl = organisation.WebsiteUrl,
+            Slug = organisation.Slug,
+            LogoUrl = organisation.LogoUrl,
+            Summary = organisation.Summary,
+            PublicLocationText = organisation.PublicLocationText,
+            PublicContactEmail = organisation.PublicContactEmail,
+            PublicContactPhone = organisation.PublicContactPhone,
+            IsPublicProfileEnabled = organisation.IsPublicProfileEnabled
+        });
+    }
+
+    [HttpPut("me/profile")]
+    public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateOrganisationProfileRequestDto request)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+
+        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+        {
+            return BadRequest();
+        }
+
+        var validationErrors = ApiValidationHelper.Validate(request);
+        if (validationErrors.Count > 0)
+        {
+            return ValidationProblem(validationErrors);
+        }
+
+        var membership = await _dbContext.OrganisationMemberships
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.OrganisationId == organisationId &&
+                x.UserId == userId &&
+                x.Status == MembershipStatus.Active);
+
+        if (membership is null || !membership.IsOwner)
+        {
+            return Forbid();
+        }
+
+        var organisation = await _dbContext.Organisations
+            .FirstOrDefaultAsync(x => x.Id == organisationId);
+
+        if (organisation is null)
+        {
+            return NotFound();
+        }
+
+        var slug = NormalizeSlug(request.Slug);
+        if (!string.IsNullOrWhiteSpace(slug))
+        {
+            var slugInUse = await _dbContext.Organisations
+                .AnyAsync(x => x.Id != organisation.Id && x.Slug == slug);
+
+            if (slugInUse)
+            {
+                return ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [nameof(UpdateOrganisationProfileRequestDto.Slug)] = ["That slug is already in use."]
+                });
+            }
+        }
+
+        organisation.Name = request.Name.Trim();
+        organisation.NormalizedName = request.Name.Trim().ToUpperInvariant();
+        organisation.LegalName = Clean(request.LegalName);
+        organisation.WebsiteUrl = Clean(request.WebsiteUrl);
+        organisation.Slug = slug;
+        organisation.LogoUrl = Clean(request.LogoUrl);
+        organisation.Summary = Clean(request.Summary);
+        organisation.PublicLocationText = Clean(request.PublicLocationText);
+        organisation.PublicContactEmail = Clean(request.PublicContactEmail);
+        organisation.PublicContactPhone = Clean(request.PublicContactPhone);
+        organisation.IsPublicProfileEnabled = request.IsPublicProfileEnabled;
+        organisation.UpdatedUtc = DateTime.UtcNow;
+        organisation.UpdatedByUserId = userId.ToString();
+
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new OrganisationProfileDto
+        {
+            OrganisationId = organisation.Id,
+            OrganisationType = organisation.Type.ToString(),
+            Name = organisation.Name,
+            LegalName = organisation.LegalName,
+            WebsiteUrl = organisation.WebsiteUrl,
+            Slug = organisation.Slug,
+            LogoUrl = organisation.LogoUrl,
+            Summary = organisation.Summary,
+            PublicLocationText = organisation.PublicLocationText,
+            PublicContactEmail = organisation.PublicContactEmail,
+            PublicContactPhone = organisation.PublicContactPhone,
+            IsPublicProfileEnabled = organisation.IsPublicProfileEnabled
+        });
+    }
+
     private ObjectResult ValidationProblem(Dictionary<string, string[]> errors)
     {
         foreach (var error in errors)
@@ -324,5 +445,24 @@ public sealed class OrganisationController : ControllerBase
         }
 
         return (ObjectResult)ValidationProblem(ModelState);
+    }
+
+    private static string? Clean(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? NormalizeSlug(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var slug = value.Trim().ToLowerInvariant();
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\-]+", "-");
+        slug = System.Text.RegularExpressions.Regex.Replace(slug, @"\-{2,}", "-").Trim('-');
+
+        return string.IsNullOrWhiteSpace(slug) ? null : slug;
     }
 }

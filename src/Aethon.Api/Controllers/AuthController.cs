@@ -1,12 +1,15 @@
 using System.Security.Claims;
 using Aethon.Api.Auth;
 using Aethon.Api.Infrastructure;
+using Aethon.Data;
 using Aethon.Data.Identity;
 using Aethon.Shared.Auth;
+using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Controllers;
 
@@ -212,6 +215,34 @@ public sealed class AuthController : ControllerBase
                 StringComparison.OrdinalIgnoreCase),
             Roles = User.FindAll(ClaimTypes.Role).Select(x => x.Value).ToList()
         });
+    }
+
+    [HttpGet("/applications/me")]
+    [Authorize]
+    public async Task<IActionResult> MyApplications([FromServices] AethonDbContext dbContext)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Forbid();
+        }
+
+        var items = await dbContext.JobApplications
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.SubmittedUtc)
+            .Select(x => new JobApplicationListItemDto
+            {
+                Id = x.Id,
+                JobId = x.JobId,
+                JobTitle = x.Job.Title,
+                OrganisationName = x.Job.OwnedByOrganisation.Name,
+                Status = x.Status.ToString(),
+                SubmittedUtc = x.SubmittedUtc
+            })
+            .ToListAsync();
+
+        return Ok(items);
     }
 
     private ObjectResult ValidationProblem(Dictionary<string, string[]> errors)

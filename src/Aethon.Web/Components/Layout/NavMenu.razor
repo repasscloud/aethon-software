@@ -33,10 +33,28 @@
                 <span class="aethon-nav-icon">⌂</span>
                 <span>Job seeker dashboard</span>
             </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/applications">
+                <span class="aethon-nav-icon">▣</span>
+                <span>My applications</span>
+            </NavLink>
         }
 
         @if (_appType is "employer" or "recruiter")
         {
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team">
+                <span class="aethon-nav-icon">👥</span>
+                <span>Organisation team</span>
+            </NavLink>
+        }
+
+        @if (_appType is "employer" or "recruiter")
+        {
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/profile">
+                <span class="aethon-nav-icon">⌘</span>
+                <span>Organisation profile</span>
+            </NavLink>
+
             <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team">
                 <span class="aethon-nav-icon">👥</span>
                 <span>Organisation team</span>

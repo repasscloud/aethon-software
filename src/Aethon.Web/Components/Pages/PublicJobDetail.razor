@@ -1,0 +1,189 @@
+@page "/jobs/{Id}"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Job | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading job…</div>
+    </div>
+}
+else if (_job is null)
+{
+    <div class="alert alert-danger rounded-4 mb-0">@(_error ?? "Job not found.")</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                @if (!string.IsNullOrWhiteSpace(_job.Organisation.LogoUrl))
+                {
+                    <img src="@_job.Organisation.LogoUrl" alt="@_job.Organisation.Name" style="max-height:56px; max-width:180px;" class="mb-3" />
+                }
+
+                <h1 class="h3 fw-bold mb-2">@_job.Title</h1>
+
+                <div class="text-secondary mb-2">
+                    <a class="text-decoration-none" href="/organisations/@_job.Organisation.Slug">@_job.Organisation.Name</a>
+                </div>
+
+                <div class="text-secondary">@_job.LocationText · @_job.WorkplaceType · @_job.EmploymentType</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Description</h2>
+                <div style="white-space: pre-wrap;">@_job.Description</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Requirements</h2>
+                <div style="white-space: pre-wrap;">@(_job.Requirements ?? "-")</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Benefits</h2>
+                <div style="white-space: pre-wrap;">@(_job.Benefits ?? "-")</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Apply</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_applyMessage))
+                {
+                    <div class="alert alert-success rounded-4">@_applyMessage</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_applyError))
+                {
+                    <div class="alert alert-danger rounded-4">@_applyError</div>
+                }
+
+                @if (_isAuthenticated)
+                {
+                    <EditForm Model="_applyModel" OnValidSubmit="ApplyAsync">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Cover letter</label>
+                            <InputTextArea @bind-Value="_applyModel.CoverLetter" class="form-control rounded-4" rows="6" />
+                        </div>
+
+                        <button class="btn btn-dark rounded-4 px-4" type="submit" disabled="@_applying">
+                            @(_applying ? "Submitting..." : "Apply now")
+                        </button>
+                    </EditForm>
+                }
+                else
+                {
+                    <p class="text-secondary mb-3">You must sign in as a job seeker to apply.</p>
+                    <a class="btn btn-dark rounded-4 px-4" href="/login">Sign in</a>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    private bool _loaded;
+    private bool _isAuthenticated;
+    private bool _applying;
+    private string? _error;
+    private string? _applyMessage;
+    private string? _applyError;
+    private PublicJobDetailDto? _job;
+    private readonly CreateJobApplicationRequestDto _applyModel = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _error = null;
+        _applyMessage = null;
+        _applyError = null;
+
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            _isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.GetAsync($"/public/jobs/{Id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _error = "Job not found.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Could not load public job.";
+                return;
+            }
+
+            _job = await response.Content.ReadFromJsonAsync<PublicJobDetailDto>();
+        }
+        catch
+        {
+            _error = "Could not load public job.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        _applyError = null;
+        _applyMessage = null;
+        _applying = true;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PostAsJsonAsync($"/public/jobs/{Id}/apply", _applyModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _applyMessage = "Application submitted successfully.";
+                _applyModel.CoverLetter = null;
+                _applyModel.Source = null;
+                return;
+            }
+
+            _applyError = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_applyError))
+            {
+                _applyError = "Application could not be submitted.";
+            }
+        }
+        catch
+        {
+            _applyError = "Application could not be submitted.";
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+}
