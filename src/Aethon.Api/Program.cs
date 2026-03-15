@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using Aethon.Data;
 using Aethon.Data.Identity;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -50,7 +52,7 @@ builder.Services
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequiredLength = 12;
-        options.SignIn.RequireConfirmedEmail = false;
+        options.SignIn.RequireConfirmedEmail = true;
     })
     .AddRoles<ApplicationRole>()
     .AddEntityFrameworkStores<AethonDbContext>()
@@ -131,6 +133,109 @@ app.UseAuthorization();
 
 app.MapIdentityApi<ApplicationUser>();
 
+app.MapPost("/auth/register", async (
+    RegisterRequestDto request,
+    UserManager<ApplicationUser> userManager,
+    IConfiguration configuration,
+    ILoggerFactory loggerFactory) =>
+{
+    var validationErrors = ValidateRegisterRequest(request);
+    if (validationErrors.Count > 0)
+    {
+        return Results.ValidationProblem(validationErrors);
+    }
+
+    var existingUser = await userManager.FindByEmailAsync(request.Email.Trim());
+    if (existingUser is not null)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(RegisterRequestDto.Email)] = ["An account with this email address already exists."]
+        });
+    }
+
+    var email = request.Email.Trim();
+    var firstName = request.FirstName.Trim();
+    var lastName = request.LastName.Trim();
+    var displayName = $"{firstName} {lastName}".Trim();
+
+    var user = new ApplicationUser
+    {
+        Id = Guid.NewGuid(),
+        UserName = email,
+        Email = email,
+        DisplayName = displayName,
+        EmailConfirmed = false,
+        IsEnabled = true
+    };
+
+    var createResult = await userManager.CreateAsync(user, request.Password);
+    if (!createResult.Succeeded)
+    {
+        return Results.ValidationProblem(createResult.Errors
+            .GroupBy(x => x.Code.Contains("Password", StringComparison.OrdinalIgnoreCase)
+                ? nameof(RegisterRequestDto.Password)
+                : nameof(RegisterRequestDto.Email))
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(e => e.Description).ToArray()));
+    }
+
+    var token = await userManager.GenerateEmailConfirmationTokenAsync(user);
+
+    var apiBaseUrl = (configuration["Api:BaseUrl"] ?? configuration["ASPNETCORE_URLS"]?.Split(';').FirstOrDefault() ?? "http://localhost:5201").TrimEnd('/');
+    var webBaseUrl = (configuration["Web:BaseUrl"] ?? "http://localhost:5101").TrimEnd('/');
+
+    var confirmationUrl = QueryHelpers.AddQueryString(
+        $"{apiBaseUrl}/auth/confirm-email",
+        new Dictionary<string, string?>
+        {
+            ["userId"] = user.Id.ToString(),
+            ["token"] = token
+        });
+
+    var logger = loggerFactory.CreateLogger("Aethon.Registration");
+    logger.LogInformation("Email confirmation link for {Email}: {ConfirmationUrl}", email, confirmationUrl);
+
+    return Results.Ok(new RegisterResultDto
+    {
+        Succeeded = true,
+        RequiresEmailConfirmation = true,
+        Email = email,
+        DisplayName = displayName
+    });
+})
+.AllowAnonymous();
+
+app.MapGet("/auth/confirm-email", async (
+    string userId,
+    string token,
+    UserManager<ApplicationUser> userManager,
+    IConfiguration configuration) =>
+{
+    var webBaseUrl = (configuration["Web:BaseUrl"] ?? "http://localhost:5101").TrimEnd('/');
+
+    if (!Guid.TryParse(userId, out var parsedUserId))
+    {
+        return Results.Redirect($"{webBaseUrl}/register/confirmed?status=invalid");
+    }
+
+    var user = await userManager.FindByIdAsync(parsedUserId.ToString());
+    if (user is null)
+    {
+        return Results.Redirect($"{webBaseUrl}/register/confirmed?status=invalid");
+    }
+
+    var result = await userManager.ConfirmEmailAsync(user, token);
+    if (!result.Succeeded)
+    {
+        return Results.Redirect($"{webBaseUrl}/register/confirmed?status=invalid");
+    }
+
+    return Results.Redirect($"{webBaseUrl}/register/confirmed?status=success");
+})
+.AllowAnonymous();
+
 app.MapPost("/auth/browser-login", async (
     HttpContext httpContext,
     SignInManager<ApplicationUser> signInManager,
@@ -159,6 +264,12 @@ app.MapPost("/auth/browser-login", async (
     }
 
     var result = await signInManager.PasswordSignInAsync(user, password, rememberMe, lockoutOnFailure: true);
+
+    if (result.IsNotAllowed)
+    {
+        return Results.Redirect(BuildLoginRedirect(webBaseUrl, returnPath, "Please confirm your email address before signing in."));
+    }
+
     if (!result.Succeeded)
     {
         return Results.Redirect(BuildLoginRedirect(webBaseUrl, returnPath, "Invalid email or password."));
@@ -203,6 +314,29 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 await InitialiseDatabaseAsync(app);
 
 app.Run();
+
+static Dictionary<string, string[]> ValidateRegisterRequest(RegisterRequestDto request)
+{
+    var context = new ValidationContext(request);
+    var results = new List<ValidationResult>();
+
+    Validator.TryValidateObject(request, context, results, validateAllProperties: true);
+
+    return results
+        .SelectMany(x =>
+        {
+            var memberNames = x.MemberNames.Any() ? x.MemberNames : [string.Empty];
+            return memberNames.Select(memberName => new
+            {
+                Key = memberName,
+                Message = x.ErrorMessage ?? "Validation error."
+            });
+        })
+        .GroupBy(x => x.Key)
+        .ToDictionary(
+            x => x.Key,
+            x => x.Select(y => y.Message).Distinct().ToArray());
+}
 
 static bool IsApiRequest(HttpRequest request)
 {

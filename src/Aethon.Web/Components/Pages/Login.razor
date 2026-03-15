@@ -1,4 +1,7 @@
 @page "/login"
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -6,74 +9,139 @@
 <PageTitle>Sign in | Aethon</PageTitle>
 
 <div class="container-fluid login-shell login-page-wrap py-4 py-lg-5">
-    <div class="row justify-content-center w-100 m-0">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4">
-            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-                <div class="card-body p-4 p-lg-5">
-                    <div class="text-center mb-4">
-                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
-                             style="width: 64px; height: 64px; font-size: 1.4rem; font-weight: 700;">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-xl-10">
+            <div class="row g-0 shadow-lg rounded-4 overflow-hidden border bg-white">
+                <div class="col-lg-5 d-none d-lg-flex flex-column justify-content-between p-5 text-white"
+                     style="background: linear-gradient(160deg, #111827 0%, #212529 100%); min-height: 680px;">
+                    <div>
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle border border-light border-opacity-25 mb-4"
+                             style="width: 72px; height: 72px; background: rgba(255,255,255,0.08); font-size: 1.6rem; font-weight: 700;">
                             A
                         </div>
 
-                        <h1 class="h3 mb-1 fw-bold">Welcome back</h1>
-                        <p class="text-secondary mb-0">Sign in to continue to Aethon</p>
+                        <div class="text-uppercase small fw-semibold text-white-50 mb-3" style="letter-spacing: 0.14em;">
+                            Aethon Platform
+                        </div>
+
+                        <h1 class="display-6 fw-bold lh-sm mb-3">
+                            Structured hiring for employers, recruiters, and candidates.
+                        </h1>
+
+                        <p class="mb-0 text-white-50 fs-6" style="max-width: 28rem;">
+                            Sign in to manage jobs, review applicants, collaborate across organisations, and keep recruitment moving.
+                        </p>
                     </div>
 
-                    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
-                    {
-                        <div class="alert alert-danger rounded-3 mb-4" role="alert">
-                            @ErrorMessage
+                    <div class="pt-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="rounded-circle bg-light me-3" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">Company and recruiter access controls</span>
                         </div>
-                    }
-
-                    <form method="post" action="http://localhost:5201/auth/browser-login">
-                        <input type="hidden" name="returnPath" value="@ReturnPath" />
-
-                        <div class="mb-3">
-                            <label for="email" class="form-label fw-semibold">Email</label>
-                            <input id="email"
-                                   name="email"
-                                   type="email"
-                                   autocomplete="username"
-                                   class="form-control form-control-lg"
-                                   placeholder="name@company.com"
-                                   required />
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="rounded-circle bg-light me-3" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">Shared job workflows and approvals</span>
                         </div>
-
-                        <div class="mb-3">
-                            <label for="password" class="form-label fw-semibold">Password</label>
-                            <input id="password"
-                                   name="password"
-                                   type="password"
-                                   autocomplete="current-password"
-                                   class="form-control form-control-lg"
-                                   placeholder="Enter your password"
-                                   required />
+                        <div class="d-flex align-items-center">
+                            <span class="rounded-circle bg-light me-3" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">Secure platform sign-in</span>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="d-flex align-items-center justify-content-between mb-4">
-                            <div class="form-check">
-                                <input id="rememberMe"
-                                       name="rememberMe"
-                                       type="checkbox"
-                                       class="form-check-input" />
-                                <label class="form-check-label" for="rememberMe">
-                                    Remember me
-                                </label>
+                <div class="col-12 col-lg-7">
+                    <div class="p-4 p-md-5 p-xl-5">
+                        <div class="d-lg-none text-center mb-4">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
+                                 style="width: 64px; height: 64px; font-size: 1.4rem; font-weight: 700;">
+                                A
+                            </div>
+                            <div class="small text-uppercase fw-semibold text-secondary mb-2" style="letter-spacing: 0.12em;">
+                                Aethon
                             </div>
                         </div>
 
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-dark btn-lg rounded-3">
-                                Sign in
-                            </button>
+                        <div class="mb-4">
+                            <h2 class="h2 fw-bold mb-2" style="color: var(--aethon-text-strong);">Welcome back</h2>
+                            <p class="text-secondary mb-0 fs-6">Sign in to continue to Aethon</p>
                         </div>
-                    </form>
-                </div>
 
-                <div class="card-footer bg-white border-0 text-center pb-4 pt-0">
-                    <small class="text-secondary">Secure access for Aethon platform users</small>
+                        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+                        {
+                            <div class="alert alert-danger rounded-4 mb-4" role="alert">
+                                @ErrorMessage
+                            </div>
+                        }
+
+                        <form method="post" action="http://localhost:5201/auth/browser-login">
+                            <input type="hidden" name="returnPath" value="@ReturnPath" />
+
+                            <div class="mb-3">
+                                <label for="email" class="form-label fw-semibold">Email</label>
+                                <input id="email"
+                                       name="email"
+                                       type="email"
+                                       autocomplete="username"
+                                       class="form-control form-control-lg rounded-4"
+                                       placeholder="name@company.com"
+                                       style="min-height: 58px;"
+                                       required />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="password" class="form-label fw-semibold">Password</label>
+                                <input id="password"
+                                       name="password"
+                                       type="password"
+                                       autocomplete="current-password"
+                                       class="form-control form-control-lg rounded-4"
+                                       placeholder="Enter your password"
+                                       style="min-height: 58px;"
+                                       required />
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-between mb-4">
+                                <div class="form-check">
+                                    <input id="rememberMe"
+                                           name="rememberMe"
+                                           type="checkbox"
+                                           class="form-check-input" />
+                                    <label class="form-check-label text-secondary" for="rememberMe">
+                                        Remember me
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="d-grid mb-4">
+                                <button type="submit" class="btn btn-dark btn-lg rounded-4" style="min-height: 58px;">
+                                    Sign in
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="position-relative text-center my-4">
+                            <hr class="my-0" />
+                            <span class="position-absolute top-50 start-50 translate-middle px-3 bg-white text-secondary small">
+                                New to Aethon?
+                            </span>
+                        </div>
+
+                        <div class="row g-2 mb-4">
+                            <div class="col-12 col-md-4">
+                                <a class="btn btn-outline-dark w-100 rounded-4 py-3" href="/register?type=company">Company</a>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <a class="btn btn-outline-dark w-100 rounded-4 py-3" href="/register?type=recruiter">Recruiter</a>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <a class="btn btn-outline-secondary w-100 rounded-4 py-3" href="/register?type=jobseeker">Job seeker</a>
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <small class="text-secondary">Secure access for Aethon platform users</small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

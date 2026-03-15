@@ -1,3 +1,4 @@
+using Aethon.Data.Entities;
 using Aethon.Data.Identity;
 using Aethon.Data.Tenancy;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -15,6 +16,16 @@ public sealed class AethonDbContext
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<UserTenantMembership> UserTenantMemberships => Set<UserTenantMembership>();
+
+    public DbSet<JobSeekerProfile> JobSeekerProfiles => Set<JobSeekerProfile>();
+    public DbSet<Organisation> Organisations => Set<Organisation>();
+    public DbSet<OrganisationDomain> OrganisationDomains => Set<OrganisationDomain>();
+    public DbSet<OrganisationMembership> OrganisationMemberships => Set<OrganisationMembership>();
+    public DbSet<OrganisationInvitation> OrganisationInvitations => Set<OrganisationInvitation>();
+    public DbSet<OrganisationClaimRequest> OrganisationClaimRequests => Set<OrganisationClaimRequest>();
+    public DbSet<CompanyRecruiterRelationship> CompanyRecruiterRelationships => Set<CompanyRecruiterRelationship>();
+    public DbSet<Job> Jobs => Set<Job>();
+    public DbSet<JobApplication> JobApplications => Set<JobApplication>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -34,7 +45,9 @@ public sealed class AethonDbContext
             entity.ToTable("user_tenant_memberships");
             entity.HasKey(x => new { x.UserId, x.TenantId });
 
-            entity.Property(x => x.RoleCode).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.RoleCode)
+                .HasMaxLength(100)
+                .IsRequired();
 
             entity.HasOne(x => x.User)
                 .WithMany()
@@ -46,5 +59,7 @@ public sealed class AethonDbContext
                 .HasForeignKey(x => x.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        builder.ApplyConfigurationsFromAssembly(typeof(AethonDbContext).Assembly);
     }
 }

@@ -30,6 +30,11 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddBlazorBootstrap();
 
+builder.Services.AddHttpClient("AethonApi", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5201");
+});
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

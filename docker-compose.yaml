@@ -37,6 +37,7 @@ services:
       Cors__Origins__1: https://localhost:7101
       Cors__Origins__2: https://app.aethon.software
       Web__BaseUrl: http://localhost:5101
+      Api__BaseUrl: http://localhost:5201
     ports:
       - "5201:8080"
     volumes:
@@ -55,6 +56,7 @@ services:
       EnableHttpsRedirection: "false"
       DataProtection__KeysPath: /keys
       DataProtection__ApplicationName: Aethon
+      ApiBaseUrl: http://api:8080
     ports:
       - "5101:8080"
     volumes:
