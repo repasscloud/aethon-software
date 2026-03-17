@@ -2,7 +2,7 @@ namespace Aethon.Shared.Organisations;
 
 public sealed class OrganisationInviteDto
 {
-    public string InvitationId { get; set; } = "";
+    public Guid InvitationId { get; set; }
     public string Email { get; set; } = "";
     public string InvitationType { get; set; } = "";
     public string InvitationStatus { get; set; } = "";

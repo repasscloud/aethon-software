@@ -1,3 +1,5 @@
+using Aethon.Api.Common;
+using Aethon.Application.RecruiterCompanies;
 using Aethon.Shared.RecruiterCompanies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

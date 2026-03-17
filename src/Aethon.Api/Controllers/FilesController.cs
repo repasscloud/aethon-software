@@ -63,7 +63,7 @@ public sealed class FilesController : ControllerBase
 
         var storedFile = new StoredFile
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = NewGuidId(),
             FileName = Path.GetFileName(storagePath),
             OriginalFileName = file.FileName,
             ContentType = file.ContentType,
@@ -72,7 +72,7 @@ public sealed class FilesController : ControllerBase
             StoragePath = storagePath,
             UploadedByUserId = userId,
             CreatedUtc = DateTime.UtcNow,
-            CreatedByUserId = userId.ToString()
+            CreatedByUserId = userId
         };
 
         _dbContext.StoredFiles.Add(storedFile);
@@ -89,7 +89,7 @@ public sealed class FilesController : ControllerBase
     }
 
     [HttpGet("{id}/download")]
-    public async Task<IActionResult> Download(string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Download(Guid id, CancellationToken cancellationToken)
     {
         var file = await _dbContext.StoredFiles
             .AsNoTracking()
@@ -141,5 +141,10 @@ public sealed class FilesController : ControllerBase
         }
 
         return (ObjectResult)ValidationProblem(ModelState);
+    }
+
+    private static Guid NewGuidId()
+    {
+        return Guid.NewGuid();
     }
 }

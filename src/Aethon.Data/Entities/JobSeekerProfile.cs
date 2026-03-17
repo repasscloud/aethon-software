@@ -13,7 +13,7 @@ public class JobSeekerProfile : EntityBase
     public string? CurrentLocation { get; set; }
     public string? PreferredLocation { get; set; }
     public string? LinkedInUrl { get; set; }
-    public string? ResumeFileId { get; set; }
+    public Guid? ResumeFileId { get; set; }
 
     public bool OpenToWork { get; set; }
 

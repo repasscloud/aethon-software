@@ -7,6 +7,7 @@ COPY ["Directory.Build.props", "."]
 COPY ["src/Aethon.Api/Aethon.Api.csproj", "src/Aethon.Api/"]
 COPY ["src/Aethon.Data/Aethon.Data.csproj", "src/Aethon.Data/"]
 COPY ["src/Aethon.Shared/Aethon.Shared.csproj", "src/Aethon.Shared/"]
+COPY ["src/Aethon.Application/Aethon.Application.csproj", "src/Aethon.Application/"]
 
 RUN dotnet restore "src/Aethon.Api/Aethon.Api.csproj"
 

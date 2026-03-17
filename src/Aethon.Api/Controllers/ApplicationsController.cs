@@ -22,7 +22,7 @@ public sealed class ApplicationsController : ControllerBase
     }
 
     [HttpGet("jobs/{jobId}/applications")]
-    public async Task<IActionResult> GetJobApplications(string jobId)
+    public async Task<IActionResult> GetJobApplications(Guid jobId)
     {
         var access = await GetJobAccessAsync(jobId);
         if (!access.Succeeded)
@@ -52,7 +52,7 @@ public sealed class ApplicationsController : ControllerBase
     }
 
     [HttpGet("applications/{id}")]
-    public async Task<IActionResult> GetApplication(string id)
+    public async Task<IActionResult> GetApplication(Guid id)
     {
         var application = await _dbContext.JobApplications
             .AsNoTracking()
@@ -98,7 +98,7 @@ public sealed class ApplicationsController : ControllerBase
             Id = application.Id,
             JobId = application.JobId,
             JobTitle = application.Title,
-            ApplicantUserId = application.ApplicantUserId.ToString(),
+            ApplicantUserId = application.ApplicantUserId,
             ApplicantDisplayName = application.ApplicantDisplayName,
             ApplicantEmail = application.ApplicantEmail ?? "",
             Status = application.Status.ToString(),
@@ -119,7 +119,7 @@ public sealed class ApplicationsController : ControllerBase
     }
 
     [HttpPost("applications/{id}/status")]
-    public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateJobApplicationStatusRequestDto request)
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateJobApplicationStatusRequestDto request)
     {
         var validationErrors = ApiValidationHelper.Validate(request);
         if (validationErrors.Count > 0)
@@ -167,7 +167,7 @@ public sealed class ApplicationsController : ControllerBase
             : request.Notes.Trim();
         application.LastStatusChangedUtc = DateTime.UtcNow;
         application.UpdatedUtc = DateTime.UtcNow;
-        application.UpdatedByUserId = userId.ToString();
+        application.UpdatedByUserId = userId;
 
         await _dbContext.SaveChangesAsync();
 
@@ -176,7 +176,7 @@ public sealed class ApplicationsController : ControllerBase
             Id = application.Id,
             JobId = application.JobId,
             JobTitle = application.Job.Title,
-            ApplicantUserId = application.UserId.ToString(),
+            ApplicantUserId = application.UserId,
             ApplicantDisplayName = application.User.DisplayName,
             ApplicantEmail = application.User.Email ?? "",
             Status = application.Status.ToString(),
@@ -191,15 +191,16 @@ public sealed class ApplicationsController : ControllerBase
     }
 
     private async Task<JobAccessResult> GetJobAccessAsync(
-        string jobId,
-        string? ownedByOrganisationId = null,
-        string? managedByOrganisationId = null)
+        Guid jobId,
+        Guid? ownedByOrganisationId = null,
+        Guid? managedByOrganisationId = null)
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
         var organisationType = User.FindFirstValue(AppClaimTypes.OrganisationType);
 
-        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+        if (!Guid.TryParse(userIdValue, out var userId) ||
+            !Guid.TryParse(organisationIdValue, out var organisationId))
         {
             return JobAccessResult.Forbidden();
         }
@@ -238,13 +239,15 @@ public sealed class ApplicationsController : ControllerBase
         }
 
         if (string.Equals(organisationType, "company", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(organisationId, ownedByOrganisationId, StringComparison.Ordinal))
+            ownedByOrganisationId.HasValue &&
+            organisationId == ownedByOrganisationId.Value)
         {
             return JobAccessResult.Success();
         }
 
         if (string.Equals(organisationType, "recruiter", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(organisationId, managedByOrganisationId, StringComparison.Ordinal))
+            managedByOrganisationId.HasValue &&
+            organisationId == managedByOrganisationId.Value)
         {
             return JobAccessResult.Success();
         }

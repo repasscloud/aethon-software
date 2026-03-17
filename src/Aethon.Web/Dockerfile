@@ -6,6 +6,7 @@ COPY ["global.json", "."]
 COPY ["Directory.Build.props", "."]
 COPY ["src/Aethon.Web/Aethon.Web.csproj", "src/Aethon.Web/"]
 COPY ["src/Aethon.Shared/Aethon.Shared.csproj", "src/Aethon.Shared/"]
+COPY ["src/Aethon.Data/Aethon.Data.csproj", "src/Aethon.Data/"]
 
 RUN dotnet restore "src/Aethon.Web/Aethon.Web.csproj"
 

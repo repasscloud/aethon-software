@@ -21,11 +21,11 @@ public class Organisation : EntityBase
     public string? PublicContactPhone { get; set; }
     public bool IsPublicProfileEnabled { get; set; }
 
-    public string? PrimaryDomainId { get; set; }
+    public Guid? PrimaryDomainId { get; set; }
     public OrganisationDomain? PrimaryDomain { get; set; }
 
     public bool IsProvisionedByRecruiter { get; set; }
-    public string? ClaimedByUserId { get; set; }
+    public Guid? ClaimedByUserId { get; set; }
     public DateTime? ClaimedUtc { get; set; }
 
     public string? PrimaryContactName { get; set; }

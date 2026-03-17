@@ -76,7 +76,7 @@ public sealed class AppUserClaimsPrincipalFactory
                 : "employer";
 
             identity.AddClaim(new Claim(AppClaimTypes.AppType, appType));
-            identity.AddClaim(new Claim(AppClaimTypes.OrganisationId, organisationMembership.OrganisationId));
+            identity.AddClaim(new Claim(AppClaimTypes.OrganisationId, organisationMembership.OrganisationId.ToString()));
             identity.AddClaim(new Claim(AppClaimTypes.OrganisationName, organisationMembership.OrganisationName));
             identity.AddClaim(new Claim(
                 AppClaimTypes.OrganisationType,

@@ -2,6 +2,8 @@ using Aethon.Api.Auth;
 using Aethon.Api.Files;
 using Aethon.Api.Infrastructure;
 using Aethon.Application.CompanyJobsApproval;
+using Aethon.Application.CompanyRecruiters;
+using Aethon.Application.RecruiterCompanies;
 using Aethon.Application.RecruiterJobs;
 using Aethon.Data;
 using Aethon.Data.Identity;
@@ -65,6 +67,10 @@ builder.Services.AddScoped<IRecruiterJobQueryService, RecruiterJobService>();
 builder.Services.AddScoped<IRecruiterJobCommandService, RecruiterJobService>();
 builder.Services.AddScoped<ICompanyJobApprovalQueryService, CompanyJobApprovalService>();
 builder.Services.AddScoped<ICompanyJobApprovalCommandService, CompanyJobApprovalService>();
+builder.Services.AddScoped<ICompanyRecruiterQueryService, CompanyRecruiterService>();
+builder.Services.AddScoped<ICompanyRecruiterCommandService, CompanyRecruiterService>();
+builder.Services.AddScoped<IRecruiterCompanyQueryService, RecruiterCompanyService>();
+builder.Services.AddScoped<IRecruiterCompanyCommandService, RecruiterCompanyService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {

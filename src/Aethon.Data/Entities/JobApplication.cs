@@ -13,8 +13,12 @@ public class JobApplication : EntityBase
 
     public ApplicationStatus Status { get; set; }
 
-    public string? ResumeFileId { get; set; }
+    public Guid? ResumeFileId { get; set; }
     public string? CoverLetter { get; set; }
+
+    public Guid? AssignedRecruiterUserId { get; set; }
+    public ApplicationUser? AssignedRecruiterUser { get; set; }
+    public DateTime? AssignedRecruiterUtc { get; set; }
 
     public DateTime SubmittedUtc { get; set; }
     public DateTime? LastStatusChangedUtc { get; set; }

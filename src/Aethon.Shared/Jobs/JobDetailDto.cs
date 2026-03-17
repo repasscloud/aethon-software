@@ -7,7 +7,9 @@ public sealed class JobDetailDto
     public Guid Id { get; set; }
 
     public Guid CompanyOrganisationId { get; set; }
+    public string? CompanyOrganisationName { get; set; }
     public Guid? ManagedByRecruiterOrganisationId { get; set; }
+    public string? ManagedByRecruiterOrganisationName { get; set; }
 
     public string Title { get; set; } = string.Empty;
     public string? Summary { get; set; }

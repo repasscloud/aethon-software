@@ -4,7 +4,7 @@ namespace Aethon.Shared.Jobs;
 
 public sealed class PublicJobListItemDto
 {
-    public string Id { get; set; } = "";
+    public Guid Id { get; set; }
     public string Title { get; set; } = "";
     public string OrganisationName { get; set; } = "";
     public string? OrganisationSlug { get; set; }

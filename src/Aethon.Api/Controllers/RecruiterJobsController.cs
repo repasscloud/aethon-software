@@ -1,3 +1,5 @@
+using Aethon.Api.Common;
+using Aethon.Application.RecruiterJobs;
 using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

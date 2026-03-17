@@ -55,7 +55,7 @@ public sealed class PublicController : ControllerBase
 
     [HttpGet("jobs/{id}")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetPublishedJob(string id)
+    public async Task<IActionResult> GetPublishedJob(Guid id)
     {
         var job = await _dbContext.Jobs
             .AsNoTracking()
@@ -124,7 +124,7 @@ public sealed class PublicController : ControllerBase
 
     [HttpPost("jobs/{id}/apply")]
     [Authorize]
-    public async Task<IActionResult> ApplyForJob(string id, [FromBody] CreateJobApplicationRequestDto request)
+    public async Task<IActionResult> ApplyForJob(Guid id, [FromBody] CreateJobApplicationRequestDto request)
     {
         var validationErrors = ApiValidationHelper.Validate(request);
         if (validationErrors.Count > 0)
@@ -176,7 +176,7 @@ public sealed class PublicController : ControllerBase
 
         var application = new JobApplication
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = NewGuidId(),
             JobId = id,
             UserId = userId,
             Status = ApplicationStatus.Submitted,
@@ -187,7 +187,7 @@ public sealed class PublicController : ControllerBase
             Source = string.IsNullOrWhiteSpace(request.Source) ? "AethonJobBoard" : request.Source.Trim(),
             Notes = null,
             CreatedUtc = DateTime.UtcNow,
-            CreatedByUserId = userId.ToString()
+            CreatedByUserId = userId
         };
 
         _dbContext.JobApplications.Add(application);
@@ -210,5 +210,10 @@ public sealed class PublicController : ControllerBase
         }
 
         return (ObjectResult)ValidationProblem(ModelState);
+    }
+
+    private static Guid NewGuidId()
+    {
+        return Guid.NewGuid();
     }
 }

@@ -27,9 +27,10 @@ public sealed class OrganisationController : ControllerBase
     public async Task<IActionResult> GetMyMembers()
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
 
-        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+        if (!Guid.TryParse(userIdValue, out var userId) ||
+            !Guid.TryParse(organisationIdValue, out var organisationId))
         {
             return BadRequest();
         }
@@ -109,9 +110,10 @@ public sealed class OrganisationController : ControllerBase
     public async Task<IActionResult> CreateInvite([FromBody] CreateOrganisationInviteRequestDto request)
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
 
-        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+        if (!Guid.TryParse(userIdValue, out var userId) ||
+            !Guid.TryParse(organisationIdValue, out var organisationId))
         {
             return BadRequest();
         }
@@ -198,7 +200,7 @@ public sealed class OrganisationController : ControllerBase
 
         var invite = new OrganisationInvitation
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = Guid.NewGuid(),
             Type = InvitationType.JoinOrganisation,
             Status = InvitationStatus.Pending,
             OrganisationId = organisationId,
@@ -211,7 +213,7 @@ public sealed class OrganisationController : ControllerBase
             RecruiterRole = recruiterRole,
             AllowClaimAsOwner = false,
             CreatedUtc = DateTime.UtcNow,
-            CreatedByUserId = userId.ToString()
+            CreatedByUserId = userId
         };
 
         _dbContext.OrganisationInvitations.Add(invite);
@@ -293,7 +295,7 @@ public sealed class OrganisationController : ControllerBase
         {
             _dbContext.OrganisationMemberships.Add(new OrganisationMembership
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = Guid.NewGuid(),
                 OrganisationId = invite.OrganisationId,
                 UserId = userId,
                 Status = MembershipStatus.Active,
@@ -307,7 +309,7 @@ public sealed class OrganisationController : ControllerBase
         }
 
         invite.Status = InvitationStatus.Accepted;
-        invite.AcceptedByUserId = userId.ToString();
+        invite.AcceptedByUserId = userId;
         invite.AcceptedUtc = DateTime.UtcNow;
         invite.UpdatedUtc = DateTime.UtcNow;
 
@@ -319,9 +321,9 @@ public sealed class OrganisationController : ControllerBase
     [HttpGet("me/profile")]
     public async Task<IActionResult> GetMyProfile()
     {
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
 
-        if (string.IsNullOrWhiteSpace(organisationId))
+        if (!Guid.TryParse(organisationIdValue, out var organisationId))
         {
             return BadRequest();
         }
@@ -356,9 +358,10 @@ public sealed class OrganisationController : ControllerBase
     public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateOrganisationProfileRequestDto request)
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
 
-        if (!Guid.TryParse(userIdValue, out var userId) || string.IsNullOrWhiteSpace(organisationId))
+        if (!Guid.TryParse(userIdValue, out var userId) ||
+            !Guid.TryParse(organisationIdValue, out var organisationId))
         {
             return BadRequest();
         }
@@ -416,7 +419,7 @@ public sealed class OrganisationController : ControllerBase
         organisation.PublicContactPhone = Clean(request.PublicContactPhone);
         organisation.IsPublicProfileEnabled = request.IsPublicProfileEnabled;
         organisation.UpdatedUtc = DateTime.UtcNow;
-        organisation.UpdatedByUserId = userId.ToString();
+        organisation.UpdatedByUserId = userId;
 
         await _dbContext.SaveChangesAsync();
 

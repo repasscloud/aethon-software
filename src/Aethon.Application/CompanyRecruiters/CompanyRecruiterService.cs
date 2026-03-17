@@ -101,7 +101,7 @@ public sealed class CompanyRecruiterService
     {
         var entity = await GetOwnedRelationshipAsync(companyUserId, relationshipId, cancellationToken);
 
-        if (entity.Status != CompanyRecruiterRelationshipStatus.Active ||
+        if (entity.Status != CompanyRecruiterRelationshipStatus.Active &&
             entity.Status != CompanyRecruiterRelationshipStatus.Pending)
         {
             throw new InvalidOperationException("Only active/pending recruiter relationships can be suspended.");

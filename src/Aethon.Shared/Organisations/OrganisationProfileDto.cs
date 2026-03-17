@@ -2,7 +2,7 @@ namespace Aethon.Shared.Organisations;
 
 public sealed class OrganisationProfileDto
 {
-    public string OrganisationId { get; set; } = "";
+    public Guid OrganisationId { get; set; }
     public string OrganisationType { get; set; } = "";
     public string Name { get; set; } = "";
     public string? LegalName { get; set; }

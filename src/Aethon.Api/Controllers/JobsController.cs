@@ -26,17 +26,16 @@ public sealed class JobsController : ControllerBase
     [HttpGet("my-org")]
     public async Task<IActionResult> GetMyOrganisationJobs()
     {
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
-        var organisationType = User.FindFirstValue(AppClaimTypes.OrganisationType);
+        var access = await GetEmployerAccessAsync();
 
-        if (string.IsNullOrWhiteSpace(organisationId) || !string.Equals(organisationType, "company", StringComparison.OrdinalIgnoreCase))
+        if (!access.Succeeded)
         {
             return Forbid();
         }
 
         var jobs = await _dbContext.Jobs
             .AsNoTracking()
-            .Where(x => x.OwnedByOrganisationId == organisationId)
+            .Where(x => x.OwnedByOrganisationId == access.OrganisationId)
             .OrderByDescending(x => x.CreatedUtc)
             .Select(x => new JobListItemDto
             {
@@ -59,37 +58,41 @@ public sealed class JobsController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetJob([FromRoute] string id)
+    public async Task<IActionResult> GetJob([FromRoute] Guid id)
     {
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
-        var organisationType = User.FindFirstValue(AppClaimTypes.OrganisationType);
+        var access = await GetEmployerAccessAsync();
 
-        if (string.IsNullOrWhiteSpace(organisationId) || !string.Equals(organisationType, "company", StringComparison.OrdinalIgnoreCase))
+        if (!access.Succeeded)
         {
             return Forbid();
         }
 
         var job = await _dbContext.Jobs
             .AsNoTracking()
-            .Where(x => x.Id == id && x.OwnedByOrganisationId == organisationId)
+            .Where(x => x.Id == id && x.OwnedByOrganisationId == access.OrganisationId)
             .Select(x => new JobDetailDto
             {
                 Id = x.Id,
-                OrganisationId = x.OwnedByOrganisationId,
-                OrganisationName = x.OwnedByOrganisation.Name,
+                CompanyOrganisationId = x.OwnedByOrganisationId,
+                CompanyOrganisationName = x.OwnedByOrganisation != null
+                    ? x.OwnedByOrganisation.Name
+                    : null,
+                ManagedByRecruiterOrganisationId = x.ManagedByOrganisationId,
+                ManagedByRecruiterOrganisationName = x.ManagedByOrganisation != null
+                    ? x.ManagedByOrganisation.Name
+                    : null,
                 Title = x.Title,
                 Department = x.Department,
-                LocationText = x.LocationText,
+                Location = x.LocationText,
                 WorkplaceType = x.WorkplaceType,
                 EmploymentType = x.EmploymentType,
                 Status = x.Status,
                 Description = x.Description,
                 Requirements = x.Requirements,
                 Benefits = x.Benefits,
-                SalaryFrom = x.SalaryFrom,
-                SalaryTo = x.SalaryTo,
+                SalaryMin = x.SalaryFrom,
+                SalaryMax = x.SalaryTo,
                 SalaryCurrency = x.SalaryCurrency,
-                CreatedByUserId = x.CreatedByIdentityUserId.ToString(),
                 CreatedUtc = x.CreatedUtc,
                 PublishedUtc = x.PublishedUtc,
                 ClosedUtc = x.ClosedUtc
@@ -120,8 +123,8 @@ public sealed class JobsController : ControllerBase
 
         var job = new Job
         {
-            Id = Guid.NewGuid().ToString("N"),
-            OwnedByOrganisationId = access.OrganisationId!,
+            Id = Guid.NewGuid(),
+            OwnedByOrganisationId = access.OrganisationId!.Value,
             ManagedByOrganisationId = null,
             CompanyRecruiterRelationshipId = null,
             CreatedByIdentityUserId = access.UserId!.Value,
@@ -143,17 +146,17 @@ public sealed class JobsController : ControllerBase
             ClosedUtc = status == JobStatus.Closed ? DateTime.UtcNow : null,
             CreatedForUnclaimedCompany = false,
             CreatedUtc = DateTime.UtcNow,
-            CreatedByUserId = access.UserId.Value.ToString()
+            CreatedByUserId = access.UserId
         };
 
         _dbContext.Jobs.Add(job);
         await _dbContext.SaveChangesAsync();
 
-        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId.Value));
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateJob([FromRoute] string id, [FromBody] UpdateJobRequestDto request)
+    public async Task<IActionResult> UpdateJob([FromRoute] Guid id, [FromBody] UpdateJobRequestDto request)
     {
         var validationErrors = ApiValidationHelper.Validate(request);
         if (validationErrors.Count > 0)
@@ -187,15 +190,15 @@ public sealed class JobsController : ControllerBase
         job.SalaryTo = request.SalaryTo;
         job.SalaryCurrency = request.SalaryCurrency;
         job.UpdatedUtc = DateTime.UtcNow;
-        job.UpdatedByUserId = access.UserId!.Value.ToString();
+        job.UpdatedByUserId = access.UserId!;
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!.Value));
     }
 
     [HttpPost("{id}/publish")]
-    public async Task<IActionResult> PublishJob([FromRoute] string id)
+    public async Task<IActionResult> PublishJob([FromRoute] Guid id)
     {
         var access = await GetEmployerAccessAsync();
         if (!access.Succeeded)
@@ -224,15 +227,15 @@ public sealed class JobsController : ControllerBase
         job.PublishedUtc ??= DateTime.UtcNow;
         job.ClosedUtc = null;
         job.UpdatedUtc = DateTime.UtcNow;
-        job.UpdatedByUserId = access.UserId!.Value.ToString();
+        job.UpdatedByUserId = access.UserId!;
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!.Value));
     }
 
     [HttpPost("{id}/close")]
-    public async Task<IActionResult> CloseJob([FromRoute] string id)
+    public async Task<IActionResult> CloseJob([FromRoute] Guid id)
     {
         var access = await GetEmployerAccessAsync();
         if (!access.Succeeded)
@@ -252,15 +255,15 @@ public sealed class JobsController : ControllerBase
         job.Visibility = JobVisibility.Private;
         job.ClosedUtc = DateTime.UtcNow;
         job.UpdatedUtc = DateTime.UtcNow;
-        job.UpdatedByUserId = access.UserId!.Value.ToString();
+        job.UpdatedByUserId = access.UserId!;
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!.Value));
     }
 
     [HttpPost("{id}/return-to-draft")]
-    public async Task<IActionResult> ReturnToDraft([FromRoute] string id)
+    public async Task<IActionResult> ReturnToDraft([FromRoute] Guid id)
     {
         var access = await GetEmployerAccessAsync();
         if (!access.Succeeded)
@@ -280,11 +283,11 @@ public sealed class JobsController : ControllerBase
         job.Visibility = JobVisibility.Private;
         job.ClosedUtc = null;
         job.UpdatedUtc = DateTime.UtcNow;
-        job.UpdatedByUserId = access.UserId!.Value.ToString();
+        job.UpdatedByUserId = access.UserId!;
 
         await _dbContext.SaveChangesAsync();
 
-        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
+        return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!.Value));
     }
 
     [HttpGet("{jobId:guid}")]
@@ -299,15 +302,17 @@ public sealed class JobsController : ControllerBase
             .Select(x => new JobDetailDto
             {
                 Id = x.Id,
-                CompanyOrganisationId = x.CompanyOrganisationId,
-                ManagedByRecruiterOrganisationId = x.ManagedByRecruiterOrganisationId,
+                CompanyOrganisationId = x.OwnedByOrganisationId,
+                ManagedByRecruiterOrganisationName = x.ManagedByOrganisation != null
+                    ? x.ManagedByOrganisation.Name
+                    : null,
                 Title = x.Title,
                 Summary = x.Summary,
                 Description = x.Description,
-                Location = x.Location,
-                SalaryMin = x.SalaryMin,
-                SalaryMax = x.SalaryMax,
-                Status = x.Status.ToString(),
+                Location = x.LocationText,
+                SalaryMin = x.SalaryFrom,
+                SalaryMax = x.SalaryTo,
+                Status = x.Status,
                 StatusReason = x.StatusReason,
                 CreatedUtc = x.CreatedUtc,
                 SubmittedForApprovalUtc = x.SubmittedForApprovalUtc,
@@ -324,7 +329,7 @@ public sealed class JobsController : ControllerBase
         return Ok(result);
     }
 
-    private async Task<JobDetailDto> BuildJobDetailAsync(string jobId, string organisationId)
+    private async Task<JobDetailDto> BuildJobDetailAsync(Guid jobId, Guid organisationId)
     {
         return await _dbContext.Jobs
             .AsNoTracking()
@@ -332,21 +337,23 @@ public sealed class JobsController : ControllerBase
             .Select(x => new JobDetailDto
             {
                 Id = x.Id,
-                OrganisationId = x.OwnedByOrganisationId,
-                OrganisationName = x.OwnedByOrganisation.Name,
+                CompanyOrganisationId = x.OwnedByOrganisationId,
+                ManagedByRecruiterOrganisationId = x.ManagedByOrganisationId,
+                ManagedByRecruiterOrganisationName = x.ManagedByOrganisation != null
+                    ? x.ManagedByOrganisation.Name
+                    : null,
                 Title = x.Title,
                 Department = x.Department,
-                LocationText = x.LocationText,
+                Location= x.LocationText,
                 WorkplaceType = x.WorkplaceType,
                 EmploymentType = x.EmploymentType,
                 Status = x.Status,
                 Description = x.Description,
                 Requirements = x.Requirements,
                 Benefits = x.Benefits,
-                SalaryFrom = x.SalaryFrom,
-                SalaryTo = x.SalaryTo,
+                SalaryMin = x.SalaryFrom,
+                SalaryMax = x.SalaryTo,
                 SalaryCurrency = x.SalaryCurrency,
-                CreatedByUserId = x.CreatedByIdentityUserId.ToString(),
                 CreatedUtc = x.CreatedUtc,
                 PublishedUtc = x.PublishedUtc,
                 ClosedUtc = x.ClosedUtc
@@ -357,11 +364,11 @@ public sealed class JobsController : ControllerBase
     private async Task<EmployerAccessResult> GetEmployerAccessAsync()
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var organisationId = User.FindFirstValue(AppClaimTypes.OrganisationId);
+        var organisationIdValue = User.FindFirstValue(AppClaimTypes.OrganisationId);
         var organisationType = User.FindFirstValue(AppClaimTypes.OrganisationType);
 
         if (!Guid.TryParse(userIdValue, out var userId) ||
-            string.IsNullOrWhiteSpace(organisationId) ||
+            !Guid.TryParse(organisationIdValue, out var organisationId) ||
             !string.Equals(organisationType, "company", StringComparison.OrdinalIgnoreCase))
         {
             return EmployerAccessResult.Forbidden();
@@ -393,10 +400,10 @@ public sealed class JobsController : ControllerBase
     {
         public bool Succeeded { get; init; }
         public Guid? UserId { get; init; }
-        public string? OrganisationId { get; init; }
+        public Guid? OrganisationId { get; init; }
         public IActionResult? ForbiddenResult { get; init; }
 
-        public static EmployerAccessResult Success(Guid userId, string organisationId) =>
+        public static EmployerAccessResult Success(Guid userId, Guid organisationId) =>
             new()
             {
                 Succeeded = true,

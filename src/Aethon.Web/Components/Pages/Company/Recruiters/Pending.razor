@@ -14,7 +14,7 @@ else
         <thead>
             <tr>
                 <th>Recruiter</th>
-                <th>Message</th>
+                <th>Notes</th>
                 <th></th>
             </tr>
         </thead>
@@ -23,7 +23,7 @@ else
         {
             <tr>
                 <td>@item.RecruiterOrganisationName</td>
-                <td>@item.Message</td>
+                <td>@item.Notes</td>
                 <td>
                     <button class="btn btn-success" @onclick="() => Approve(item.Id)">Approve</button>
                 </td>

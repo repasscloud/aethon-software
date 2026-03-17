@@ -82,7 +82,7 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
                 {
                     _dbContext.JobSeekerProfiles.Add(new JobSeekerProfile
                     {
-                        Id = NewStringId(),
+                        Id = NewGuidId(),
                         UserId = user.Id,
                         OpenToWork = true,
                         CreatedUtc = DateTime.UtcNow
@@ -116,14 +116,14 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
 
                 var organisation = new Organisation
                 {
-                    Id = NewStringId(),
+                    Id = NewGuidId(),
                     Type = organisationType,
                     Status = OrganisationStatus.Active,
                     ClaimStatus = OrganisationClaimStatus.Claimed,
                     Name = request.OrganisationName!.Trim(),
                     NormalizedName = request.OrganisationName.Trim().ToUpperInvariant(),
                     IsProvisionedByRecruiter = false,
-                    ClaimedByUserId = user.Id.ToString(),
+                    ClaimedByUserId = user.Id,
                     ClaimedUtc = DateTime.UtcNow,
                     PrimaryContactName = user.DisplayName,
                     PrimaryContactEmail = email,
@@ -135,7 +135,7 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
 
                 var organisationDomain = new OrganisationDomain
                 {
-                    Id = NewStringId(),
+                    Id = NewGuidId(),
                     OrganisationId = organisation.Id,
                     Domain = emailDomain,
                     NormalizedDomain = normalizedDomain,
@@ -146,7 +146,7 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
                     VerificationEmailAddress = email,
                     VerificationRequestedUtc = DateTime.UtcNow,
                     VerifiedUtc = DateTime.UtcNow,
-                    VerifiedByUserId = user.Id.ToString(),
+                    VerifiedByUserId = user.Id,
                     CreatedUtc = DateTime.UtcNow
                 };
 
@@ -157,7 +157,7 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
 
                 var membership = new OrganisationMembership
                 {
-                    Id = NewStringId(),
+                    Id = NewGuidId(),
                     OrganisationId = organisation.Id,
                     UserId = user.Id,
                     Status = MembershipStatus.Active,
@@ -209,9 +209,9 @@ public sealed class RegistrationProvisioningService : IRegistrationProvisioningS
         return email[(atIndex + 1)..].Trim().ToLowerInvariant();
     }
 
-    private static string NewStringId()
+    private static Guid NewGuidId()
     {
-        return Guid.NewGuid().ToString("N");
+        return Guid.NewGuid();
     }
 
     private static RegistrationProvisioningResult Failure(string key, string message)

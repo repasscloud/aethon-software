@@ -32,7 +32,7 @@ else
                 <div class="d-flex flex-column flex-lg-row justify-content-lg-between gap-3">
                     <div>
                         <h1 class="h3 fw-bold mb-2">@_job.Title</h1>
-                        <p class="text-secondary mb-0">@_job.OrganisationName</p>
+                        <p class="text-secondary mb-0">@_job.CompanyOrganisationName</p>
                     </div>
                     <div class="text-lg-end">
                         <div class="fw-semibold">@_job.Status</div>
@@ -87,7 +87,7 @@ else
                 <div class="card border-0 shadow-sm rounded-4 h-100">
                     <div class="card-body p-4">
                         <div class="small text-secondary mb-2">Location</div>
-                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(_job.LocationText) ? "-" : _job.LocationText)</div>
+                        <div class="fw-semibold">@(string.IsNullOrWhiteSpace(_job.Location) ? "-" : _job.Location)</div>
                         <div class="text-secondary mt-2">@_job.WorkplaceType</div>
                     </div>
                 </div>
@@ -99,9 +99,9 @@ else
                         <div class="small text-secondary mb-2">Employment</div>
                         <div class="fw-semibold">@_job.EmploymentType</div>
                         <div class="text-secondary mt-2">
-                            @if (_job.SalaryFrom.HasValue || _job.SalaryTo.HasValue)
+                            @if (_job.SalaryMin.HasValue || _job.SalaryMax.HasValue)
                             {
-                                <span>@_job.SalaryCurrency @(_job.SalaryFrom?.ToString("0.##") ?? "0") - @(_job.SalaryTo?.ToString("0.##") ?? "0")</span>
+                                <span>@_job.SalaryCurrency @(_job.SalaryMin?.ToString("0.##") ?? "0") - @(_job.SalaryMax?.ToString("0.##") ?? "0")</span>
                             }
                             else
                             {

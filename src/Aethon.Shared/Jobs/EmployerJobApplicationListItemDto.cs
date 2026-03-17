@@ -2,8 +2,8 @@ namespace Aethon.Shared.Jobs;
 
 public sealed class EmployerJobApplicationListItemDto
 {
-    public string Id { get; set; } = "";
-    public string JobId { get; set; } = "";
+    public Guid Id { get; set; }
+    public Guid JobId { get; set; }
     public string ApplicantUserId { get; set; } = "";
     public string ApplicantDisplayName { get; set; } = "";
     public string ApplicantEmail { get; set; } = "";

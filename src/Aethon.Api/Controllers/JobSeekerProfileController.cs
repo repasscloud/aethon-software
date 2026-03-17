@@ -106,7 +106,7 @@ public sealed class JobSeekerProfileController : ControllerBase
         profile.DesiredSalaryTo = request.DesiredSalaryTo;
         profile.DesiredSalaryCurrency = request.DesiredSalaryCurrency;
         profile.UpdatedUtc = DateTime.UtcNow;
-        profile.UpdatedByUserId = userId.ToString();
+        profile.UpdatedByUserId = userId;
 
         await _dbContext.SaveChangesAsync();
 
@@ -114,7 +114,7 @@ public sealed class JobSeekerProfileController : ControllerBase
     }
 
     [HttpPost("resume/{fileId}")]
-    public async Task<IActionResult> SetResume(string fileId)
+    public async Task<IActionResult> SetResume(Guid fileId)
     {
         var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdValue, out var userId))
@@ -141,7 +141,7 @@ public sealed class JobSeekerProfileController : ControllerBase
 
         profile.ResumeFileId = fileId;
         profile.UpdatedUtc = DateTime.UtcNow;
-        profile.UpdatedByUserId = userId.ToString();
+        profile.UpdatedByUserId = userId;
 
         await _dbContext.SaveChangesAsync();
 
