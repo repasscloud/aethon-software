@@ -16,9 +16,13 @@ public class Job : EntityBase
 
     public Guid CreatedByIdentityUserId { get; set; }
     public ApplicationUser CreatedByUser { get; set; } = null!;
+    public Guid? ManagedByUserId { get; set; }
+    public ApplicationUser? ManagedByUser { get; set; }
+    
     public JobCreatedByType CreatedByType { get; set; }
 
     public JobStatus Status { get; set; }
+    public string? StatusReason { get; set; }
     public JobVisibility Visibility { get; set; }
 
     public string Title { get; set; } = null!;
@@ -39,8 +43,11 @@ public class Job : EntityBase
     public DateTime? PublishedUtc { get; set; }
     public DateTime? ClosedUtc { get; set; }
 
+    public DateTime? SubmittedForApprovalUtc { get; set; }
     public Guid? ApprovedByUserId { get; set; }
     public DateTime? ApprovedUtc { get; set; }
+
+    public string? Summary { get; set; }
 
     public bool CreatedForUnclaimedCompany { get; set; }
 
