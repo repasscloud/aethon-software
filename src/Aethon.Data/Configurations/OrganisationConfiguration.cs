@@ -12,9 +12,6 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.Name)
             .IsRequired()
             .HasMaxLength(250);
@@ -50,12 +47,6 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
         builder.Property(x => x.IsPublicProfileEnabled)
             .IsRequired();
 
-        builder.Property(x => x.PrimaryDomainId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.ClaimedByUserId)
-            .HasMaxLength(64);
-
         builder.Property(x => x.PrimaryContactName)
             .HasMaxLength(250);
 
@@ -76,12 +67,6 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
 
         builder.Property(x => x.IsProvisionedByRecruiter)
             .IsRequired();
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => new { x.Type, x.NormalizedName });
         builder.HasIndex(x => x.Slug).IsUnique();

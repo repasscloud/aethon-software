@@ -12,22 +12,15 @@ public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfi
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.CompanyOrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.RecruiterOrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
-        builder.Property(x => x.RequestedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.RequestedByUserId);
 
-        builder.Property(x => x.ApprovedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.ApprovedByUserId);
 
         builder.Property(x => x.Notes)
             .HasMaxLength(4000);
@@ -47,11 +40,9 @@ public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfi
         builder.Property(x => x.RecruiterCanManageCandidates)
             .IsRequired();
 
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.CreatedByUserId);
 
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.UpdatedByUserId);
 
         builder.HasIndex(x => new { x.CompanyOrganisationId, x.RecruiterOrganisationId })
             .IsUnique();

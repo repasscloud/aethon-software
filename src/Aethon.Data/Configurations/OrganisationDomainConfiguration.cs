@@ -12,9 +12,6 @@ public sealed class OrganisationDomainConfiguration : IEntityTypeConfiguration<O
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.OrganisationId)
             .IsRequired()
             .HasMaxLength(64);

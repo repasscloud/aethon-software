@@ -12,12 +12,8 @@ public sealed class OrganisationClaimRequestConfiguration : IEntityTypeConfigura
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.OrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.EmailUsed)
             .IsRequired()
@@ -38,12 +34,6 @@ public sealed class OrganisationClaimRequestConfiguration : IEntityTypeConfigura
 
         builder.Property(x => x.VerificationMethod)
             .IsRequired();
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => new { x.OrganisationId, x.Status });
         builder.HasIndex(x => new { x.EmailDomain, x.Status });

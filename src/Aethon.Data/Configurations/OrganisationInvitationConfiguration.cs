@@ -12,12 +12,8 @@ public sealed class OrganisationInvitationConfiguration : IEntityTypeConfigurati
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.OrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.Email)
             .IsRequired()
@@ -35,20 +31,11 @@ public sealed class OrganisationInvitationConfiguration : IEntityTypeConfigurati
             .IsRequired()
             .HasMaxLength(200);
 
-        builder.Property(x => x.AcceptedByUserId)
-            .HasMaxLength(64);
-
         builder.Property(x => x.Type)
             .IsRequired();
 
         builder.Property(x => x.Status)
             .IsRequired();
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => x.Token)
             .IsUnique();

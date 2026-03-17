@@ -5,7 +5,7 @@ namespace Aethon.Data.Entities;
 
 public class JobApplication : EntityBase
 {
-    public string JobId { get; set; } = null!;
+    public Guid JobId { get; set; }
     public Job Job { get; set; } = null!;
 
     public Guid UserId { get; set; }

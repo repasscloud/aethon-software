@@ -5,13 +5,13 @@ namespace Aethon.Data.Entities;
 
 public class Job : EntityBase
 {
-    public string OwnedByOrganisationId { get; set; } = null!;
+    public Guid OwnedByOrganisationId { get; set; }
     public Organisation OwnedByOrganisation { get; set; } = null!;
 
-    public string? ManagedByOrganisationId { get; set; }
+    public Guid? ManagedByOrganisationId { get; set; }
     public Organisation? ManagedByOrganisation { get; set; }
 
-    public string? CompanyRecruiterRelationshipId { get; set; }
+    public Guid? CompanyRecruiterRelationshipId { get; set; }
     public CompanyRecruiterRelationship? CompanyRecruiterRelationship { get; set; }
 
     public Guid CreatedByIdentityUserId { get; set; }
@@ -44,5 +44,5 @@ public class Job : EntityBase
 
     public bool CreatedForUnclaimedCompany { get; set; }
 
-    public ICollection<JobApplication> Applications { get; set; } = [];
+    public ICollection<JobApplication> Applications { get; set; } = new List<JobApplication>();
 }

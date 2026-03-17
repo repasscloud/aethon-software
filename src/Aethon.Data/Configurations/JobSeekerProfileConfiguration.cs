@@ -12,9 +12,6 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.Headline)
             .HasMaxLength(250);
 
@@ -30,20 +27,11 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
         builder.Property(x => x.LinkedInUrl)
             .HasMaxLength(500);
 
-        builder.Property(x => x.ResumeFileId)
-            .HasMaxLength(128);
-
         builder.Property(x => x.DesiredSalaryFrom)
             .HasPrecision(18, 2);
 
         builder.Property(x => x.DesiredSalaryTo)
             .HasPrecision(18, 2);
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => x.UserId)
             .IsUnique();

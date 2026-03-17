@@ -12,15 +12,10 @@ public sealed class JobApplicationConfiguration : IEntityTypeConfiguration<JobAp
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.JobId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
-        builder.Property(x => x.ResumeFileId)
-            .HasMaxLength(128);
+        builder.Property(x => x.ResumeFileId);
 
         builder.Property(x => x.CoverLetter)
             .HasMaxLength(20000);
@@ -34,11 +29,9 @@ public sealed class JobApplicationConfiguration : IEntityTypeConfiguration<JobAp
         builder.Property(x => x.Status)
             .IsRequired();
 
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.CreatedByUserId);
 
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.UpdatedByUserId);
 
         builder.HasIndex(x => new { x.JobId, x.UserId })
             .IsUnique();

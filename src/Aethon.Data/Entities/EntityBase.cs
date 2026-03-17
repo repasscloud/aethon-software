@@ -2,9 +2,9 @@ namespace Aethon.Data.Entities;
 
 public abstract class EntityBase
 {
-    public string Id { get; set; } = null!;
+    public Guid Id { get; set; }
     public DateTime CreatedUtc { get; set; }
     public DateTime? UpdatedUtc { get; set; }
-    public string? CreatedByUserId { get; set; }
-    public string? UpdatedByUserId { get; set; }
+    public Guid? CreatedByUserId { get; set; }
+    public Guid? UpdatedByUserId { get; set; }
 }

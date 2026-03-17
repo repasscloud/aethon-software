@@ -12,9 +12,6 @@ public sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredFil
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.FileName)
             .IsRequired()
             .HasMaxLength(260);
@@ -34,12 +31,6 @@ public sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredFil
         builder.Property(x => x.StoragePath)
             .IsRequired()
             .HasMaxLength(1000);
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => x.UploadedByUserId);
     }

@@ -21,6 +21,6 @@ public class OrganisationInvitation : EntityBase
     public RecruiterRole? RecruiterRole { get; set; }
 
     public bool AllowClaimAsOwner { get; set; }
-    public string? AcceptedByUserId { get; set; }
+    public Guid? AcceptedByUserId { get; set; }
     public DateTime? AcceptedUtc { get; set; }
 }

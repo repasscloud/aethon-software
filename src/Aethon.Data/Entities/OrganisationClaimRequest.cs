@@ -5,7 +5,7 @@ namespace Aethon.Data.Entities;
 
 public class OrganisationClaimRequest : EntityBase
 {
-    public string OrganisationId { get; set; } = null!;
+    public Guid OrganisationId { get; set; }
     public Organisation Organisation { get; set; } = null!;
 
     public Guid RequestedByUserId { get; set; }

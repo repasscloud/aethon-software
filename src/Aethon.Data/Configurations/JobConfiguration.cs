@@ -12,18 +12,14 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.OwnedByOrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.ManagedByOrganisationId)
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.CompanyRecruiterRelationshipId)
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.Title)
             .IsRequired()
@@ -77,11 +73,9 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
 
         builder.Property(x => x.ApprovedByUserId);
 
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.CreatedByUserId);
 
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
+        builder.Property(x => x.UpdatedByUserId);
 
         builder.HasIndex(x => new { x.OwnedByOrganisationId, x.Status });
         builder.HasIndex(x => new { x.ManagedByOrganisationId, x.Status });

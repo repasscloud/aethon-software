@@ -12,21 +12,11 @@ public sealed class OrganisationMembershipConfiguration : IEntityTypeConfigurati
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Id)
-            .HasMaxLength(64);
-
         builder.Property(x => x.OrganisationId)
-            .IsRequired()
-            .HasMaxLength(64);
+            .IsRequired();
 
         builder.Property(x => x.Status)
             .IsRequired();
-
-        builder.Property(x => x.CreatedByUserId)
-            .HasMaxLength(64);
-
-        builder.Property(x => x.UpdatedByUserId)
-            .HasMaxLength(64);
 
         builder.HasIndex(x => new { x.OrganisationId, x.UserId })
             .IsUnique();

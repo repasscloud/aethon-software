@@ -4,7 +4,7 @@ namespace Aethon.Data.Entities;
 
 public class OrganisationDomain : EntityBase
 {
-    public string OrganisationId { get; set; } = null!;
+    public Guid OrganisationId { get; set; }
     public Organisation Organisation { get; set; } = null!;
 
     public string Domain { get; set; } = null!;
@@ -22,5 +22,5 @@ public class OrganisationDomain : EntityBase
 
     public DateTime? VerificationRequestedUtc { get; set; }
     public DateTime? VerifiedUtc { get; set; }
-    public string? VerifiedByUserId { get; set; }
+    public Guid? VerifiedByUserId { get; set; }
 }
