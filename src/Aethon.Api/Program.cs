@@ -1,6 +1,8 @@
 using Aethon.Api.Auth;
 using Aethon.Api.Files;
 using Aethon.Api.Infrastructure;
+using Aethon.Application.CompanyJobsApproval;
+using Aethon.Application.RecruiterJobs;
 using Aethon.Data;
 using Aethon.Data.Identity;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -59,6 +61,10 @@ builder.Services
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppUserClaimsPrincipalFactory>();
 builder.Services.AddScoped<IRegistrationProvisioningService, RegistrationProvisioningService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+builder.Services.AddScoped<IRecruiterJobQueryService, RecruiterJobService>();
+builder.Services.AddScoped<IRecruiterJobCommandService, RecruiterJobService>();
+builder.Services.AddScoped<ICompanyJobApprovalQueryService, CompanyJobApprovalService>();
+builder.Services.AddScoped<ICompanyJobApprovalCommandService, CompanyJobApprovalService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {

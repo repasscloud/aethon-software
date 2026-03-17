@@ -287,6 +287,43 @@ public sealed class JobsController : ControllerBase
         return Ok(await BuildJobDetailAsync(job.Id, access.OrganisationId!));
     }
 
+    [HttpGet("{jobId:guid}")]
+    public async Task<ActionResult<JobDetailDto>> GetById(
+        Guid jobId,
+        [FromServices] AethonDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var result = await db.Jobs
+            .AsNoTracking()
+            .Where(x => x.Id == jobId)
+            .Select(x => new JobDetailDto
+            {
+                Id = x.Id,
+                CompanyOrganisationId = x.CompanyOrganisationId,
+                ManagedByRecruiterOrganisationId = x.ManagedByRecruiterOrganisationId,
+                Title = x.Title,
+                Summary = x.Summary,
+                Description = x.Description,
+                Location = x.Location,
+                SalaryMin = x.SalaryMin,
+                SalaryMax = x.SalaryMax,
+                Status = x.Status.ToString(),
+                StatusReason = x.StatusReason,
+                CreatedUtc = x.CreatedUtc,
+                SubmittedForApprovalUtc = x.SubmittedForApprovalUtc,
+                ApprovedUtc = x.ApprovedUtc,
+                PublishedUtc = x.PublishedUtc
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(result);
+    }
+
     private async Task<JobDetailDto> BuildJobDetailAsync(string jobId, string organisationId)
     {
         return await _dbContext.Jobs

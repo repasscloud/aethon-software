@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Aethon.Data\Aethon.Data.csproj" />
     <ProjectReference Include="..\Aethon.Shared\Aethon.Shared.csproj" />
+    <ProjectReference Include="..\Aethon.Application\Aethon.Application.csproj" />
   </ItemGroup>
 
 </Project>

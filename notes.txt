@@ -1,2 +1,12 @@
 miss piggy logo: https://i.pinimg.com/236x/44/bc/5a/44bc5a9c9fffd35a5d60b0497676275d.jpg
 
+mkdir -p src/Aethon.Web/Pages/Recruiter/Companies/
+touch src/Aethon.Web/Pages/Recruiter/Companies/Index.razor
+touch src/Aethon.Web/Pages/Recruiter/Companies/Request.razor
+mkdir -p src/Aethon.Web/Pages/Recruiter/Jobs/
+touch src/Aethon.Web/Pages/Recruiter/Jobs/Index.razor
+touch src/Aethon.Web/Pages/Recruiter/Jobs/Create.razor
+touch src/Aethon.Web/Pages/Recruiter/Jobs/Edit.razor
+mkdir -p src/Aethon.Web/Pages/Recruiter/Applications/
+
+touch src/Aethon.Web/Pages/Recruiter/Applications/Index.razor

@@ -1,0 +1,65 @@
+@page "/recruiter/jobs/create"
+@using Aethon.Shared.Jobs
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Create Recruiter Job</PageTitle>
+
+<h3>Create Draft Job</h3>
+
+<EditForm Model="model" OnValidSubmit="SaveAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label>Company Organisation Id</label>
+        <InputText class="form-control" @bind-Value="companyOrganisationIdText" />
+    </div>
+
+    <div class="mb-3">
+        <label>Title</label>
+        <InputText class="form-control" @bind-Value="model.Title" />
+    </div>
+
+    <div class="mb-3">
+        <label>Summary</label>
+        <InputTextArea class="form-control" @bind-Value="model.Summary" />
+    </div>
+
+    <div class="mb-3">
+        <label>Description</label>
+        <InputTextArea class="form-control" @bind-Value="model.Description" />
+    </div>
+
+    <div class="mb-3">
+        <label>Location</label>
+        <InputText class="form-control" @bind-Value="model.Location" />
+    </div>
+
+    <div class="mb-3">
+        <label>Salary Min</label>
+        <InputNumber class="form-control" @bind-Value="model.SalaryMin" />
+    </div>
+
+    <div class="mb-3">
+        <label>Salary Max</label>
+        <InputNumber class="form-control" @bind-Value="model.SalaryMax" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Draft</button>
+</EditForm>
+
+@code {
+    private readonly RecruiterCreateJobDraftDto model = new();
+    private string companyOrganisationIdText = string.Empty;
+
+    private async Task SaveAsync()
+    {
+        model.CompanyOrganisationId = Guid.Parse(companyOrganisationIdText);
+
+        var response = await Http.PostAsJsonAsync("api/recruiter/jobs", model);
+        response.EnsureSuccessStatusCode();
+
+        Nav.NavigateTo("/recruiter/jobs");
+    }
+}

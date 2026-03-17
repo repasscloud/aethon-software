@@ -1,0 +1,48 @@
+@page "/recruiter/jobs"
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Recruiter Jobs</PageTitle>
+
+<button class="btn btn-primary" @onclick="CreateNew">New Draft Job</button>
+
+@if (items is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Company</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in items)
+        {
+            <tr>
+                <td>@item.Title</td>
+                <td>@item.OrganisationName</td>
+                <td>@item.Status</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<JobSummaryDto>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/recruiter/jobs");
+    }
+
+    private void CreateNew()
+    {
+        Nav.NavigateTo("/recruiter/jobs/create");
+    }
+}

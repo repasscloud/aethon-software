@@ -1,0 +1,68 @@
+@page "/company/jobs/pending-approvals"
+@using Aethon.Shared.CompanyJobsApproval
+@using Aethon.Shared.Jobs
+@inject HttpClient Http
+
+<PageTitle>Pending Job Approvals</PageTitle>
+
+@if (items is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Submitted</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in items)
+        {
+            <tr>
+                <td>@item.Title</td>
+                <td>@item.SubmittedForApprovalUtc?.ToLocalTime()</td>
+                <td>
+                    <button class="btn btn-success" @onclick="() => Approve(item.Id)">Approve</button>
+                    <button class="btn btn-danger ms-2" @onclick="() => Reject(item.Id)">Reject</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<JobSummaryDto>? items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/company/jobs/approvals/pending");
+    }
+
+    private async Task Approve(Guid id)
+    {
+        var response = await Http.PostAsync($"api/company/jobs/approvals/{id}/approve", null);
+        response.EnsureSuccessStatusCode();
+        await ReloadAsync();
+    }
+
+    private async Task Reject(Guid id)
+    {
+        var response = await Http.PostAsJsonAsync($"api/company/jobs/approvals/{id}/reject", new RejectJobApprovalDto
+        {
+            Reason = "Rejected by company"
+        });
+
+        response.EnsureSuccessStatusCode();
+        await ReloadAsync();
+    }
+}
