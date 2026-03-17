@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using Aethon.Api.Common;
 using Aethon.Api.Infrastructure;
+using Aethon.Application.Jobs;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Auth;
@@ -17,10 +19,12 @@ namespace Aethon.Api.Controllers;
 public sealed class JobsController : ControllerBase
 {
     private readonly AethonDbContext _dbContext;
+    private readonly IJobPermissionService _jobPermissionService;
 
-    public JobsController(AethonDbContext dbContext)
+    public JobsController(AethonDbContext dbContext, IJobPermissionService jobPermissionService)
     {
         _dbContext = dbContext;
+        _jobPermissionService = jobPermissionService;
     }
 
     [HttpGet("my-org")]
@@ -326,6 +330,16 @@ public sealed class JobsController : ControllerBase
             return NotFound();
         }
 
+        return Ok(result);
+    }
+
+    [HttpGet("allowed-companies")]
+    public async Task<ActionResult<IReadOnlyList<Guid>>> GetAllowedCompanies(
+        [FromServices] IJobPermissionService service,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await service.GetAllowedCompanyIdsAsync(userId, cancellationToken);
         return Ok(result);
     }
 

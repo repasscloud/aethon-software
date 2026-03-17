@@ -1,6 +1,7 @@
 using Aethon.Api.Common;
 using Aethon.Application.RecruiterJobs;
 using Aethon.Shared.Jobs;
+using Aethon.Shared.RecruiterCompanies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +19,16 @@ public sealed class RecruiterJobsController : ControllerBase
     {
         var userId = User.GetUserId();
         var result = await service.GetRecruiterJobsAsync(userId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("allowed-companies")]
+    public async Task<ActionResult<IReadOnlyList<RecruiterCompanyRelationshipDto>>> GetAllowedCompanies(
+        [FromServices] IRecruiterJobQueryService service,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await service.GetAllowedPostingCompaniesAsync(userId, cancellationToken);
         return Ok(result);
     }
 

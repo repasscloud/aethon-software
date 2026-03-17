@@ -1,0 +1,50 @@
+@page "/jobs/create"
+@using Aethon.Shared.Jobs
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Create Job</PageTitle>
+
+@if (allowedCompanies is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync">
+        <div class="mb-3">
+            <label>Company</label>
+            <select class="form-select" @bind="model.CompanyOrganisationId">
+                @foreach (var id in allowedCompanies)
+                {
+                    <option value="@id">@id</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label>Title</label>
+            <InputText class="form-control" @bind-Value="model.Title" />
+        </div>
+
+        <button class="btn btn-primary" type="submit">Create</button>
+    </EditForm>
+}
+
+@code {
+    private readonly CreateJobDto model = new();
+    private List<Guid>? allowedCompanies;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allowedCompanies = await Http.GetFromJsonAsync<List<Guid>>("api/jobs/allowed-companies") ?? [];
+    }
+
+    private async Task SaveAsync()
+    {
+        var response = await Http.PostAsJsonAsync("api/jobs", model);
+        response.EnsureSuccessStatusCode();
+
+        Nav.NavigateTo("/jobs");
+    }
+}

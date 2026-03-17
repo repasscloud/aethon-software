@@ -32,12 +32,16 @@ public class Organisation : EntityBase
     public string? PrimaryContactEmail { get; set; }
     public string? PrimaryContactPhone { get; set; }
 
+    public bool IsVerified { get; set; } = false;
+    public DateTime? VerifiedUtc { get; set; }
+    public Guid? VerifiedByUserId { get; set; }
+
     public ICollection<OrganisationDomain> Domains { get; set; } = [];
     public ICollection<OrganisationMembership> Memberships { get; set; } = [];
     public ICollection<OrganisationInvitation> Invitations { get; set; } = [];
 
-    public ICollection<CompanyRecruiterRelationship> CompanyRelationships { get; set; } = [];
-    public ICollection<CompanyRecruiterRelationship> RecruiterRelationships { get; set; } = [];
+    public ICollection<OrganisationRecruitmentPartnership> CompanyRelationships { get; set; } = [];
+    public ICollection<OrganisationRecruitmentPartnership> RecruiterRelationships { get; set; } = [];
 
     public ICollection<Job> OwnedJobs { get; set; } = [];
     public ICollection<Job> ManagedJobs { get; set; } = [];

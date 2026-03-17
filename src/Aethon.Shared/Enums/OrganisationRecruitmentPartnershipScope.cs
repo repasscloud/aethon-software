@@ -1,7 +1,7 @@
 namespace Aethon.Shared.Enums;
 
 [Flags]
-public enum CompanyRecruiterRelationshipScope
+public enum OrganisationRecruitmentPartnershipScope
 {
     None = 0,
     CreateDraftJobs = 1 << 0,

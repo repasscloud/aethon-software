@@ -1,6 +1,6 @@
 namespace Aethon.Shared.Enums;
 
-public enum CompanyRecruiterRelationshipStatus
+public enum OrganisationRecruitmentPartnershipStatus
 {
     Pending = 1,
     Active = 2,

@@ -71,6 +71,7 @@ builder.Services.AddScoped<ICompanyRecruiterQueryService, CompanyRecruiterServic
 builder.Services.AddScoped<ICompanyRecruiterCommandService, CompanyRecruiterService>();
 builder.Services.AddScoped<IRecruiterCompanyQueryService, RecruiterCompanyService>();
 builder.Services.AddScoped<IRecruiterCompanyCommandService, RecruiterCompanyService>();
+builder.Services.AddScoped<IRecruiterPostingPermissionService, RecruiterPostingPermissionService>();
 
 builder.Services.ConfigureApplicationCookie(options =>
 {
