@@ -1,0 +1,37 @@
+@page "/recruiter/companies/request"
+@using Aethon.Shared.RecruiterCompanies
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Request Company Relationship</PageTitle>
+
+<h3>Request Company Relationship</h3>
+
+<EditForm Model="model" OnValidSubmit="SaveAsync">
+    <div class="mb-3">
+        <label>Company Organisation Id</label>
+        <InputText class="form-control" @bind-Value="companyOrganisationIdText" />
+    </div>
+
+    <div class="mb-3">
+        <label>Message</label>
+        <InputTextArea class="form-control" @bind-Value="model.Message" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Send Request</button>
+</EditForm>
+
+@code {
+    private readonly CreateRecruiterCompanyRequestDto model = new();
+    private string companyOrganisationIdText = string.Empty;
+
+    private async Task SaveAsync()
+    {
+        model.CompanyOrganisationId = Guid.Parse(companyOrganisationIdText);
+
+        var response = await Http.PostAsJsonAsync("api/recruiter/companies/requests", model);
+        response.EnsureSuccessStatusCode();
+
+        Nav.NavigateTo("/recruiter/companies");
+    }
+}

@@ -1,0 +1,165 @@
+@page "/company/recruiters"
+@using Aethon.Shared.CompanyRecruiters
+@using Aethon.Shared.Enums
+@using Aethon.Shared.RecruiterCompanies
+@inject HttpClient Http
+
+<PageTitle>Company Recruiters</PageTitle>
+
+<h3>Recruiter Relationships</h3>
+
+<EditForm Model="inviteModel" OnValidSubmit="InviteAsync">
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Invite Recruiter Organisation</h5>
+
+            <div class="mb-3">
+                <label>Recruiter Organisation Id</label>
+                <InputText class="form-control" @bind-Value="recruiterOrganisationIdText" />
+            </div>
+
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowCreateDraftJobs" />
+                <label class="form-check-label">Allow Create Draft Jobs</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowSubmitJobsForApproval" />
+                <label class="form-check-label">Allow Submit Jobs For Approval</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowManageApprovedJobs" />
+                <label class="form-check-label">Allow Manage Approved Jobs</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowViewCandidates" />
+                <label class="form-check-label">Allow View Candidates</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowSubmitCandidates" />
+                <label class="form-check-label">Allow Submit Candidates</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowCommunicateWithCandidates" />
+                <label class="form-check-label">Allow Communicate With Candidates</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowScheduleInterviews" />
+                <label class="form-check-label">Allow Schedule Interviews</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.AllowPublishJobs" />
+                <label class="form-check-label">Allow Publish Jobs</label>
+            </div>
+
+            <hr />
+
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.RecruiterCanCreateUnclaimedCompanyJobs" />
+                <label class="form-check-label">Recruiter Can Create Unclaimed Company Jobs</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.RecruiterCanPublishJobs" />
+                <label class="form-check-label">Recruiter Can Publish Jobs</label>
+            </div>
+            <div class="form-check">
+                <InputCheckbox class="form-check-input" @bind-Value="inviteModel.RecruiterCanManageCandidates" />
+                <label class="form-check-label">Recruiter Can Manage Candidates</label>
+            </div>
+
+            <div class="mt-3">
+                <label>Message</label>
+                <InputTextArea class="form-control" @bind-Value="inviteModel.Message" />
+            </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Create Invite</button>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@if (items is null)
+{
+    <p>Loading...</p>
+}
+else if (items.Count == 0)
+{
+    <p>No recruiter relationships.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Recruiter</th>
+                <th>Status</th>
+                <th>Scope</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in items)
+        {
+            <tr>
+                <td>@item.RecruiterOrganisationName</td>
+                <td>@item.Status</td>
+                <td>@item.Scope</td>
+                <td>
+                    @if (item.Status == CompanyRecruiterRelationshipStatus.Active || item.Status == CompanyRecruiterRelationshipStatus.Pending)
+                    {
+                        <button class="btn btn-warning btn-sm" @onclick="() => SuspendAsync(item.Id)">Suspend</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<RecruiterCompanyRelationshipDto>? items;
+    private readonly CreateCompanyRecruiterInviteDto inviteModel = new();
+    private string recruiterOrganisationIdText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters") ?? [];
+    }
+
+    private async Task InviteAsync()
+    {
+        inviteModel.RecruiterOrganisationId = Guid.Parse(recruiterOrganisationIdText);
+
+        var response = await Http.PostAsJsonAsync("api/company/recruiters/invites", inviteModel);
+        response.EnsureSuccessStatusCode();
+
+        recruiterOrganisationIdText = string.Empty;
+
+        inviteModel.AllowCreateDraftJobs = false;
+        inviteModel.AllowSubmitJobsForApproval = false;
+        inviteModel.AllowManageApprovedJobs = false;
+        inviteModel.AllowViewCandidates = false;
+        inviteModel.AllowSubmitCandidates = false;
+        inviteModel.AllowCommunicateWithCandidates = false;
+        inviteModel.AllowScheduleInterviews = false;
+        inviteModel.AllowPublishJobs = false;
+        inviteModel.RecruiterCanCreateUnclaimedCompanyJobs = false;
+        inviteModel.RecruiterCanPublishJobs = false;
+        inviteModel.RecruiterCanManageCandidates = false;
+        inviteModel.Message = null;
+
+        await LoadAsync();
+    }
+
+    private async Task SuspendAsync(Guid relationshipId)
+    {
+        var response = await Http.PostAsync($"api/company/recruiters/{relationshipId}/suspend", null);
+        response.EnsureSuccessStatusCode();
+        await LoadAsync();
+    }
+}

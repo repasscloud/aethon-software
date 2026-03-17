@@ -7,6 +7,7 @@ public interface ICompanyRecruiterCommandService
     Task ApproveAsync(
         Guid companyUserId,
         Guid relationshipId,
+        ApproveRecruiterCompanyRequestDto request,
         CancellationToken cancellationToken);
 
     Task RejectAsync(
@@ -18,5 +19,10 @@ public interface ICompanyRecruiterCommandService
     Task SuspendAsync(
         Guid companyUserId,
         Guid relationshipId,
+        CancellationToken cancellationToken);
+
+    Task InviteAsync(
+        Guid companyUserId,
+        CreateCompanyRecruiterInviteDto request,
         CancellationToken cancellationToken);
 }

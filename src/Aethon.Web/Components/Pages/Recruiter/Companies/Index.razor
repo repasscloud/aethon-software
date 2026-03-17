@@ -1,14 +1,22 @@
 @page "/recruiter/companies"
+@using Aethon.Shared.Enums
 @using Aethon.Shared.RecruiterCompanies
 @inject HttpClient Http
+@inject NavigationManager Nav
 
 <PageTitle>Recruiter Companies</PageTitle>
 
-<h3>Company Relationships</h3>
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="CreateNew">Request Company Access</button>
+</div>
 
 @if (items is null)
 {
     <p>Loading...</p>
+}
+else if (items.Count == 0)
+{
+    <p>No company relationships.</p>
 }
 else
 {
@@ -17,7 +25,9 @@ else
             <tr>
                 <th>Company</th>
                 <th>Status</th>
+                <th>Scope</th>
                 <th>Created</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -26,7 +36,14 @@ else
             <tr>
                 <td>@item.CompanyOrganisationName</td>
                 <td>@item.Status</td>
+                <td>@item.Scope</td>
                 <td>@item.CreatedUtc.ToLocalTime()</td>
+                <td>
+                    @if (item.Status == CompanyRecruiterRelationshipStatus.Pending)
+                    {
+                        <button class="btn btn-outline-danger btn-sm" @onclick="() => CancelAsync(item.Id)">Cancel</button>
+                    }
+                </td>
             </tr>
         }
         </tbody>
@@ -38,6 +55,23 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/recruiter/companies");
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/recruiter/companies") ?? [];
+    }
+
+    private void CreateNew()
+    {
+        Nav.NavigateTo("/recruiter/companies/request");
+    }
+
+    private async Task CancelAsync(Guid relationshipId)
+    {
+        var response = await Http.PostAsync($"api/recruiter/companies/requests/{relationshipId}/cancel", null);
+        response.EnsureSuccessStatusCode();
+        await LoadAsync();
     }
 }

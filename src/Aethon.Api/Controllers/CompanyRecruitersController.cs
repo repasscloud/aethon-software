@@ -12,6 +12,16 @@ namespace Aethon.Api.Controllers;
 [Authorize]
 public sealed class CompanyRecruitersController : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<RecruiterCompanyRelationshipDto>>> GetMine(
+        [FromServices] ICompanyRecruiterQueryService service,
+        CancellationToken cancellationToken)
+    {
+        var companyUserId = User.GetUserId();
+        var result = await service.GetRelationshipsAsync(companyUserId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("pending")]
     public async Task<ActionResult<IReadOnlyList<RecruiterCompanyRelationshipDto>>> GetPending(
         [FromServices] ICompanyRecruiterQueryService service,
@@ -22,14 +32,26 @@ public sealed class CompanyRecruitersController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPost("{relationshipId:guid}/approve")]
-    public async Task<IActionResult> Approve(
-        Guid relationshipId,
+    [HttpPost("invites")]
+    public async Task<IActionResult> Invite(
+        [FromBody] CreateCompanyRecruiterInviteDto request,
         [FromServices] ICompanyRecruiterCommandService service,
         CancellationToken cancellationToken)
     {
         var companyUserId = User.GetUserId();
-        await service.ApproveAsync(companyUserId, relationshipId, cancellationToken);
+        await service.InviteAsync(companyUserId, request, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{relationshipId:guid}/approve")]
+    public async Task<IActionResult> Approve(
+        Guid relationshipId,
+        [FromBody] ApproveRecruiterCompanyRequestDto request,
+        [FromServices] ICompanyRecruiterCommandService service,
+        CancellationToken cancellationToken)
+    {
+        var companyUserId = User.GetUserId();
+        await service.ApproveAsync(companyUserId, relationshipId, request, cancellationToken);
         return NoContent();
     }
 

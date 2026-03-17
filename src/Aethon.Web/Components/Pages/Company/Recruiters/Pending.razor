@@ -1,4 +1,5 @@
 @page "/company/recruiters/pending"
+@using Aethon.Shared.CompanyRecruiters
 @using Aethon.Shared.RecruiterCompanies
 @inject HttpClient Http
 
@@ -8,42 +9,172 @@
 {
     <p>Loading...</p>
 }
+else if (items.Count == 0)
+{
+    <p>No pending recruiter requests.</p>
+}
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Recruiter</th>
-                <th>Notes</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        @foreach (var item in items)
-        {
-            <tr>
-                <td>@item.RecruiterOrganisationName</td>
-                <td>@item.Notes</td>
-                <td>
-                    <button class="btn btn-success" @onclick="() => Approve(item.Id)">Approve</button>
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    @foreach (var item in items)
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">@item.RecruiterOrganisationName</h5>
+                <p class="card-text">@item.Notes</p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowCreateDraftJobs" />
+                            <label class="form-check-label">Allow Create Draft Jobs</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowSubmitJobsForApproval" />
+                            <label class="form-check-label">Allow Submit Jobs For Approval</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowManageApprovedJobs" />
+                            <label class="form-check-label">Allow Manage Approved Jobs</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowViewCandidates" />
+                            <label class="form-check-label">Allow View Candidates</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowSubmitCandidates" />
+                            <label class="form-check-label">Allow Submit Candidates</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowCommunicateWithCandidates" />
+                            <label class="form-check-label">Allow Communicate With Candidates</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowScheduleInterviews" />
+                            <label class="form-check-label">Allow Schedule Interviews</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.AllowPublishJobs" />
+                            <label class="form-check-label">Allow Publish Jobs</label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.RecruiterCanCreateUnclaimedCompanyJobs" />
+                            <label class="form-check-label">Recruiter Can Create Unclaimed Company Jobs</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.RecruiterCanPublishJobs" />
+                            <label class="form-check-label">Recruiter Can Publish Jobs</label>
+                        </div>
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input" @bind-Value="item.RecruiterCanManageCandidates" />
+                            <label class="form-check-label">Recruiter Can Manage Candidates</label>
+                        </div>
+
+                        <div class="mt-3">
+                            <label>Approval Notes</label>
+                            <InputTextArea class="form-control" @bind-Value="item.ApprovalNotes" />
+                        </div>
+
+                        <div class="mt-3">
+                            <label>Reject Reason</label>
+                            <InputTextArea class="form-control" @bind-Value="item.RejectReason" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <button class="btn btn-success me-2" @onclick="() => ApproveAsync(item)">Approve</button>
+                    <button class="btn btn-danger" @onclick="() => RejectAsync(item)">Reject</button>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
-    private List<RecruiterCompanyRelationshipDto>? items;
+    private List<RowModel>? items;
 
     protected override async Task OnInitializedAsync()
     {
-        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters/pending");
+        await LoadAsync();
     }
 
-    private async Task Approve(Guid id)
+    private async Task LoadAsync()
     {
-        await Http.PostAsync($"api/company/recruiters/{id}/approve", null);
-        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters/pending");
+        var result = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters/pending")
+            ?? [];
+
+        items = result.Select(x => new RowModel
+        {
+            Id = x.Id,
+            RecruiterOrganisationName = x.RecruiterOrganisationName,
+            Notes = x.Notes,
+            RecruiterCanCreateUnclaimedCompanyJobs = x.RecruiterCanCreateUnclaimedCompanyJobs,
+            RecruiterCanPublishJobs = x.RecruiterCanPublishJobs,
+            RecruiterCanManageCandidates = x.RecruiterCanManageCandidates
+        }).ToList();
+    }
+
+    private async Task ApproveAsync(RowModel item)
+    {
+        var request = new ApproveRecruiterCompanyRequestDto
+        {
+            AllowCreateDraftJobs = item.AllowCreateDraftJobs,
+            AllowSubmitJobsForApproval = item.AllowSubmitJobsForApproval,
+            AllowManageApprovedJobs = item.AllowManageApprovedJobs,
+            AllowViewCandidates = item.AllowViewCandidates,
+            AllowSubmitCandidates = item.AllowSubmitCandidates,
+            AllowCommunicateWithCandidates = item.AllowCommunicateWithCandidates,
+            AllowScheduleInterviews = item.AllowScheduleInterviews,
+            AllowPublishJobs = item.AllowPublishJobs,
+            RecruiterCanCreateUnclaimedCompanyJobs = item.RecruiterCanCreateUnclaimedCompanyJobs,
+            RecruiterCanPublishJobs = item.RecruiterCanPublishJobs,
+            RecruiterCanManageCandidates = item.RecruiterCanManageCandidates,
+            Notes = item.ApprovalNotes
+        };
+
+        var response = await Http.PostAsJsonAsync($"api/company/recruiters/{item.Id}/approve", request);
+        response.EnsureSuccessStatusCode();
+
+        await LoadAsync();
+    }
+
+    private async Task RejectAsync(RowModel item)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/company/recruiters/{item.Id}/reject",
+            new RejectRecruiterCompanyRequestDto
+            {
+                Reason = item.RejectReason
+            });
+
+        response.EnsureSuccessStatusCode();
+
+        await LoadAsync();
+    }
+
+    private sealed class RowModel
+    {
+        public Guid Id { get; set; }
+        public string RecruiterOrganisationName { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+
+        public bool AllowCreateDraftJobs { get; set; }
+        public bool AllowSubmitJobsForApproval { get; set; }
+        public bool AllowManageApprovedJobs { get; set; }
+        public bool AllowViewCandidates { get; set; }
+        public bool AllowSubmitCandidates { get; set; }
+        public bool AllowCommunicateWithCandidates { get; set; }
+        public bool AllowScheduleInterviews { get; set; }
+        public bool AllowPublishJobs { get; set; }
+
+        public bool RecruiterCanCreateUnclaimedCompanyJobs { get; set; }
+        public bool RecruiterCanPublishJobs { get; set; }
+        public bool RecruiterCanManageCandidates { get; set; }
+
+        public string? ApprovalNotes { get; set; }
+        public string? RejectReason { get; set; }
     }
 }
