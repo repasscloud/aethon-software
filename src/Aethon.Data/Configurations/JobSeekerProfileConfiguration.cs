@@ -59,6 +59,18 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
         builder.Property(x => x.AvailabilityText)
             .HasMaxLength(250);
 
+        builder.Property(x => x.IsPublicProfileEnabled)
+            .IsRequired();
+
+        builder.Property(x => x.IsSearchable)
+            .IsRequired();
+
+        builder.Property(x => x.Slug)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.AboutMe)
+            .HasMaxLength(2000);
+
         builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
 
@@ -66,6 +78,11 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
             .IsUnique();
 
         builder.HasIndex(x => x.OpenToWork);
+        builder.HasIndex(x => x.IsPublicProfileEnabled);
+        builder.HasIndex(x => x.IsSearchable);
+        builder.HasIndex(x => x.Slug)
+            .IsUnique()
+            .HasFilter("[Slug] IS NOT NULL");
 
         builder.HasOne(x => x.User)
             .WithMany()

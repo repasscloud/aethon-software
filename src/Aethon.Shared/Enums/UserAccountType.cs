@@ -1,9 +1,12 @@
 namespace Aethon.Shared.Enums;
 
+/// <summary>
+/// High-level user account type selected during onboarding.
+/// </summary>
 public enum UserAccountType
 {
-    JobSeeker = 1,
+    Admin = 1,
     Company = 2,
-    Recruiter = 3,
-    PlatformAdmin = 4
+    RecruiterAgency = 3,
+    JobSeeker = 4
 }

@@ -4,11 +4,10 @@ using Aethon.Shared.Enums;
 namespace Aethon.Data.Entities;
 
 /// <summary>
-/// Profile data for a job seeker account.
+/// Candidate profile data for a job seeker account.
 /// 
-/// This stores personal profile and job preference information.
-/// Account-level verification concerns such as identity verification,
-/// login verification, and phone verification should live on ApplicationUser.
+/// This stores public-facing profile, career preferences, and candidate details.
+/// Account-level verification concerns should live on ApplicationUser.
 /// </summary>
 public class JobSeekerProfile : EntityBase
 {
@@ -40,7 +39,6 @@ public class JobSeekerProfile : EntityBase
 
     /// <summary>
     /// Candidate date of birth, if supplied.
-    /// Nullable because not every user will provide it immediately.
     /// </summary>
     public DateOnly? DateOfBirth { get; set; }
 
@@ -56,7 +54,7 @@ public class JobSeekerProfile : EntityBase
     public string? WhatsAppNumber { get; set; }
 
     /// <summary>
-    /// Profile headline shown on the candidate profile.
+    /// Headline shown on the candidate profile.
     /// Example: Senior .NET Developer | Azure | Blazor
     /// </summary>
     public string? Headline { get; set; }
@@ -68,13 +66,11 @@ public class JobSeekerProfile : EntityBase
 
     /// <summary>
     /// Candidate current location in free text form.
-    /// Example: Sydney, NSW, Australia
     /// </summary>
     public string? CurrentLocation { get; set; }
 
     /// <summary>
-    /// Candidate preferred job location in free text form.
-    /// Example: Remote / Sydney / Melbourne
+    /// Candidate preferred location in free text form.
     /// </summary>
     public string? PreferredLocation { get; set; }
 
@@ -82,12 +78,6 @@ public class JobSeekerProfile : EntityBase
     /// Candidate LinkedIn profile URL.
     /// </summary>
     public string? LinkedInUrl { get; set; }
-
-    /// <summary>
-    /// Resume/CV files uploaded by the candidate.
-    /// One of these can optionally be marked as the default resume.
-    /// </summary>
-    public ICollection<JobSeekerResume> Resumes { get; set; } = new List<JobSeekerResume>();
 
     /// <summary>
     /// Indicates whether the candidate is currently open to work.
@@ -126,10 +116,45 @@ public class JobSeekerProfile : EntityBase
     public bool? HasWorkRights { get; set; }
 
     /// <summary>
-    /// Candidate free-text availability / notice period.
+    /// Candidate availability / notice period in free text form.
     /// Example: Immediate / 2 weeks / 1 month
     /// </summary>
     public string? AvailabilityText { get; set; }
+
+    /// <summary>
+    /// Whether the candidate's profile can be viewed publicly.
+    /// </summary>
+    public bool IsPublicProfileEnabled { get; set; }
+
+    /// <summary>
+    /// Whether the candidate can appear in recruiter/company search results.
+    /// This allows a candidate to have a profile without being discoverable.
+    /// </summary>
+    public bool IsSearchable { get; set; }
+
+    /// <summary>
+    /// Public URL slug for the candidate profile.
+    /// Example: "jane-smith" or "jane-smith-dotnet"
+    /// </summary>
+    public string? Slug { get; set; }
+
+    /// <summary>
+    /// Optional short public "about me" text used for profile previews/cards.
+    /// This is separate from the fuller summary if you want a shorter recruiter-facing intro.
+    /// </summary>
+    public string? AboutMe { get; set; }
+
+    /// <summary>
+    /// When the candidate profile was last meaningfully updated.
+    /// Useful for profile freshness and search ranking later.
+    /// </summary>
+    public DateTime? LastProfileUpdatedUtc { get; set; }
+
+    /// <summary>
+    /// Resume/CV files uploaded by the candidate.
+    /// One of these can optionally be marked as the default resume.
+    /// </summary>
+    public ICollection<JobSeekerResume> Resumes { get; set; } = new List<JobSeekerResume>();
 
     /// <summary>
     /// Candidate nationality records.
