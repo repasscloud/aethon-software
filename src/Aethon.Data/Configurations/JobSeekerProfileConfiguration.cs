@@ -12,6 +12,24 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.UserId)
+            .IsRequired();
+
+        builder.Property(x => x.FirstName)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.MiddleName)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.LastName)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.PhoneNumber)
+            .HasMaxLength(50);
+
+        builder.Property(x => x.WhatsAppNumber)
+            .HasMaxLength(50);
+
         builder.Property(x => x.Headline)
             .HasMaxLength(250);
 
@@ -25,7 +43,10 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
             .HasMaxLength(250);
 
         builder.Property(x => x.LinkedInUrl)
-            .HasMaxLength(500);
+            .HasMaxLength(1000);
+
+        builder.Property(x => x.OpenToWork)
+            .IsRequired();
 
         builder.Property(x => x.DesiredSalaryFrom)
             .HasPrecision(18, 2);
@@ -33,12 +54,22 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
         builder.Property(x => x.DesiredSalaryTo)
             .HasPrecision(18, 2);
 
+        builder.Property(x => x.DesiredSalaryCurrency);
+
+        builder.Property(x => x.AvailabilityText)
+            .HasMaxLength(250);
+
+        builder.Property(x => x.CreatedByUserId);
+        builder.Property(x => x.UpdatedByUserId);
+
         builder.HasIndex(x => x.UserId)
             .IsUnique();
 
+        builder.HasIndex(x => x.OpenToWork);
+
         builder.HasOne(x => x.User)
-            .WithOne()
-            .HasForeignKey<JobSeekerProfile>(x => x.UserId)
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

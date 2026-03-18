@@ -15,13 +15,26 @@ public sealed class OrganisationMembershipConfiguration : IEntityTypeConfigurati
         builder.Property(x => x.OrganisationId)
             .IsRequired();
 
+        builder.Property(x => x.UserId)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .IsRequired();
+
+        builder.Property(x => x.IsOwner)
+            .IsRequired();
+
+        builder.Property(x => x.JoinedUtc)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedByUserId);
+        builder.Property(x => x.UpdatedByUserId);
 
         builder.HasIndex(x => new { x.OrganisationId, x.UserId })
             .IsUnique();
 
-        builder.HasIndex(x => new { x.OrganisationId, x.IsOwner });
+        builder.HasIndex(x => x.UserId);
+        builder.HasIndex(x => new { x.OrganisationId, x.Status });
 
         builder.HasOne(x => x.Organisation)
             .WithMany(x => x.Memberships)

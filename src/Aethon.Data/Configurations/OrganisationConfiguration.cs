@@ -12,6 +12,15 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.Type)
+            .IsRequired();
+
+        builder.Property(x => x.Status)
+            .IsRequired();
+
+        builder.Property(x => x.ClaimStatus)
+            .IsRequired();
+
         builder.Property(x => x.Name)
             .IsRequired()
             .HasMaxLength(250);
@@ -24,10 +33,10 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
             .HasMaxLength(250);
 
         builder.Property(x => x.WebsiteUrl)
-            .HasMaxLength(500);
+            .HasMaxLength(1000);
 
         builder.Property(x => x.Slug)
-            .HasMaxLength(100);
+            .HasMaxLength(150);
 
         builder.Property(x => x.LogoUrl)
             .HasMaxLength(1000);
@@ -48,7 +57,7 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
             .IsRequired();
 
         builder.Property(x => x.PrimaryContactName)
-            .HasMaxLength(250);
+            .HasMaxLength(150);
 
         builder.Property(x => x.PrimaryContactEmail)
             .HasMaxLength(320);
@@ -56,59 +65,23 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
         builder.Property(x => x.PrimaryContactPhone)
             .HasMaxLength(50);
 
-        builder.Property(x => x.Type)
+        builder.Property(x => x.IsVerified)
             .IsRequired();
 
-        builder.Property(x => x.Status)
-            .IsRequired();
+        builder.Property(x => x.CreatedByUserId);
+        builder.Property(x => x.UpdatedByUserId);
 
-        builder.Property(x => x.ClaimStatus)
-            .IsRequired();
-
-        builder.Property(x => x.IsProvisionedByRecruiter)
-            .IsRequired();
-
-        builder.HasIndex(x => new { x.Type, x.NormalizedName });
-        builder.HasIndex(x => x.Slug).IsUnique();
+        builder.HasIndex(x => x.NormalizedName);
+        builder.HasIndex(x => x.Slug)
+            .IsUnique()
+            .HasFilter("[Slug] IS NOT NULL");
+        builder.HasIndex(x => x.PrimaryDomainId);
+        builder.HasIndex(x => new { x.Type, x.Status });
+        builder.HasIndex(x => x.IsVerified);
 
         builder.HasOne(x => x.PrimaryDomain)
             .WithMany()
             .HasForeignKey(x => x.PrimaryDomainId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(x => x.Domains)
-            .WithOne(x => x.Organisation)
-            .HasForeignKey(x => x.OrganisationId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.Memberships)
-            .WithOne(x => x.Organisation)
-            .HasForeignKey(x => x.OrganisationId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.Invitations)
-            .WithOne(x => x.Organisation)
-            .HasForeignKey(x => x.OrganisationId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        builder.HasMany(x => x.CompanyRelationships)
-            .WithOne(x => x.CompanyOrganisation)
-            .HasForeignKey(x => x.CompanyOrganisationId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(x => x.RecruiterRelationships)
-            .WithOne(x => x.RecruiterOrganisation)
-            .HasForeignKey(x => x.RecruiterOrganisationId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(x => x.OwnedJobs)
-            .WithOne(x => x.OwnedByOrganisation)
-            .HasForeignKey(x => x.OwnedByOrganisationId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(x => x.ManagedJobs)
-            .WithOne(x => x.ManagedByOrganisation)
-            .HasForeignKey(x => x.ManagedByOrganisationId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

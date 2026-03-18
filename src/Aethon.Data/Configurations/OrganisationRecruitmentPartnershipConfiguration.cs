@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Aethon.Data.Configurations;
 
-public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfiguration<CompanyRecruiterRelationship>
+public sealed class OrganisationRecruitmentPartnershipConfiguration : IEntityTypeConfiguration<OrganisationRecruitmentPartnership>
 {
-    public void Configure(EntityTypeBuilder<CompanyRecruiterRelationship> builder)
+    public void Configure(EntityTypeBuilder<OrganisationRecruitmentPartnership> builder)
     {
-        builder.ToTable("CompanyRecruiterRelationships");
+        builder.ToTable("OrganisationRecruitmentPartnerships");
 
         builder.HasKey(x => x.Id);
 
@@ -17,13 +17,6 @@ public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfi
 
         builder.Property(x => x.RecruiterOrganisationId)
             .IsRequired();
-
-        builder.Property(x => x.RequestedByUserId);
-
-        builder.Property(x => x.ApprovedByUserId);
-
-        builder.Property(x => x.Notes)
-            .HasMaxLength(4000);
 
         builder.Property(x => x.Status)
             .IsRequired();
@@ -40,12 +33,18 @@ public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfi
         builder.Property(x => x.RecruiterCanManageCandidates)
             .IsRequired();
 
-        builder.Property(x => x.CreatedByUserId);
+        builder.Property(x => x.Notes)
+            .HasMaxLength(4000);
 
+        builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
 
         builder.HasIndex(x => new { x.CompanyOrganisationId, x.RecruiterOrganisationId })
             .IsUnique();
+
+        builder.HasIndex(x => x.Status);
+        builder.HasIndex(x => x.RequestedByUserId);
+        builder.HasIndex(x => x.ApprovedByUserId);
 
         builder.HasOne(x => x.CompanyOrganisation)
             .WithMany(x => x.CompanyRelationships)
@@ -56,10 +55,5 @@ public sealed class CompanyRecruiterRelationshipConfiguration : IEntityTypeConfi
             .WithMany(x => x.RecruiterRelationships)
             .HasForeignKey(x => x.RecruiterOrganisationId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasMany(x => x.Jobs)
-            .WithOne(x => x.CompanyRecruiterRelationship)
-            .HasForeignKey(x => x.CompanyRecruiterRelationshipId)
-            .OnDelete(DeleteBehavior.SetNull);
     }
 }

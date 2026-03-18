@@ -12,8 +12,8 @@ public sealed class RecruiterCompanyRelationshipDto
     public string RecruiterOrganisationName { get; set; } = string.Empty;
     public string CompanyOrganisationName { get; set; } = string.Empty;
 
-    public CompanyRecruiterRelationshipStatus Status { get; set; }
-    public CompanyRecruiterRelationshipScope Scope { get; set; }
+    public OrganisationRecruitmentPartnershipStatus Status { get; set; }
+    public OrganisationRecruitmentPartnershipScope Scope { get; set; }
 
     public bool RecruiterCanCreateUnclaimedCompanyJobs { get; set; }
     public bool RecruiterCanPublishJobs { get; set; }
