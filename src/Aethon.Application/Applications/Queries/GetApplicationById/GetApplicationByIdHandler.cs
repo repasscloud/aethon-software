@@ -1,7 +1,8 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Applications.Services;
 using Aethon.Application.Common.Results;
-using Aethon.Application.Organisations.Services;
 using Aethon.Data;
+using Aethon.Shared.Applications;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Application.Applications.Queries.GetApplicationById;
@@ -10,31 +11,35 @@ public sealed class GetApplicationByIdHandler
 {
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
-    private readonly OrganisationAccessService _organisationAccessService;
+    private readonly ApplicationAccessService _applicationAccessService;
 
     public GetApplicationByIdHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        OrganisationAccessService organisationAccessService)
+        ApplicationAccessService applicationAccessService)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
-        _organisationAccessService = organisationAccessService;
+        _applicationAccessService = applicationAccessService;
     }
 
-    public async Task<Result<ApplicationDetailModel>> HandleAsync(
+    public async Task<Result<ApplicationDetailDto>> HandleAsync(
         GetApplicationByIdQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (!_currentUserAccessor.IsAuthenticated || !_currentUserAccessor.UserId.HasValue)
+        if (!_currentUserAccessor.IsAuthenticated || _currentUserAccessor.UserId == Guid.Empty)
         {
-            return Result<ApplicationDetailModel>.Failure("auth.unauthenticated", "The current user is not authenticated.");
+            return Result<ApplicationDetailDto>.Failure(
+                "auth.unauthenticated",
+                "The current user is not authenticated.");
         }
+
+        var currentUserId = _currentUserAccessor.UserId;
 
         var application = await _dbContext.JobApplications
             .AsNoTracking()
             .Where(x => x.Id == query.ApplicationId)
-            .Select(x => new ApplicationDetailModel
+            .Select(x => new ApplicationDetailDto
             {
                 Id = x.Id,
                 JobId = x.JobId,
@@ -49,28 +54,40 @@ public sealed class GetApplicationByIdHandler
                 Source = x.Source ?? string.Empty,
                 SubmittedUtc = x.SubmittedUtc,
                 LastStatusChangedUtc = x.LastStatusChangedUtc,
-                OwnedByOrganisationId = x.Job.OwnedByOrganisationId,
-                ManagedByOrganisationId = x.Job.ManagedByOrganisationId
+                LastActivityUtc = x.LastActivityUtc,
+                AssignedRecruiterUserId = x.AssignedRecruiterUserId,
+                AssignedRecruiterDisplayName = x.AssignedRecruiterUser != null
+                    ? x.AssignedRecruiterUser.DisplayName
+                    : null,
+                Rating = x.Rating,
+                Recommendation = x.Recommendation,
+                IsRejected = x.IsRejected,
+                IsWithdrawn = x.IsWithdrawn,
+                IsHired = x.IsHired
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (application is null)
         {
-            return Result<ApplicationDetailModel>.Failure("applications.not_found", "The requested application was not found.");
+            return Result<ApplicationDetailDto>.Failure(
+                "applications.not_found",
+                "The requested application was not found.");
         }
 
-        var canView = application.ApplicantUserId == _currentUserAccessor.UserId.Value ||
-                      await _organisationAccessService.CanViewJobAsync(
-                          _currentUserAccessor.UserId.Value,
-                          application.OwnedByOrganisationId,
-                          application.ManagedByOrganisationId,
-                          cancellationToken);
+        var canManage = await _applicationAccessService.CanManageApplicationAsync(
+            currentUserId,
+            query.ApplicationId,
+            cancellationToken);
 
-        if (!canView)
+        var canViewOwn = application.ApplicantUserId == currentUserId;
+
+        if (!canManage && !canViewOwn)
         {
-            return Result<ApplicationDetailModel>.Failure("applications.forbidden", "The current user cannot view this application.");
+            return Result<ApplicationDetailDto>.Failure(
+                "applications.forbidden",
+                "The current user cannot view this application.");
         }
 
-        return Result<ApplicationDetailModel>.Success(application);
+        return Result<ApplicationDetailDto>.Success(application);
     }
 }

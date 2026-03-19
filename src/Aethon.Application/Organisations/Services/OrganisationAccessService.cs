@@ -61,4 +61,42 @@ public sealed class OrganisationAccessService
         return managedByOrganisationId.HasValue &&
                await IsActiveMemberAsync(userId, managedByOrganisationId.Value, cancellationToken);
     }
+
+    public async Task<bool> CanManageApplicationsAsync(
+        Guid userId,
+        Guid ownedByOrganisationId,
+        Guid? managedByOrganisationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (await CanManageApplicationsForOrganisationAsync(userId, ownedByOrganisationId, cancellationToken))
+        {
+            return true;
+        }
+
+        return managedByOrganisationId.HasValue &&
+               await CanManageApplicationsForOrganisationAsync(userId, managedByOrganisationId.Value, cancellationToken);
+    }
+
+    private Task<bool> CanManageApplicationsForOrganisationAsync(
+        Guid userId,
+        Guid organisationId,
+        CancellationToken cancellationToken)
+    {
+        return _dbContext.OrganisationMemberships.AnyAsync(
+            x => x.UserId == userId &&
+                 x.OrganisationId == organisationId &&
+                 x.Status == MembershipStatus.Active &&
+                 (
+                     x.IsOwner ||
+                     x.CompanyRole == CompanyRole.Owner ||
+                     x.CompanyRole == CompanyRole.Admin ||
+                     x.CompanyRole == CompanyRole.Recruiter ||
+                     x.CompanyRole == CompanyRole.HiringManager ||
+                     x.RecruiterRole == RecruiterRole.Owner ||
+                     x.RecruiterRole == RecruiterRole.Admin ||
+                     x.RecruiterRole == RecruiterRole.Recruiter ||
+                     x.RecruiterRole == RecruiterRole.TeamLead
+                 ),
+            cancellationToken);
+    }
 }

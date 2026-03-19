@@ -30,7 +30,9 @@ public sealed class SubmitJobApplicationHandler
     {
         if (!_currentUserAccessor.IsAuthenticated || !_currentUserAccessor.UserId.HasValue)
         {
-            return Result<SubmitJobApplicationResult>.Failure("auth.unauthenticated", "The current user is not authenticated.");
+            return Result<SubmitJobApplicationResult>.Failure(
+                "auth.unauthenticated",
+                "The current user is not authenticated.");
         }
 
         var currentUserId = _currentUserAccessor.UserId.Value;
@@ -44,12 +46,16 @@ public sealed class SubmitJobApplicationHandler
 
         if (job is null)
         {
-            return Result<SubmitJobApplicationResult>.Failure("jobs.not_found", "The requested job was not found or is not open for applications.");
+            return Result<SubmitJobApplicationResult>.Failure(
+                "jobs.not_found",
+                "The requested job was not found or is not open for applications.");
         }
 
         if (job.ApplyByUtc.HasValue && job.ApplyByUtc.Value < _dateTimeProvider.UtcNow)
         {
-            return Result<SubmitJobApplicationResult>.Failure("applications.job_closed", "Applications are closed for this job.");
+            return Result<SubmitJobApplicationResult>.Failure(
+                "applications.job_closed",
+                "Applications are closed for this job.");
         }
 
         var profileExists = await _dbContext.JobSeekerProfiles
@@ -58,7 +64,9 @@ public sealed class SubmitJobApplicationHandler
 
         if (!profileExists)
         {
-            return Result<SubmitJobApplicationResult>.Failure("applications.profile_required", "A job seeker profile is required before applying.");
+            return Result<SubmitJobApplicationResult>.Failure(
+                "applications.profile_required",
+                "A job seeker profile is required before applying.");
         }
 
         var existingApplicationExists = await _dbContext.JobApplications
@@ -67,7 +75,9 @@ public sealed class SubmitJobApplicationHandler
 
         if (existingApplicationExists)
         {
-            return Result<SubmitJobApplicationResult>.Failure("applications.duplicate", "The current user has already applied for this job.");
+            return Result<SubmitJobApplicationResult>.Failure(
+                "applications.duplicate",
+                "The current user has already applied for this job.");
         }
 
         if (command.ResumeFileId.HasValue)
@@ -78,15 +88,18 @@ public sealed class SubmitJobApplicationHandler
 
             if (!resumeExists)
             {
-                return Result<SubmitJobApplicationResult>.Failure("applications.resume_not_found", "The selected resume file was not found.");
+                return Result<SubmitJobApplicationResult>.Failure(
+                    "applications.resume_not_found",
+                    "The selected resume file was not found.");
             }
         }
 
         var utcNow = _dateTimeProvider.UtcNow;
+        var applicationId = Guid.NewGuid();
 
         var application = new JobApplication
         {
-            Id = Guid.NewGuid(),
+            Id = applicationId,
             JobId = command.JobId,
             UserId = currentUserId,
             Status = ApplicationStatus.Submitted,
@@ -95,26 +108,27 @@ public sealed class SubmitJobApplicationHandler
             Source = Normalize(command.Source) ?? "AethonJobBoard",
             SubmittedUtc = utcNow,
             LastStatusChangedUtc = utcNow,
+            LastActivityUtc = utcNow,
+            CreatedUtc = utcNow,
+            CreatedByUserId = currentUserId
+        };
+
+        var historyEntry = new JobApplicationStatusHistory
+        {
+            Id = Guid.NewGuid(),
+            JobApplicationId = applicationId,
+            FromStatus = null,
+            ToStatus = ApplicationStatus.Submitted,
+            ChangedByUserId = currentUserId,
+            ChangedUtc = utcNow,
             CreatedUtc = utcNow,
             CreatedByUserId = currentUserId,
-            StatusHistory =
-            [
-                new JobApplicationStatusHistory
-                {
-                    Id = Guid.NewGuid(),
-                    JobApplicationId = applicationId,
-                    FromStatus = null,
-                    ToStatus = ApplicationStatus.Submitted,
-                    ChangedByUserId = currentUserId,
-                    ChangedUtc = utcNow,
-                    CreatedUtc = utcNow,
-                    CreatedByUserId = currentUserId,
-                    Notes = "Application submitted."
-                }
-            ]
+            Notes = "Application submitted."
         };
 
         _dbContext.JobApplications.Add(application);
+        _dbContext.JobApplicationStatusHistoryEntries.Add(historyEntry);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<SubmitJobApplicationResult>.Success(new SubmitJobApplicationResult
