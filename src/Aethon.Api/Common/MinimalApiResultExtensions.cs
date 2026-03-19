@@ -12,11 +12,7 @@ public static class MinimalApiResultExtensions
             return Results.Ok();
         }
 
-        return Results.BadRequest(new
-        {
-            error = result.ErrorCode,
-            message = result.ErrorMessage
-        });
+        return MapError(result.ErrorCode, result.ErrorMessage);
     }
 
     public static IResult ToMinimalApiResult<T>(this Result<T> result)
@@ -26,10 +22,37 @@ public static class MinimalApiResultExtensions
             return Results.Ok(result.Value);
         }
 
-        return Results.BadRequest(new
+        return MapError(result.ErrorCode, result.ErrorMessage);
+    }
+
+    private static IResult MapError(string? code, string? message)
+    {
+        var error = new ApiError
         {
-            error = result.ErrorCode,
-            message = result.ErrorMessage
-        });
+            Code = code ?? "unknown",
+            Message = message ?? "An error occurred."
+        };
+
+        if (code is null)
+        {
+            return Results.BadRequest(error);
+        }
+
+        if (code.StartsWith("auth.unauthenticated"))
+        {
+            return Results.Unauthorized();
+        }
+
+        if (code.EndsWith(".forbidden"))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden, error);
+        }
+
+        if (code.EndsWith(".not_found"))
+        {
+            return Results.NotFound(error);
+        }
+
+        return Results.BadRequest(error);
     }
 }

@@ -1,6 +1,10 @@
+using Aethon.Api.Auth;
+using Aethon.Api.Endpoints;
+using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
 using Aethon.Data;
 using Aethon.Data.Identity;
+using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,26 +26,21 @@ services
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AethonDbContext>();
 
-services.AddAuthentication();
-services.AddAuthorization();
+services.AddAethonAuth(configuration);
+
+services.AddScoped<JwtTokenService>();
 
 services.AddApplicationServices();
+
+services.AddValidatorsFromAssembly(typeof(ApplicationAssemblyMarker).Assembly);
 
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
 app.UseAuthentication();
 app.UseAuthorization();
-
-app.MapGet("/", () => "Aethon API");
 
 app.MapApplicationEndpoints();
 

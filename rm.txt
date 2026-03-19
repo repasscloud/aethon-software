@@ -1,6 +1,0 @@
-src/Aethon.Application/Applications/Queries/GetApplicationById/ApplicationDetailModel.cs
-src/Aethon.Application/Applications/Queries/GetApplicationTimeline/ApplicationTimelineItemModel.cs
-src/Aethon.Application/Applications/Queries/GetApplicationsForJob/JobApplicationSummaryModel.cs
-src/Aethon.Application/Jobs/Queries/GetJobById/JobDetailModel.cs
-src/Aethon.Shared/Jobs/JobSeekerProfileDto.cs
-src/Aethon.Shared/Jobs/UpdateJobSeekerProfileRequestDto.cs

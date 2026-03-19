@@ -15,7 +15,7 @@ public static class ApplicationEndpoints
 {
     public static void MapApplicationEndpointsGroup(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/applications");
+        var group = app.MapGroup("/applications").RequireAuthorization();
 
         group.MapPost("/", async (
             [FromServices] SubmitJobApplicationHandler handler,
@@ -28,9 +28,18 @@ public static class ApplicationEndpoints
 
         group.MapGet("/my", async (
             [FromServices] GetMyApplicationsHandler handler,
+            int page,
+            int pageSize,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(new GetMyApplicationsQuery(), ct);
+            var result = await handler.HandleAsync(
+                new GetMyApplicationsQuery
+                {
+                    Page = page,
+                    PageSize = pageSize
+                },
+                ct);
+
             return result.ToMinimalApiResult();
         });
 
@@ -55,9 +64,21 @@ public static class ApplicationEndpoints
         group.MapGet("/job/{jobId:guid}", async (
             [FromServices] GetApplicationsForJobHandler handler,
             Guid jobId,
+            int page,
+            int pageSize,
+            ApplicationStatus? status,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(new GetApplicationsForJobQuery { JobId = jobId }, ct);
+            var result = await handler.HandleAsync(
+                new GetApplicationsForJobQuery
+                {
+                    JobId = jobId,
+                    Page = page,
+                    PageSize = pageSize,
+                    Status = status
+                },
+                ct);
+
             return result.ToMinimalApiResult();
         });
 

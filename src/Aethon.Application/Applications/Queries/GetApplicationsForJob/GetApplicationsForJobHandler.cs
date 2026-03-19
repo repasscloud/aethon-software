@@ -2,7 +2,8 @@ using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Applications.Services;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
-using Aethon.Shared.Jobs;
+using Aethon.Shared.Applications;
+using Aethon.Shared.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Application.Applications.Queries.GetApplicationsForJob;
@@ -23,26 +24,15 @@ public sealed class GetApplicationsForJobHandler
         _applicationAccessService = applicationAccessService;
     }
 
-    public async Task<Result<IReadOnlyList<EmployerJobApplicationListItemDto>>> HandleAsync(
+    public async Task<Result<PagedResult<ApplicationSummaryDto>>> HandleAsync(
         GetApplicationsForJobQuery query,
         CancellationToken cancellationToken = default)
     {
         if (!_currentUserAccessor.IsAuthenticated || _currentUserAccessor.UserId == Guid.Empty)
         {
-            return Result<IReadOnlyList<EmployerJobApplicationListItemDto>>.Failure(
+            return Result<PagedResult<ApplicationSummaryDto>>.Failure(
                 "auth.unauthenticated",
                 "The current user is not authenticated.");
-        }
-
-        var jobExists = await _dbContext.Jobs
-            .AsNoTracking()
-            .AnyAsync(x => x.Id == query.JobId, cancellationToken);
-
-        if (!jobExists)
-        {
-            return Result<IReadOnlyList<EmployerJobApplicationListItemDto>>.Failure(
-                "jobs.not_found",
-                "The requested job was not found.");
         }
 
         var canView = await _applicationAccessService.CanViewJobApplicationsAsync(
@@ -52,29 +42,52 @@ public sealed class GetApplicationsForJobHandler
 
         if (!canView)
         {
-            return Result<IReadOnlyList<EmployerJobApplicationListItemDto>>.Failure(
+            return Result<PagedResult<ApplicationSummaryDto>>.Failure(
                 "applications.forbidden",
                 "The current user cannot view applications for this job.");
         }
 
-        var items = await _dbContext.JobApplications
+        var page = query.Page <= 0 ? 1 : query.Page;
+        var pageSize = query.PageSize <= 0 ? 20 : query.PageSize;
+
+        var baseQuery = _dbContext.JobApplications
             .AsNoTracking()
-            .Where(x => x.JobId == query.JobId)
+            .Where(x => x.JobId == query.JobId);
+
+        if (query.Status.HasValue)
+        {
+            baseQuery = baseQuery.Where(x => x.Status == query.Status.Value);
+        }
+
+        var totalCount = await baseQuery.CountAsync(cancellationToken);
+
+        var items = await baseQuery
             .OrderByDescending(x => x.SubmittedUtc)
-            .Select(x => new EmployerJobApplicationListItemDto
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new ApplicationSummaryDto
             {
                 Id = x.Id,
                 JobId = x.JobId,
-                ApplicantUserId = x.UserId.ToString(),
-                ApplicantDisplayName = x.User.DisplayName,
-                ApplicantEmail = x.User.Email ?? string.Empty,
-                Status = x.Status.ToString(),
-                Source = x.Source,
+                JobTitle = x.Job.Title,
+                Status = x.Status,
+                StatusReason = x.StatusReason,
+                Source = x.Source ?? string.Empty,
                 SubmittedUtc = x.SubmittedUtc,
-                LastStatusChangedUtc = x.LastStatusChangedUtc
+                LastStatusChangedUtc = x.LastStatusChangedUtc,
+                LastActivityUtc = x.LastActivityUtc,
+                IsRejected = x.IsRejected,
+                IsWithdrawn = x.IsWithdrawn,
+                IsHired = x.IsHired
             })
             .ToListAsync(cancellationToken);
 
-        return Result<IReadOnlyList<EmployerJobApplicationListItemDto>>.Success(items);
+        return Result<PagedResult<ApplicationSummaryDto>>.Success(new PagedResult<ApplicationSummaryDto>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }

@@ -2,6 +2,7 @@ using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Shared.Applications;
+using Aethon.Shared.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Application.Applications.Queries.GetMyApplications;
@@ -19,23 +20,32 @@ public sealed class GetMyApplicationsHandler
         _currentUserAccessor = currentUserAccessor;
     }
 
-    public async Task<Result<IReadOnlyList<ApplicationSummaryDto>>> HandleAsync(
+    public async Task<Result<PagedResult<ApplicationSummaryDto>>> HandleAsync(
         GetMyApplicationsQuery query,
         CancellationToken cancellationToken = default)
     {
         if (!_currentUserAccessor.IsAuthenticated || _currentUserAccessor.UserId == Guid.Empty)
         {
-            return Result<IReadOnlyList<ApplicationSummaryDto>>.Failure(
+            return Result<PagedResult<ApplicationSummaryDto>>.Failure(
                 "auth.unauthenticated",
                 "The current user is not authenticated.");
         }
 
+        var page = query.Page <= 0 ? 1 : query.Page;
+        var pageSize = query.PageSize <= 0 ? 20 : query.PageSize;
+
         var currentUserId = _currentUserAccessor.UserId;
 
-        var items = await _dbContext.JobApplications
+        var baseQuery = _dbContext.JobApplications
             .AsNoTracking()
-            .Where(x => x.UserId == currentUserId)
+            .Where(x => x.UserId == currentUserId);
+
+        var totalCount = await baseQuery.CountAsync(cancellationToken);
+
+        var items = await baseQuery
             .OrderByDescending(x => x.SubmittedUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(x => new ApplicationSummaryDto
             {
                 Id = x.Id,
@@ -53,6 +63,12 @@ public sealed class GetMyApplicationsHandler
             })
             .ToListAsync(cancellationToken);
 
-        return Result<IReadOnlyList<ApplicationSummaryDto>>.Success(items);
+        return Result<PagedResult<ApplicationSummaryDto>>.Success(new PagedResult<ApplicationSummaryDto>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        });
     }
 }

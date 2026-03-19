@@ -8,7 +8,7 @@ public static class CandidateEndpoints
 {
     public static void MapCandidateEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/me");
+        var group = app.MapGroup("/me").RequireAuthorization();
 
         group.MapGet("/profile", async (
             [FromServices] GetMyCandidateProfileHandler handler,

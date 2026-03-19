@@ -8,7 +8,7 @@ public static class JobEndpoints
 {
     public static void MapJobEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/jobs");
+        var group = app.MapGroup("/jobs").RequireAuthorization();
 
         group.MapPost("/", async (
             [FromServices] CreateJobHandler handler,
