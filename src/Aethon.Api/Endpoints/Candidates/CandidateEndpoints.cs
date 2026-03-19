@@ -1,0 +1,30 @@
+using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
+using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Aethon.Api.Endpoints.Candidates;
+
+public static class CandidateEndpoints
+{
+    public static void MapCandidateEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/me");
+
+        group.MapGet("/profile", async (
+            [FromServices] GetMyCandidateProfileHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(new GetMyCandidateProfileQuery(), ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPut("/profile", async (
+            [FromServices] UpsertMyCandidateProfileHandler handler,
+            UpsertMyCandidateProfileCommand command,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(command, ct);
+            return result.ToMinimalApiResult();
+        });
+    }
+}

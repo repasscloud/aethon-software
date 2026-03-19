@@ -1,0 +1,28 @@
+Phase 5 (API layer) is now in place and wired to the Application layer.
+
+Next is Phase 6: hardening + cross-cutting concerns:
+	•	Authentication integration
+	•	Implement ICurrentUserAccessor in API (read from claims)
+	•	Configure JWT / cookie auth properly
+	•	Validation layer
+	•	Add FluentValidation for commands
+	•	Hook into pipeline (or manual invocation)
+	•	Error handling standardisation
+	•	Replace BadRequest mapping with proper status codes:
+	•	401 / 403 / 404 / 400
+	•	Pagination + filtering
+	•	Apply to:
+	•	GetApplicationsForJob
+	•	GetMyApplications
+	•	Consistency cleanup
+	•	Ensure all endpoints:
+	•	use HandleAsync
+	•	have consistent route naming
+	•	Optional (recommended)
+	•	Add request logging / correlation IDs
+	•	Add basic API versioning
+
+After that → Phase 7:
+	•	file uploads (CVs, attachments)
+	•	external integrations
+	•	performance + indexing + caching
