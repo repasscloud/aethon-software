@@ -8,6 +8,7 @@ using Aethon.Application.Applications.Queries.GetApplicationTimeline;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Applications.Queries.GetMyApplications;
 using Microsoft.AspNetCore.Mvc;
+using Aethon.Shared.Enums;
 
 namespace Aethon.Api.Endpoints.Applications;
 

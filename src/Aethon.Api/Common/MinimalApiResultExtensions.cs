@@ -38,17 +38,17 @@ public static class MinimalApiResultExtensions
             return Results.BadRequest(error);
         }
 
-        if (code.StartsWith("auth.unauthenticated"))
+        if (code.StartsWith("auth.unauthenticated", StringComparison.OrdinalIgnoreCase))
         {
-            return Results.Unauthorized();
+            return Results.Json(error, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        if (code.EndsWith(".forbidden"))
+        if (code.EndsWith(".forbidden", StringComparison.OrdinalIgnoreCase))
         {
-            return Results.StatusCode(StatusCodes.Status403Forbidden, error);
+            return Results.Json(error, statusCode: StatusCodes.Status403Forbidden);
         }
 
-        if (code.EndsWith(".not_found"))
+        if (code.EndsWith(".not_found", StringComparison.OrdinalIgnoreCase))
         {
             return Results.NotFound(error);
         }

@@ -1,5 +1,6 @@
 using Aethon.Api.Auth;
 using Aethon.Api.Endpoints;
+using Aethon.Api.Middleware;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
 using Aethon.Data;
@@ -38,6 +39,9 @@ services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();
