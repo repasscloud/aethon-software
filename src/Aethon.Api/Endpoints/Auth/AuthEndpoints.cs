@@ -1,7 +1,6 @@
 using Aethon.Api.Auth;
 using Aethon.Data.Identity;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Auth;
 
@@ -9,7 +8,8 @@ public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/auth");
+        var group = app.MapGroup("/auth")
+            .WithTags("Auth");
 
         group.MapPost("/register", async (
             UserManager<ApplicationUser> userManager,
@@ -33,7 +33,10 @@ public static class AuthEndpoints
 
             var token = tokenService.GenerateToken(user);
 
-            return Results.Ok(new { token });
+            return Results.Ok(new AuthTokenResponse
+            {
+                Token = token
+            });
         });
 
         group.MapPost("/login", async (
@@ -45,19 +48,22 @@ public static class AuthEndpoints
 
             if (user is null)
             {
-                return Results.BadRequest("Invalid credentials.");
+                return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid credentials." });
             }
 
             var valid = await userManager.CheckPasswordAsync(user, request.Password);
 
             if (!valid)
             {
-                return Results.BadRequest("Invalid credentials.");
+                return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid credentials." });
             }
 
             var token = tokenService.GenerateToken(user);
 
-            return Results.Ok(new { token });
+            return Results.Ok(new AuthTokenResponse
+            {
+                Token = token
+            });
         });
     }
 
@@ -72,5 +78,10 @@ public static class AuthEndpoints
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
+    }
+
+    public sealed class AuthTokenResponse
+    {
+        public string Token { get; set; } = string.Empty;
     }
 }

@@ -19,6 +19,8 @@ using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Organisations.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Aethon.Application.Applications.Commands.AttachApplicationFile;
+using Aethon.Application.Applications.Queries.GetApplicationFiles;
 
 namespace Aethon.Application.DependencyInjection;
 
@@ -52,6 +54,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RemoveCandidateResumeHandler>();
 
         services.AddScoped<UploadStoredFileHandler>();
+
+        services.AddScoped<AttachApplicationFileHandler>();
+        services.AddScoped<GetApplicationFilesHandler>();
 
         return services;
     }

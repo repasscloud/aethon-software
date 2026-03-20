@@ -1,8 +1,7 @@
 using Aethon.Api.Auth;
 using Aethon.Api.Endpoints;
 using Aethon.Api.Infrastructure;
-using Aethon.Api.Infrastructure.Files;
-using Aethon.Application.Abstractions.Files;
+using Aethon.Api.Middleware;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
@@ -33,17 +32,24 @@ services
 services.AddAethonAuth(configuration);
 
 services.AddScoped<IDateTimeProvider, SystemDateTimeProvider>();
-services.AddScoped<IFileStorageService, LocalFileStorageService>();
 services.AddScoped<JwtTokenService>();
 
 services.AddApplicationServices();
-
 services.AddValidatorsFromAssembly(typeof(ApplicationAssemblyMarker).Assembly);
 
 services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

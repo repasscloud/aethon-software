@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Aethon.Data.Identity;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Aethon.Api.Auth;
@@ -18,9 +17,12 @@ public sealed class JwtTokenService
 
     public string GenerateToken(ApplicationUser user)
     {
-        var key = _configuration["Auth:JwtKey"] ?? "dev-secret-key-change-me";
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        var jwtKey = _configuration["Auth:JwtKey"] ?? "dev-secret-key-change-me-dev-secret-key-change-me";
+        var jwtIssuer = _configuration["Auth:Issuer"];
+        var jwtAudience = _configuration["Auth:Audience"];
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
         {
@@ -30,6 +32,8 @@ public sealed class JwtTokenService
         };
 
         var token = new JwtSecurityToken(
+            issuer: string.IsNullOrWhiteSpace(jwtIssuer) ? null : jwtIssuer,
+            audience: string.IsNullOrWhiteSpace(jwtAudience) ? null : jwtAudience,
             claims: claims,
             expires: DateTime.UtcNow.AddHours(8),
             signingCredentials: credentials);

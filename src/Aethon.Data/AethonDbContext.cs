@@ -1,3 +1,4 @@
+using Aethon.Data.Configurations;
 using Aethon.Data.Entities;
 using Aethon.Data.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -37,10 +38,14 @@ public sealed class AethonDbContext
 
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
+    public DbSet<JobApplicationAttachment> JobApplicationAttachments => Set<JobApplicationAttachment>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         builder.ApplyConfigurationsFromAssembly(typeof(AethonDbContext).Assembly);
+
+        builder.ApplyConfiguration(new JobApplicationAttachmentConfiguration());
     }
 }

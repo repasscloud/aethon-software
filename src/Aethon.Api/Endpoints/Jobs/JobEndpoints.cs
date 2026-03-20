@@ -3,7 +3,6 @@ using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Shared.Enums;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Jobs;
 

@@ -21,21 +21,13 @@ public sealed class CurrentUserAccessor : ICurrentUserAccessor
         get
         {
             var user = _httpContextAccessor.HttpContext?.User;
-
             if (user is null)
             {
                 return Guid.Empty;
             }
 
             var value = user.FindFirstValue(ClaimTypes.NameIdentifier);
-
             return Guid.TryParse(value, out var id) ? id : Guid.Empty;
         }
     }
-
-    public string? Email =>
-        _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.Email);
-
-    public string? DisplayName =>
-        _httpContextAccessor.HttpContext?.User?.FindFirstValue("name");
 }

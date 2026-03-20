@@ -1,10 +1,12 @@
 using Aethon.Api.Common;
 using Aethon.Application.Applications.Commands.AddApplicationComment;
 using Aethon.Application.Applications.Commands.AddApplicationNote;
+using Aethon.Application.Applications.Commands.AttachApplicationFile;
 using Aethon.Application.Applications.Commands.ChangeApplicationStatus;
 using Aethon.Application.Applications.Commands.ScheduleInterview;
 using Aethon.Application.Applications.Commands.SubmitJobApplication;
 using Aethon.Application.Applications.Queries.GetApplicationById;
+using Aethon.Application.Applications.Queries.GetApplicationFiles;
 using Aethon.Application.Applications.Queries.GetApplicationTimeline;
 using Aethon.Application.Applications.Queries.GetMyApplications;
 using Microsoft.AspNetCore.Mvc;
@@ -180,6 +182,46 @@ public static class ApplicationEndpoints
             }
 
             var result = await handler.HandleAsync(command, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{applicationId:guid}/files", async (
+            [FromServices] AttachApplicationFileHandler handler,
+            HttpContext httpContext,
+            Guid applicationId,
+            AttachApplicationFileCommand request,
+            CancellationToken ct) =>
+        {
+            var command = new AttachApplicationFileCommand
+            {
+                ApplicationId = applicationId,
+                StoredFileId = request.StoredFileId,
+                Category = request.Category,
+                Notes = request.Notes
+            };
+
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
+            var result = await handler.HandleAsync(command, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapGet("/{applicationId:guid}/files", async (
+            [FromServices] GetApplicationFilesHandler handler,
+            Guid applicationId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(
+                new GetApplicationFilesQuery
+                {
+                    ApplicationId = applicationId
+                },
+                ct);
+
             return result.ToMinimalApiResult();
         });
     }
