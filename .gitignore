@@ -485,4 +485,5 @@ $RECYCLE.BIN/
 
 _smtpapi-test/
 *.txt
-*.md
+UI_PLAN.md
+aethon_mvp_technical_implementation_plan.md
