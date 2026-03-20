@@ -1,4 +1,5 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Data.Entities;
@@ -12,11 +13,19 @@ public sealed class CreateOrganisationInviteHandler
 {
     private readonly AethonDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
+    private readonly IEmailService _emailService;
+    private readonly IAppSettings _appSettings;
 
-    public CreateOrganisationInviteHandler(AethonDbContext db, ICurrentUserAccessor currentUser)
+    public CreateOrganisationInviteHandler(
+        AethonDbContext db,
+        ICurrentUserAccessor currentUser,
+        IEmailService emailService,
+        IAppSettings appSettings)
     {
         _db = db;
         _currentUser = currentUser;
+        _emailService = emailService;
+        _appSettings = appSettings;
     }
 
     public async Task<Result<OrganisationInviteDto>> HandleAsync(
@@ -83,6 +92,24 @@ public sealed class CreateOrganisationInviteHandler
 
         _db.OrganisationInvitations.Add(invitation);
         await _db.SaveChangesAsync(ct);
+
+        var orgName = myMembership.Organisation.Name;
+        var acceptUrl = $"{_appSettings.WebBaseUrl.TrimEnd('/')}/app/organisation/team?token={token}";
+
+        await _emailService.SendAsync(new EmailMessage
+        {
+            ToEmail = invitation.Email,
+            Subject = $"You've been invited to join {orgName} on Aethon",
+            TextBody = $"You have been invited to join {orgName} on Aethon.\n\nAccept your invitation here:\n{acceptUrl}\n\nThis invitation expires in 7 days.",
+            HtmlBody = $"""
+                <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;">
+                <h2>You've been invited to join {orgName}</h2>
+                <p>You have been invited to join <strong>{orgName}</strong> on Aethon.</p>
+                <p><a href="{acceptUrl}" style="background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;display:inline-block;">Accept invitation</a></p>
+                <p style="color:#666;font-size:0.9em;">This invitation expires in 7 days. If you did not expect this email, you can safely ignore it.</p>
+                </body></html>
+                """
+        }, ct);
 
         return Result<OrganisationInviteDto>.Success(new OrganisationInviteDto
         {

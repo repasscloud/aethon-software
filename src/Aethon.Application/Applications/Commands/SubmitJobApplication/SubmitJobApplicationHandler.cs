@@ -1,5 +1,6 @@
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Abstractions.Caching;
+using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
@@ -16,17 +17,20 @@ public sealed class SubmitJobApplicationHandler
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IAppCache _cache;
+    private readonly IEmailService _emailService;
 
     public SubmitJobApplicationHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
         IDateTimeProvider dateTimeProvider,
-        IAppCache cache)
+        IAppCache cache,
+        IEmailService emailService)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _dateTimeProvider = dateTimeProvider;
         _cache = cache;
+        _emailService = emailService;
     }
 
     public async Task<Result<SubmitJobApplicationResult>> HandleAsync(
@@ -138,6 +142,28 @@ public sealed class SubmitJobApplicationHandler
 
         await _cache.RemoveByPrefixAsync(CacheKeys.MyApplicationsPrefix(currentUserId), cancellationToken);
         await _cache.RemoveByPrefixAsync(CacheKeys.JobApplicationsPrefix(command.JobId), cancellationToken);
+
+        var applicantEmail = await _dbContext.Users
+            .Where(u => u.Id == currentUserId)
+            .Select(u => u.Email)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(applicantEmail))
+        {
+            await _emailService.SendAsync(new EmailMessage
+            {
+                ToEmail = applicantEmail,
+                Subject = $"Application submitted — {job.Title}",
+                TextBody = $"Your application for \"{job.Title}\" has been submitted successfully.\n\nYou can track the status of your application in My applications on Aethon.",
+                HtmlBody = $"""
+                    <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;">
+                    <h2>Application submitted</h2>
+                    <p>Your application for <strong>{job.Title}</strong> has been submitted successfully.</p>
+                    <p>You can track the status of your application in <em>My applications</em> on Aethon.</p>
+                    </body></html>
+                    """
+            }, cancellationToken);
+        }
 
         return Result<SubmitJobApplicationResult>.Success(new SubmitJobApplicationResult
         {

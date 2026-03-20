@@ -1,4 +1,5 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
@@ -14,15 +15,18 @@ public sealed class SubmitOrganisationClaimHandler
     private readonly AethonDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IEmailService _emailService;
 
     public SubmitOrganisationClaimHandler(
         AethonDbContext db,
         ICurrentUserAccessor currentUser,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IEmailService emailService)
     {
         _db = db;
         _currentUser = currentUser;
         _dateTimeProvider = dateTimeProvider;
+        _emailService = emailService;
     }
 
     public async Task<Result<OrganisationClaimRequestDto>> HandleAsync(
@@ -81,6 +85,22 @@ public sealed class SubmitOrganisationClaimHandler
 
         _db.OrganisationClaimRequests.Add(claimRequest);
         await _db.SaveChangesAsync(ct);
+
+        await _emailService.SendAsync(new EmailMessage
+        {
+            ToEmail = userEmail,
+            Subject = $"Your claim request for {org.Name} — verification token",
+            TextBody = $"Your claim request for {org.Name} has been submitted.\n\nYour verification token is:\n{verificationToken}\n\nSend this token to Aethon support to complete your claim verification.",
+            HtmlBody = $"""
+                <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.5;">
+                <h2>Claim request submitted — {org.Name}</h2>
+                <p>Your claim request for <strong>{org.Name}</strong> has been submitted successfully.</p>
+                <p>Your verification token is:</p>
+                <p style="background:#f4f4f4;padding:12px;border-radius:6px;font-family:monospace;font-size:1.1em;">{verificationToken}</p>
+                <p>Send this token to Aethon support to complete verification. You can also find it in <em>My claim requests</em>.</p>
+                </body></html>
+                """
+        }, ct);
 
         return Result<OrganisationClaimRequestDto>.Success(new OrganisationClaimRequestDto
         {

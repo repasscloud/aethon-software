@@ -28,6 +28,8 @@ using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
 using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Jobs.Queries.GetMyOrgJobs;
+using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
+using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Commands.AcceptOrganisationInvite;
 using Aethon.Application.Organisations.Commands.AddOrganisationDomain;
 using Aethon.Application.Organisations.Commands.CancelClaimRequest;
@@ -82,6 +84,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ReturnJobToDraftHandler>();
         services.AddScoped<GetJobByIdHandler>();
         services.AddScoped<GetMyOrgJobsHandler>();
+        services.AddScoped<GetPublicJobsHandler>();
+        services.AddScoped<GetPublicJobDetailHandler>();
 
         services.AddScoped<GetMyOrganisationProfileHandler>();
         services.AddScoped<UpdateMyOrganisationProfileHandler>();

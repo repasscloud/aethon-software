@@ -1,5 +1,9 @@
 using Aethon.Api.Common;
+using Aethon.Application.Applications.Commands.SubmitJobApplication;
+using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
+using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
+using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Public;
@@ -21,5 +25,43 @@ public static class PublicEndpoints
             var result = await handler.HandleAsync(slug, ct);
             return result.ToMinimalApiResult();
         });
+
+        // GET /api/v1/public/jobs
+        group.MapGet("/jobs", async (
+            [FromServices] GetPublicJobsHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/public/jobs/{id}
+        group.MapGet("/jobs/{jobId:guid}", async (
+            [FromServices] GetPublicJobDetailHandler handler,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // POST /api/v1/public/jobs/{id}/apply  (requires auth)
+        group.MapPost("/jobs/{jobId:guid}/apply", async (
+            [FromServices] SubmitJobApplicationHandler handler,
+            HttpContext ctx,
+            Guid jobId,
+            CreateJobApplicationRequestDto request,
+            CancellationToken ct) =>
+        {
+            var command = new SubmitJobApplicationCommand
+            {
+                JobId = jobId,
+                CoverLetter = request.CoverLetter,
+                Source = request.Source ?? "AethonPublicBoard"
+            };
+
+            var result = await handler.HandleAsync(command, ct);
+            return result.ToMinimalApiResult();
+        }).RequireAuthorization();
     }
 }
