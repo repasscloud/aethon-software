@@ -1,6 +1,9 @@
 using Aethon.Api.Auth;
 using Aethon.Api.Endpoints;
-using Aethon.Api.Middleware;
+using Aethon.Api.Infrastructure;
+using Aethon.Api.Infrastructure.Files;
+using Aethon.Application.Abstractions.Files;
+using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
 using Aethon.Data;
@@ -16,7 +19,7 @@ var configuration = builder.Configuration;
 
 services.AddDbContext<AethonDbContext>(options =>
 {
-    options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+    options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
 });
 
 services
@@ -29,6 +32,8 @@ services
 
 services.AddAethonAuth(configuration);
 
+services.AddScoped<IDateTimeProvider, SystemDateTimeProvider>();
+services.AddScoped<IFileStorageService, LocalFileStorageService>();
 services.AddScoped<JwtTokenService>();
 
 services.AddApplicationServices();
@@ -39,9 +44,6 @@ services.AddEndpointsApiExplorer();
 services.AddSwaggerGen();
 
 var app = builder.Build();
-
-app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseMiddleware<RequestLoggingMiddleware>();
 
 app.UseAuthentication();
 app.UseAuthorization();

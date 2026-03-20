@@ -11,6 +11,7 @@ using Aethon.Application.Applications.Queries.GetMyApplications;
 using Aethon.Application.Applications.Services;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
+using Aethon.Application.Files.Commands.UploadStoredFile;
 using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Organisations.Services;
@@ -43,6 +44,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<GetMyCandidateProfileHandler>();
         services.AddScoped<UpsertMyCandidateProfileHandler>();
+
+        services.AddScoped<UploadStoredFileHandler>();
 
         return services;
     }

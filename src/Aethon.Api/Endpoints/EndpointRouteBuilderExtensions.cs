@@ -1,6 +1,7 @@
 using Aethon.Api.Endpoints.Applications;
 using Aethon.Api.Endpoints.Auth;
 using Aethon.Api.Endpoints.Candidates;
+using Aethon.Api.Endpoints.Files;
 using Aethon.Api.Endpoints.Jobs;
 using Microsoft.AspNetCore.Builder;
 
@@ -10,11 +11,10 @@ public static class EndpointRouteBuilderExtensions
 {
     public static void MapApplicationEndpoints(this IEndpointRouteBuilder app)
     {
-        var api = app.MapGroup("/api/v1");
-
-        api.MapAuthEndpoints();
-        api.MapJobEndpoints();
-        api.MapApplicationEndpointsGroup();
-        api.MapCandidateEndpoints();
+        app.MapAuthEndpoints();
+        app.MapFileEndpoints();
+        app.MapJobEndpoints();
+        app.MapApplicationEndpointsGroup();
+        app.MapCandidateEndpoints();
     }
 }

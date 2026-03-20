@@ -1,5 +1,5 @@
 using System.Text;
-using Aethon.Data.Identity;
+using Aethon.Application.Abstractions.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -12,10 +12,12 @@ public static class AuthExtensions
         IConfiguration configuration)
     {
         services.AddHttpContextAccessor();
-
         services.AddScoped<ICurrentUserAccessor, CurrentUserAccessor>();
 
-        var jwtKey = configuration["Auth:JwtKey"] ?? "dev-secret-key-change-me";
+        var jwtKey = configuration["Auth:JwtKey"] ?? "dev-secret-key-change-me-dev-secret-key-change-me";
+        var jwtIssuer = configuration["Auth:Issuer"];
+        var jwtAudience = configuration["Auth:Audience"];
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
         services
@@ -26,12 +28,16 @@ public static class AuthExtensions
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = key,
                     ValidateLifetime = true,
-                    ClockSkew = TimeSpan.FromMinutes(2)
+                    ClockSkew = TimeSpan.FromMinutes(2),
+
+                    ValidateIssuer = !string.IsNullOrWhiteSpace(jwtIssuer),
+                    ValidIssuer = jwtIssuer,
+
+                    ValidateAudience = !string.IsNullOrWhiteSpace(jwtAudience),
+                    ValidAudience = jwtAudience
                 };
             });
 

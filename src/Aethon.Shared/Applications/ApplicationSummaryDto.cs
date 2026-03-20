@@ -13,6 +13,9 @@ public sealed class ApplicationSummaryDto
 
     public string Source { get; set; } = string.Empty;
 
+    public Guid? ResumeFileId { get; set; }
+    public ApplicationResumeDto? Resume { get; set; }
+
     public DateTime SubmittedUtc { get; set; }
     public DateTime? LastStatusChangedUtc { get; set; }
     public DateTime? LastActivityUtc { get; set; }

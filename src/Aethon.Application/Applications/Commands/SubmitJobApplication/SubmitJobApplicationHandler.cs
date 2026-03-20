@@ -28,14 +28,14 @@ public sealed class SubmitJobApplicationHandler
         SubmitJobApplicationCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!_currentUserAccessor.IsAuthenticated || !_currentUserAccessor.UserId.HasValue)
+        if (!_currentUserAccessor.IsAuthenticated || _currentUserAccessor.UserId == Guid.Empty)
         {
             return Result<SubmitJobApplicationResult>.Failure(
                 "auth.unauthenticated",
                 "The current user is not authenticated.");
         }
 
-        var currentUserId = _currentUserAccessor.UserId.Value;
+        var currentUserId = _currentUserAccessor.UserId;
 
         var job = await _dbContext.Jobs
             .AsNoTracking()
@@ -58,11 +58,11 @@ public sealed class SubmitJobApplicationHandler
                 "Applications are closed for this job.");
         }
 
-        var profileExists = await _dbContext.JobSeekerProfiles
+        var profile = await _dbContext.JobSeekerProfiles
             .AsNoTracking()
-            .AnyAsync(x => x.UserId == currentUserId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.UserId == currentUserId, cancellationToken);
 
-        if (!profileExists)
+        if (profile is null)
         {
             return Result<SubmitJobApplicationResult>.Failure(
                 "applications.profile_required",
@@ -82,15 +82,19 @@ public sealed class SubmitJobApplicationHandler
 
         if (command.ResumeFileId.HasValue)
         {
-            var resumeExists = await _dbContext.StoredFiles
+            var resumeExists = await _dbContext.JobSeekerResumes
                 .AsNoTracking()
-                .AnyAsync(x => x.Id == command.ResumeFileId.Value, cancellationToken);
+                .AnyAsync(
+                    x => x.JobSeekerProfileId == profile.Id &&
+                         x.StoredFileId == command.ResumeFileId.Value &&
+                         x.IsActive,
+                    cancellationToken);
 
             if (!resumeExists)
             {
                 return Result<SubmitJobApplicationResult>.Failure(
                     "applications.resume_not_found",
-                    "The selected resume file was not found.");
+                    "The selected resume was not found for the current candidate.");
             }
         }
 

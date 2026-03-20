@@ -50,6 +50,24 @@ public sealed class GetApplicationByIdHandler
                 Status = x.Status,
                 StatusReason = x.StatusReason,
                 ResumeFileId = x.ResumeFileId,
+                Resume = x.ResumeFileId.HasValue
+                    ? x.User.JobSeekerProfile != null
+                        ? x.User.JobSeekerProfile.Resumes
+                            .Where(r => r.StoredFileId == x.ResumeFileId.Value && r.IsActive)
+                            .Select(r => new ApplicationResumeDto
+                            {
+                                Id = r.Id,
+                                StoredFileId = r.StoredFileId,
+                                Name = r.Name,
+                                Description = r.Description,
+                                IsDefault = r.IsDefault,
+                                OriginalFileName = r.StoredFile.OriginalFileName,
+                                ContentType = r.StoredFile.ContentType,
+                                LengthBytes = r.StoredFile.LengthBytes
+                            })
+                            .FirstOrDefault()
+                        : null
+                    : null,
                 CoverLetter = x.CoverLetter,
                 Source = x.Source ?? string.Empty,
                 SubmittedUtc = x.SubmittedUtc,

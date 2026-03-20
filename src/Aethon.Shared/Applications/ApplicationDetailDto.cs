@@ -16,6 +16,8 @@ public sealed class ApplicationDetailDto
     public string? StatusReason { get; set; }
 
     public Guid? ResumeFileId { get; set; }
+    public ApplicationResumeDto? Resume { get; set; }
+
     public string? CoverLetter { get; set; }
     public string Source { get; set; } = string.Empty;
 

@@ -1,3 +1,4 @@
+using Aethon.Api.Common;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,9 @@ public static class CandidateEndpoints
 {
     public static void MapCandidateEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/me").RequireAuthorization();
+        var group = app.MapGroup("/me")
+            .RequireAuthorization()
+            .WithTags("Candidates");
 
         group.MapGet("/profile", async (
             [FromServices] GetMyCandidateProfileHandler handler,
@@ -20,9 +23,16 @@ public static class CandidateEndpoints
 
         group.MapPut("/profile", async (
             [FromServices] UpsertMyCandidateProfileHandler handler,
+            HttpContext httpContext,
             UpsertMyCandidateProfileCommand command,
             CancellationToken ct) =>
         {
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });

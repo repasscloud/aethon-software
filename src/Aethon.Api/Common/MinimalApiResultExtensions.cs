@@ -33,7 +33,7 @@ public static class MinimalApiResultExtensions
             Message = message ?? "An error occurred."
         };
 
-        if (code is null)
+        if (string.IsNullOrWhiteSpace(code))
         {
             return Results.BadRequest(error);
         }

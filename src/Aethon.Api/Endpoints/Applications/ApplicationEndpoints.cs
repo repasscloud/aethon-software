@@ -1,3 +1,4 @@
+using Aethon.Api.Common;
 using Aethon.Application.Applications.Commands.AddApplicationComment;
 using Aethon.Application.Applications.Commands.AddApplicationNote;
 using Aethon.Application.Applications.Commands.ChangeApplicationStatus;
@@ -5,10 +6,8 @@ using Aethon.Application.Applications.Commands.ScheduleInterview;
 using Aethon.Application.Applications.Commands.SubmitJobApplication;
 using Aethon.Application.Applications.Queries.GetApplicationById;
 using Aethon.Application.Applications.Queries.GetApplicationTimeline;
-using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Applications.Queries.GetMyApplications;
 using Microsoft.AspNetCore.Mvc;
-using Aethon.Shared.Enums;
 
 namespace Aethon.Api.Endpoints.Applications;
 
@@ -16,22 +15,31 @@ public static class ApplicationEndpoints
 {
     public static void MapApplicationEndpointsGroup(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/applications").RequireAuthorization();
+        var group = app.MapGroup("/applications")
+            .RequireAuthorization()
+            .WithTags("Applications");
 
-        group.MapPost("/", async (
+        group.MapPost(string.Empty, async (
             [FromServices] SubmitJobApplicationHandler handler,
+            HttpContext httpContext,
             SubmitJobApplicationCommand command,
             CancellationToken ct) =>
         {
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });
 
-        group.MapGet("/my", async (
+        group.MapGet("/mine", async (
             [FromServices] GetMyApplicationsHandler handler,
-            int page,
-            int pageSize,
-            CancellationToken ct) =>
+            int page = 1,
+            int pageSize = 20,
+            CancellationToken ct = default) =>
         {
             var result = await handler.HandleAsync(
                 new GetMyApplicationsQuery
@@ -44,96 +52,133 @@ public static class ApplicationEndpoints
             return result.ToMinimalApiResult();
         });
 
-        group.MapGet("/{id:guid}", async (
+        group.MapGet("/{applicationId:guid}", async (
             [FromServices] GetApplicationByIdHandler handler,
-            Guid id,
-            CancellationToken ct) =>
-        {
-            var result = await handler.HandleAsync(new GetApplicationByIdQuery { ApplicationId = id }, ct);
-            return result.ToMinimalApiResult();
-        });
-
-        group.MapGet("/{id:guid}/timeline", async (
-            [FromServices] GetApplicationTimelineHandler handler,
-            Guid id,
-            CancellationToken ct) =>
-        {
-            var result = await handler.HandleAsync(new GetApplicationTimelineQuery { ApplicationId = id }, ct);
-            return result.ToMinimalApiResult();
-        });
-
-        group.MapGet("/job/{jobId:guid}", async (
-            [FromServices] GetApplicationsForJobHandler handler,
-            Guid jobId,
-            int page,
-            int pageSize,
-            ApplicationStatus? status,
+            Guid applicationId,
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(
-                new GetApplicationsForJobQuery
+                new GetApplicationByIdQuery
                 {
-                    JobId = jobId,
-                    Page = page,
-                    PageSize = pageSize,
-                    Status = status
+                    ApplicationId = applicationId
                 },
                 ct);
 
             return result.ToMinimalApiResult();
         });
 
-        group.MapPost("/{id:guid}/status", async (
+        group.MapGet("/{applicationId:guid}/timeline", async (
+            [FromServices] GetApplicationTimelineHandler handler,
+            Guid applicationId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(
+                new GetApplicationTimelineQuery
+                {
+                    ApplicationId = applicationId
+                },
+                ct);
+
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{applicationId:guid}/status", async (
             [FromServices] ChangeApplicationStatusHandler handler,
-            Guid id,
-            ChangeApplicationStatusCommand command,
+            HttpContext httpContext,
+            Guid applicationId,
+            ChangeApplicationStatusCommand request,
             CancellationToken ct) =>
         {
-            command = command with { ApplicationId = id };
+            var command = new ChangeApplicationStatusCommand
+            {
+                ApplicationId = applicationId,
+                Status = request.Status,
+                Reason = request.Reason,
+                Notes = request.Notes
+            };
+
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });
 
-        group.MapPost("/{id:guid}/notes", async (
+        group.MapPost("/{applicationId:guid}/notes", async (
             [FromServices] AddApplicationNoteHandler handler,
-            Guid id,
-            AddApplicationNoteCommand command,
+            HttpContext httpContext,
+            Guid applicationId,
+            AddApplicationNoteCommand request,
             CancellationToken ct) =>
         {
-            command = new AddApplicationNoteCommand
+            var command = new AddApplicationNoteCommand
             {
-                ApplicationId = id,
-                Content = command.Content
+                ApplicationId = applicationId,
+                Content = request.Content
             };
+
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
 
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });
 
-        group.MapPost("/{id:guid}/comments", async (
+        group.MapPost("/{applicationId:guid}/comments", async (
             [FromServices] AddApplicationCommentHandler handler,
-            Guid id,
-            AddApplicationCommentCommand command,
+            HttpContext httpContext,
+            Guid applicationId,
+            AddApplicationCommentCommand request,
             CancellationToken ct) =>
         {
-            command = new AddApplicationCommentCommand
+            var command = new AddApplicationCommentCommand
             {
-                ApplicationId = id,
-                ParentCommentId = command.ParentCommentId,
-                Content = command.Content
+                ApplicationId = applicationId,
+                ParentCommentId = request.ParentCommentId,
+                Content = request.Content
             };
+
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
 
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });
 
-        group.MapPost("/{id:guid}/interviews", async (
+        group.MapPost("/{applicationId:guid}/interviews", async (
             [FromServices] ScheduleInterviewHandler handler,
-            Guid id,
-            ScheduleInterviewCommand command,
+            HttpContext httpContext,
+            Guid applicationId,
+            ScheduleInterviewCommand request,
             CancellationToken ct) =>
         {
-            command = command with { ApplicationId = id };
+            var command = new ScheduleInterviewCommand
+            {
+                ApplicationId = applicationId,
+                Type = request.Type,
+                Title = request.Title,
+                Location = request.Location,
+                MeetingUrl = request.MeetingUrl,
+                Notes = request.Notes,
+                ScheduledStartUtc = request.ScheduledStartUtc,
+                ScheduledEndUtc = request.ScheduledEndUtc
+            };
+
+            var validation = await httpContext.ValidateAsync(command, ct);
+            if (validation is not null)
+            {
+                return validation;
+            }
+
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         });

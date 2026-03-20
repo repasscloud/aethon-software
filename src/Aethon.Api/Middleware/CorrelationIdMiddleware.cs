@@ -36,4 +36,3 @@ public sealed class CorrelationIdMiddleware
         return Guid.NewGuid().ToString("N");
     }
 }
-

@@ -32,26 +32,34 @@ public sealed class CreateJobHandler
         CreateJobCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!_currentUserAccessor.IsAuthenticated || !_currentUserAccessor.UserId.HasValue)
+        if (!_currentUserAccessor.IsAuthenticated || _currentUserAccessor.UserId == Guid.Empty)
         {
-            return Result<Guid>.Failure("auth.unauthenticated", "The current user is not authenticated.");
+            return Result<Guid>.Failure(
+                "auth.unauthenticated",
+                "The current user is not authenticated.");
         }
 
-        var currentUserId = _currentUserAccessor.UserId.Value;
+        var currentUserId = _currentUserAccessor.UserId;
 
         if (string.IsNullOrWhiteSpace(command.Title))
         {
-            return Result<Guid>.Failure("jobs.title_required", "Job title is required.");
+            return Result<Guid>.Failure(
+                "jobs.title_required",
+                "Job title is required.");
         }
 
         if (string.IsNullOrWhiteSpace(command.Description))
         {
-            return Result<Guid>.Failure("jobs.description_required", "Job description is required.");
+            return Result<Guid>.Failure(
+                "jobs.description_required",
+                "Job description is required.");
         }
 
         if (command.SalaryFrom.HasValue && command.SalaryTo.HasValue && command.SalaryFrom > command.SalaryTo)
         {
-            return Result<Guid>.Failure("jobs.salary_range_invalid", "SalaryFrom must be less than or equal to SalaryTo.");
+            return Result<Guid>.Failure(
+                "jobs.salary_range_invalid",
+                "SalaryFrom must be less than or equal to SalaryTo.");
         }
 
         var organisation = await _dbContext.Organisations
@@ -60,7 +68,9 @@ public sealed class CreateJobHandler
 
         if (organisation is null)
         {
-            return Result<Guid>.Failure("organisations.not_found", "The owning organisation was not found.");
+            return Result<Guid>.Failure(
+                "organisations.not_found",
+                "The owning organisation was not found.");
         }
 
         var canCreate = await _organisationAccessService.CanCreateJobsAsync(
@@ -70,7 +80,9 @@ public sealed class CreateJobHandler
 
         if (!canCreate)
         {
-            return Result<Guid>.Failure("jobs.forbidden", "The current user cannot create jobs for this organisation.");
+            return Result<Guid>.Failure(
+                "jobs.forbidden",
+                "The current user cannot create jobs for this organisation.");
         }
 
         if (command.ManagedByOrganisationId.HasValue)
@@ -81,7 +93,9 @@ public sealed class CreateJobHandler
 
             if (!managingOrganisationExists)
             {
-                return Result<Guid>.Failure("jobs.managing_organisation_not_found", "The managing organisation was not found.");
+                return Result<Guid>.Failure(
+                    "jobs.managing_organisation_not_found",
+                    "The managing organisation was not found.");
             }
         }
 
@@ -93,7 +107,9 @@ public sealed class CreateJobHandler
 
             if (!partnershipExists)
             {
-                return Result<Guid>.Failure("jobs.partnership_not_found", "The recruitment partnership was not found.");
+                return Result<Guid>.Failure(
+                    "jobs.partnership_not_found",
+                    "The recruitment partnership was not found.");
             }
         }
 
@@ -133,11 +149,11 @@ public sealed class CreateJobHandler
             ApplicationEmail = Normalize(command.ApplicationEmail),
             CreatedForUnclaimedCompany = command.CreatedForUnclaimedCompany,
             CreatedUtc = utcNow,
-            CreatedByUserId = currentUserId,
-            SubmittedForApprovalUtc = requiresApproval ? utcNow : null
+            CreatedByUserId = currentUserId
         };
 
         _dbContext.Jobs.Add(job);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Result<Guid>.Success(job.Id);
