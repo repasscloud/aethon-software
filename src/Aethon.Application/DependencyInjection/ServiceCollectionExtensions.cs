@@ -9,6 +9,9 @@ using Aethon.Application.Applications.Queries.GetApplicationTimeline;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Applications.Queries.GetMyApplications;
 using Aethon.Application.Applications.Services;
+using Aethon.Application.Candidates.Commands.AddCandidateResume;
+using Aethon.Application.Candidates.Commands.RemoveCandidateResume;
+using Aethon.Application.Candidates.Commands.SetDefaultCandidateResume;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
 using Aethon.Application.Files.Commands.UploadStoredFile;
@@ -44,6 +47,9 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<GetMyCandidateProfileHandler>();
         services.AddScoped<UpsertMyCandidateProfileHandler>();
+        services.AddScoped<AddCandidateResumeHandler>();
+        services.AddScoped<SetDefaultCandidateResumeHandler>();
+        services.AddScoped<RemoveCandidateResumeHandler>();
 
         services.AddScoped<UploadStoredFileHandler>();
 
