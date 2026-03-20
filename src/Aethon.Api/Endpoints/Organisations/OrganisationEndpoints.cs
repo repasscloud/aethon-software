@@ -1,8 +1,16 @@
 using Aethon.Api.Common;
 using Aethon.Application.Organisations.Commands.AcceptOrganisationInvite;
+using Aethon.Application.Organisations.Commands.AddOrganisationDomain;
+using Aethon.Application.Organisations.Commands.CancelClaimRequest;
+using Aethon.Application.Organisations.Commands.ConfirmDomainVerification;
 using Aethon.Application.Organisations.Commands.CreateOrganisationInvite;
+using Aethon.Application.Organisations.Commands.RegenerateDomainVerificationToken;
+using Aethon.Application.Organisations.Commands.SubmitOrganisationClaim;
 using Aethon.Application.Organisations.Commands.UpdateMyOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetClaimableOrganisations;
+using Aethon.Application.Organisations.Queries.GetMyClaimRequests;
 using Aethon.Application.Organisations.Queries.GetMyOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetOrganisationDomains;
 using Aethon.Application.Organisations.Queries.GetOrganisationMembers;
 using Aethon.Shared.Organisations;
 using Microsoft.AspNetCore.Mvc;
@@ -74,6 +82,97 @@ public static class OrganisationEndpoints
             if (validation is not null) return validation;
 
             var result = await handler.HandleAsync(request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/me/domains
+        group.MapGet("/me/domains", async (
+            [FromServices] GetOrganisationDomainsHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // POST /api/v1/organisations/me/domains
+        group.MapPost("/me/domains", async (
+            [FromServices] AddOrganisationDomainHandler handler,
+            HttpContext ctx,
+            AddOrganisationDomainRequestDto request,
+            CancellationToken ct) =>
+        {
+            var validation = await ctx.ValidateAsync(request, ct);
+            if (validation is not null) return validation;
+
+            var result = await handler.HandleAsync(request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // POST /api/v1/organisations/me/domains/{id}/confirm-verification
+        group.MapPost("/me/domains/{domainId:guid}/confirm-verification", async (
+            [FromServices] ConfirmDomainVerificationHandler handler,
+            HttpContext ctx,
+            Guid domainId,
+            ConfirmDomainVerificationRequestDto request,
+            CancellationToken ct) =>
+        {
+            var validation = await ctx.ValidateAsync(request, ct);
+            if (validation is not null) return validation;
+
+            var result = await handler.HandleAsync(domainId, request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // POST /api/v1/organisations/me/domains/{id}/regenerate-token
+        group.MapPost("/me/domains/{domainId:guid}/regenerate-token", async (
+            [FromServices] RegenerateDomainVerificationTokenHandler handler,
+            Guid domainId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(domainId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/claimable
+        group.MapGet("/claimable", async (
+            [FromServices] GetClaimableOrganisationsHandler handler,
+            string? search,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(search, ct);
+            return result.ToMinimalApiResult();
+        }).AllowAnonymous();
+
+        // POST /api/v1/organisations/claim
+        group.MapPost("/claim", async (
+            [FromServices] SubmitOrganisationClaimHandler handler,
+            HttpContext ctx,
+            SubmitClaimRequestDto request,
+            CancellationToken ct) =>
+        {
+            var validation = await ctx.ValidateAsync(request, ct);
+            if (validation is not null) return validation;
+
+            var result = await handler.HandleAsync(request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/me/claim-requests
+        group.MapGet("/me/claim-requests", async (
+            [FromServices] GetMyClaimRequestsHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // DELETE /api/v1/organisations/me/claim-requests/{id}
+        group.MapDelete("/me/claim-requests/{claimId:guid}", async (
+            [FromServices] CancelClaimRequestHandler handler,
+            Guid claimId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(claimId, ct);
             return result.ToMinimalApiResult();
         });
     }

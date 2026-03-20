@@ -99,4 +99,23 @@ public sealed class OrganisationAccessService
                  ),
             cancellationToken);
     }
+
+    public Task<bool> IsAdminOrOwnerAsync(
+        Guid userId,
+        Guid organisationId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrganisationMemberships.AnyAsync(
+            x => x.UserId == userId &&
+                 x.OrganisationId == organisationId &&
+                 x.Status == MembershipStatus.Active &&
+                 (
+                     x.IsOwner ||
+                     x.CompanyRole == CompanyRole.Owner ||
+                     x.CompanyRole == CompanyRole.Admin ||
+                     x.RecruiterRole == RecruiterRole.Owner ||
+                     x.RecruiterRole == RecruiterRole.Admin
+                 ),
+            cancellationToken);
+    }
 }

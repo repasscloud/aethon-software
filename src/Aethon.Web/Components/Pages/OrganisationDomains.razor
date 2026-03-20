@@ -1,0 +1,374 @@
+@page "/app/organisation/domains"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Organisations
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Organisation domains | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading domains…</div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h1 class="h3 fw-bold mb-1">Domain management</h1>
+                <p class="text-secondary mb-0">Add and verify domains associated with your organisation.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_pageError))
+        {
+            <div class="alert alert-danger rounded-4 mb-0">@_pageError</div>
+        }
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Registered domains</h2>
+
+                @if (_domains.Count == 0)
+                {
+                    <p class="text-secondary mb-0">No domains registered yet.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Domain</th>
+                                    <th>Status</th>
+                                    <th>Method</th>
+                                    <th>Primary</th>
+                                    <th>Verified</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var domain in _domains)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@domain.Domain</td>
+                                        <td>
+                                            @if (domain.Status == DomainStatus.Verified)
+                                            {
+                                                <span class="badge bg-success rounded-pill">Verified</span>
+                                            }
+                                            else if (domain.Status == DomainStatus.Pending)
+                                            {
+                                                <span class="badge bg-warning text-dark rounded-pill">Pending</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary rounded-pill">@domain.Status</span>
+                                            }
+                                        </td>
+                                        <td>@domain.VerificationMethod</td>
+                                        <td>@(domain.IsPrimary ? "Yes" : "—")</td>
+                                        <td>@(domain.VerifiedUtc.HasValue ? domain.VerifiedUtc.Value.ToLocalTime().ToString("dd MMM yyyy") : "—")</td>
+                                        <td>
+                                            @if (domain.Status != DomainStatus.Verified)
+                                            {
+                                                <button class="btn btn-sm btn-outline-secondary rounded-3"
+                                                        @onclick="() => SelectDomainForVerification(domain)">
+                                                    Verify
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+
+                                    @if (_selectedDomain?.Id == domain.Id)
+                                    {
+                                        <tr class="table-light">
+                                            <td colspan="6" class="p-3">
+                                                <div class="fw-semibold mb-2">Verify @domain.Domain</div>
+
+                                                @if (domain.VerificationMethod == DomainVerificationMethod.DnsTxt)
+                                                {
+                                                    <p class="text-secondary small mb-2">
+                                                        Add the following TXT record to your DNS provider, then enter the token below to confirm.
+                                                    </p>
+                                                    <div class="mb-2">
+                                                        <div class="small fw-semibold">Record name:</div>
+                                                        <code>@domain.VerificationDnsRecordName</code>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <div class="small fw-semibold">Record value:</div>
+                                                        <code>@domain.VerificationDnsRecordValue</code>
+                                                    </div>
+                                                }
+
+                                                <div class="row g-2 align-items-end">
+                                                    <div class="col-12 col-lg-8">
+                                                        <label class="form-label fw-semibold small">Verification token</label>
+                                                        <input class="form-control rounded-3"
+                                                               @bind="_verifyToken"
+                                                               placeholder="Paste the verification token" />
+                                                    </div>
+                                                    <div class="col-12 col-lg-2">
+                                                        <button class="btn btn-dark rounded-3 w-100"
+                                                                @onclick="() => ConfirmVerificationAsync(domain)"
+                                                                disabled="@_verifying">
+                                                            @(_verifying ? "Verifying…" : "Confirm")
+                                                        </button>
+                                                    </div>
+                                                    <div class="col-12 col-lg-2">
+                                                        <button class="btn btn-outline-secondary rounded-3 w-100"
+                                                                @onclick="() => RegenerateTokenAsync(domain)"
+                                                                disabled="@_regenerating">
+                                                            @(_regenerating ? "…" : "New token")
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                @if (!string.IsNullOrWhiteSpace(_verifyError))
+                                                {
+                                                    <div class="alert alert-danger rounded-3 mt-2 mb-0 py-2">@_verifyError</div>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(_verifySuccess))
+                                                {
+                                                    <div class="alert alert-success rounded-3 mt-2 mb-0 py-2">@_verifySuccess</div>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Add domain</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_addSuccess))
+                {
+                    <div class="alert alert-success rounded-4 mb-3">@_addSuccess</div>
+                }
+
+                <EditForm Model="_addModel" OnValidSubmit="AddDomainAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-5">
+                            <label class="form-label fw-semibold">Domain</label>
+                            <InputText @bind-Value="_addModel.Domain"
+                                       class="form-control rounded-4"
+                                       placeholder="example.com" />
+                            <ValidationMessage For="@(() => _addModel.Domain)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Verification method</label>
+                            <InputSelect @bind-Value="_addModel.VerificationMethod" class="form-select rounded-4">
+                                <option value="@DomainVerificationMethod.DnsTxt">DNS TXT record</option>
+                                <option value="@DomainVerificationMethod.Manual">Manual (admin)</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-lg-3 d-grid">
+                            <label class="form-label fw-semibold d-none d-lg-block">&nbsp;</label>
+                            <button type="submit" class="btn btn-dark rounded-4" disabled="@_adding">
+                                @(_adding ? "Adding…" : "Add domain")
+                            </button>
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loaded;
+    private string? _pageError;
+    private string? _addSuccess;
+    private bool _adding;
+    private bool _verifying;
+    private bool _regenerating;
+    private string? _verifyError;
+    private string? _verifySuccess;
+    private string _verifyToken = "";
+
+    private List<OrganisationDomainDto> _domains = [];
+    private OrganisationDomainDto? _selectedDomain;
+    private AddOrganisationDomainRequestDto _addModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _pageError = null;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.GetAsync("/api/v1/organisations/me/domains");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = "Could not load domains.";
+                _loaded = true;
+                return;
+            }
+
+            _domains = await response.Content.ReadFromJsonAsync<List<OrganisationDomainDto>>() ?? [];
+        }
+        catch
+        {
+            _pageError = "Could not load domains.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private void SelectDomainForVerification(OrganisationDomainDto domain)
+    {
+        if (_selectedDomain?.Id == domain.Id)
+        {
+            _selectedDomain = null;
+        }
+        else
+        {
+            _selectedDomain = domain;
+            _verifyToken = domain.VerificationToken ?? "";
+            _verifyError = null;
+            _verifySuccess = null;
+        }
+    }
+
+    private async Task AddDomainAsync()
+    {
+        _adding = true;
+        _addSuccess = null;
+        _pageError = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PostAsJsonAsync("/api/v1/organisations/me/domains", _addModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var added = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>();
+                _addSuccess = $"Domain {added?.Domain} added. Use the Verify button to complete verification.";
+                _addModel = new AddOrganisationDomainRequestDto();
+                await LoadAsync();
+                return;
+            }
+
+            _pageError = await ReadErrorAsync(response) ?? "Could not add domain.";
+        }
+        catch
+        {
+            _pageError = "Could not add domain.";
+        }
+        finally
+        {
+            _adding = false;
+        }
+    }
+
+    private async Task ConfirmVerificationAsync(OrganisationDomainDto domain)
+    {
+        _verifying = true;
+        _verifyError = null;
+        _verifySuccess = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PostAsJsonAsync(
+                $"/api/v1/organisations/me/domains/{domain.Id}/confirm-verification",
+                new ConfirmDomainVerificationRequestDto { Token = _verifyToken });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _verifySuccess = "Domain verified successfully.";
+                _selectedDomain = null;
+                await LoadAsync();
+                return;
+            }
+
+            _verifyError = await ReadErrorAsync(response) ?? "Verification failed.";
+        }
+        catch
+        {
+            _verifyError = "Verification failed.";
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+
+    private async Task RegenerateTokenAsync(OrganisationDomainDto domain)
+    {
+        _regenerating = true;
+        _verifyError = null;
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApi");
+            var response = await client.PostAsync(
+                $"/api/v1/organisations/me/domains/{domain.Id}/regenerate-token", null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var updated = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>();
+                if (updated is not null)
+                {
+                    _verifyToken = updated.VerificationToken ?? "";
+                    var idx = _domains.FindIndex(d => d.Id == updated.Id);
+                    if (idx >= 0) _domains[idx] = updated;
+                    _selectedDomain = updated;
+                }
+                return;
+            }
+
+            _verifyError = await ReadErrorAsync(response) ?? "Could not regenerate token.";
+        }
+        catch
+        {
+            _verifyError = "Could not regenerate token.";
+        }
+        finally
+        {
+            _regenerating = false;
+        }
+    }
+
+    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+            if (!string.IsNullOrWhiteSpace(problem?.Detail)) return problem.Detail;
+        }
+        catch { }
+
+        var raw = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    private sealed class ProblemResponse
+    {
+        public string? Detail { get; set; }
+    }
+}
