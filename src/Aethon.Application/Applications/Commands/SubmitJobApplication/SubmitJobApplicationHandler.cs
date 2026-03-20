@@ -80,13 +80,40 @@ public sealed class SubmitJobApplicationHandler
                 "The current user has already applied for this job.");
         }
 
-        if (command.ResumeFileId.HasValue)
+        Guid? resumeFileId = command.ResumeFileId;
+
+        if (!resumeFileId.HasValue)
+        {
+            resumeFileId = await _dbContext.JobSeekerResumes
+                .AsNoTracking()
+                .Where(x =>
+                    x.JobSeekerProfileId == profile.Id &&
+                    x.IsActive &&
+                    x.IsDefault)
+                .Select(x => (Guid?)x.StoredFileId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (!resumeFileId.HasValue)
+            {
+                resumeFileId = await _dbContext.JobSeekerResumes
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.JobSeekerProfileId == profile.Id &&
+                        x.IsActive)
+                    .OrderByDescending(x => x.IsDefault)
+                    .ThenBy(x => x.CreatedUtc)
+                    .Select(x => (Guid?)x.StoredFileId)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+        }
+
+        if (resumeFileId.HasValue)
         {
             var resumeExists = await _dbContext.JobSeekerResumes
                 .AsNoTracking()
                 .AnyAsync(
                     x => x.JobSeekerProfileId == profile.Id &&
-                         x.StoredFileId == command.ResumeFileId.Value &&
+                         x.StoredFileId == resumeFileId.Value &&
                          x.IsActive,
                     cancellationToken);
 
@@ -107,7 +134,7 @@ public sealed class SubmitJobApplicationHandler
             JobId = command.JobId,
             UserId = currentUserId,
             Status = ApplicationStatus.Submitted,
-            ResumeFileId = command.ResumeFileId,
+            ResumeFileId = resumeFileId,
             CoverLetter = Normalize(command.CoverLetter),
             Source = Normalize(command.Source) ?? "AethonJobBoard",
             SubmittedUtc = utcNow,
