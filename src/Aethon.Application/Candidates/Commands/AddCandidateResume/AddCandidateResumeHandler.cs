@@ -6,6 +6,7 @@ using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Candidates;
+using Aethon.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Application.Candidates.Commands.AddCandidateResume;
@@ -109,6 +110,17 @@ public sealed class AddCandidateResumeHandler
         };
 
         _dbContext.JobSeekerResumes.Add(resume);
+
+        // Queue analysis for the newly uploaded resume
+        _dbContext.ResumeAnalyses.Add(new ResumeAnalysis
+        {
+            Id = Guid.NewGuid(),
+            JobSeekerResumeId = resume.Id,
+            StoredFileId = storedFile.Id,
+            Status = ResumeAnalysisStatus.Pending,
+            CreatedUtc = utcNow,
+            CreatedByUserId = currentUserId
+        });
 
         profile.LastProfileUpdatedUtc = utcNow;
         profile.UpdatedUtc = utcNow;

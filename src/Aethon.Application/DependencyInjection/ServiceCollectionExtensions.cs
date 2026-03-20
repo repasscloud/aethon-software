@@ -15,8 +15,10 @@ using Aethon.Application.Applications.Services;
 using Aethon.Application.Candidates.Commands.AddCandidateResume;
 using Aethon.Application.Candidates.Commands.RemoveCandidateResume;
 using Aethon.Application.Candidates.Commands.SetDefaultCandidateResume;
+using Aethon.Application.Candidates.Commands.TriggerResumeAnalysis;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
+using Aethon.Application.Candidates.Queries.GetResumeAnalysis;
 using Aethon.Application.Files.Commands.UploadStoredFile;
 using Aethon.Application.Integrations.Commands.CreateWebhookSubscription;
 using Aethon.Application.Integrations.Queries.GetWebhookSubscriptions;
@@ -119,6 +121,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AddCandidateResumeHandler>();
         services.AddScoped<SetDefaultCandidateResumeHandler>();
         services.AddScoped<RemoveCandidateResumeHandler>();
+        services.AddScoped<GetResumeAnalysisHandler>();
+        services.AddScoped<TriggerResumeAnalysisHandler>();
 
         services.AddScoped<UploadStoredFileHandler>();
 

@@ -5,11 +5,13 @@ using Aethon.Api.Infrastructure;
 using Aethon.Api.Infrastructure.Caching;
 using Aethon.Api.Infrastructure.Email;
 using Aethon.Api.Infrastructure.Files;
+using Aethon.Api.Infrastructure.ResumeAnalysis;
 using Aethon.Api.Infrastructure.Workers;
 using Aethon.Api.Middleware;
 using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Files;
+using Aethon.Application.Abstractions.ResumeAnalysis;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
@@ -55,6 +57,10 @@ services.Configure<EmailOptions>(configuration.GetSection("Email"));
 services.AddScoped<IEmailService, MailerSendEmailService>();
 services.AddScoped<IAppSettings, AppSettingsService>();
 
+services.Configure<ClaudeOptions>(configuration.GetSection("Claude"));
+services.AddScoped<IResumeAnalysisService, ClaudeResumeAnalysisService>();
+services.AddHostedService<ResumeAnalysisWorker>();
+
 services.AddHttpClient();
 services.AddHostedService<WebhookDeliveryWorker>();
 
@@ -72,6 +78,13 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+// Apply pending EF migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AethonDbContext>();
+    db.Database.Migrate();
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();

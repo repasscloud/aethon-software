@@ -28,6 +28,7 @@ public sealed class AethonDbContext
     public DbSet<JobSeekerNationality> JobSeekerNationalities => Set<JobSeekerNationality>();
     public DbSet<JobSeekerProfile> JobSeekerProfiles => Set<JobSeekerProfile>();
     public DbSet<JobSeekerResume> JobSeekerResumes => Set<JobSeekerResume>();
+    public DbSet<ResumeAnalysis> ResumeAnalyses => Set<ResumeAnalysis>();
 
     public DbSet<Organisation> Organisations => Set<Organisation>();
     public DbSet<OrganisationClaimRequest> OrganisationClaimRequests => Set<OrganisationClaimRequest>();

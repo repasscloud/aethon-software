@@ -1,0 +1,66 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aethon
+      POSTGRES_USER: aethon
+      POSTGRES_PASSWORD: aethon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aethon -d aethon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Aethon.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=aethon;Username=aethon;Password=aethon"
+      Auth__JwtKey: "${Auth__JwtKey}"
+      Auth__Issuer: "${Auth__Issuer:-aethon-api}"
+      Auth__Audience: "${Auth__Audience:-aethon-web}"
+      Email__MailerSendApiKey: "${Email__MailerSendApiKey:-}"
+      Email__FromEmail: "${Email__FromEmail:-do-not-reply@repasscloud.com}"
+      Email__FromName: "${Email__FromName:-Aethon}"
+      Email__WebBaseUrl: "${Email__WebBaseUrl:-http://localhost:5200}"
+      Claude__ApiKey: "${Claude__ApiKey:-}"
+    volumes:
+      - api_uploads:/app/uploads
+      - dp_keys:/keys
+    ports:
+      - "5201:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Aethon.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ApiBaseUrl: "http://api:8080"
+      DataProtection__CertBase64: "${DataProtection__CertBase64:-}"
+      DataProtection__KeysPath: /keys
+      DataProtection__ApplicationName: Aethon
+    volumes:
+      - dp_keys:/keys
+    ports:
+      - "5200:8080"
+
+volumes:
+  postgres_data:
+  api_uploads:
+  dp_keys:
