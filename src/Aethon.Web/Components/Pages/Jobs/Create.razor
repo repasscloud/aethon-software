@@ -37,12 +37,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        allowedCompanies = await Http.GetFromJsonAsync<List<Guid>>("api/jobs/allowed-companies") ?? [];
+        allowedCompanies = await Http.GetFromJsonAsync<List<Guid>>("api/v1/jobs/allowed-companies") ?? [];
     }
 
     private async Task SaveAsync()
     {
-        var response = await Http.PostAsJsonAsync("api/jobs", model);
+        var response = await Http.PostAsJsonAsync("api/v1/jobs", model);
         response.EnsureSuccessStatusCode();
 
         Nav.NavigateTo("/jobs");

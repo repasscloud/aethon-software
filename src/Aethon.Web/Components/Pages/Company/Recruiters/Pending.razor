@@ -103,7 +103,7 @@ else
 
     private async Task LoadAsync()
     {
-        var result = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters/pending")
+        var result = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/v1/company/recruiters/pending")
             ?? [];
 
         items = result.Select(x => new RowModel
@@ -135,7 +135,7 @@ else
             Notes = item.ApprovalNotes
         };
 
-        var response = await Http.PostAsJsonAsync($"api/company/recruiters/{item.Id}/approve", request);
+        var response = await Http.PostAsJsonAsync($"api/v1/company/recruiters/{item.Id}/approve", request);
         response.EnsureSuccessStatusCode();
 
         await LoadAsync();
@@ -144,7 +144,7 @@ else
     private async Task RejectAsync(RowModel item)
     {
         var response = await Http.PostAsJsonAsync(
-            $"api/company/recruiters/{item.Id}/reject",
+            $"api/v1/company/recruiters/{item.Id}/reject",
             new RejectRecruiterCompanyRequestDto
             {
                 Reason = item.RejectReason

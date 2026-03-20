@@ -21,9 +21,35 @@ using Aethon.Application.Files.Commands.UploadStoredFile;
 using Aethon.Application.Integrations.Commands.CreateWebhookSubscription;
 using Aethon.Application.Integrations.Queries.GetWebhookSubscriptions;
 using Aethon.Application.Integrations.Services;
+using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
+using Aethon.Application.Jobs.Commands.PublishJob;
+using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
+using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
+using Aethon.Application.Jobs.Queries.GetMyOrgJobs;
+using Aethon.Application.Organisations.Commands.AcceptOrganisationInvite;
+using Aethon.Application.Organisations.Commands.CreateOrganisationInvite;
+using Aethon.Application.Organisations.Commands.UpdateMyOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetMyOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetOrganisationMembers;
 using Aethon.Application.Organisations.Services;
+using Aethon.Application.RecruiterCompanies.Commands.CreateRecruiterCompanyRequest;
+using Aethon.Application.RecruiterCompanies.Queries.GetRecruiterCompanies;
+using Aethon.Application.RecruiterCompanies.Commands.CancelRecruiterCompanyRequest;
+using Aethon.Application.CompanyRecruiters.Queries.GetCompanyRecruiters;
+using Aethon.Application.CompanyRecruiters.Queries.GetPendingCompanyRecruiters;
+using Aethon.Application.CompanyRecruiters.Commands.CreateCompanyRecruiterInvite;
+using Aethon.Application.CompanyRecruiters.Commands.ApproveCompanyRecruiter;
+using Aethon.Application.CompanyRecruiters.Commands.RejectCompanyRecruiter;
+using Aethon.Application.CompanyRecruiters.Commands.SuspendCompanyRecruiter;
+using Aethon.Application.RecruiterJobs.Commands.CreateRecruiterJobDraft;
+using Aethon.Application.RecruiterJobs.Queries.GetRecruiterJobs;
+using Aethon.Application.RecruiterJobs.Commands.UpdateRecruiterJobDraft;
+using Aethon.Application.RecruiterJobs.Commands.SubmitRecruiterJobForApproval;
+using Aethon.Application.CompanyJobs.Queries.GetPendingJobApprovals;
+using Aethon.Application.CompanyJobs.Commands.ApproveRecruiterJob;
+using Aethon.Application.CompanyJobs.Commands.RejectRecruiterJob;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aethon.Application.DependencyInjection;
@@ -41,7 +67,18 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IWebhookEventDispatcher, WebhookEventDispatcher>();
 
         services.AddScoped<CreateJobHandler>();
+        services.AddScoped<UpdateJobHandler>();
+        services.AddScoped<PublishJobHandler>();
+        services.AddScoped<CloseJobHandler>();
+        services.AddScoped<ReturnJobToDraftHandler>();
         services.AddScoped<GetJobByIdHandler>();
+        services.AddScoped<GetMyOrgJobsHandler>();
+
+        services.AddScoped<GetMyOrganisationProfileHandler>();
+        services.AddScoped<UpdateMyOrganisationProfileHandler>();
+        services.AddScoped<GetOrganisationMembersHandler>();
+        services.AddScoped<CreateOrganisationInviteHandler>();
+        services.AddScoped<AcceptOrganisationInviteHandler>();
 
         services.AddScoped<SubmitJobApplicationHandler>();
         services.AddScoped<GetApplicationByIdHandler>();
@@ -65,6 +102,26 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<CreateWebhookSubscriptionHandler>();
         services.AddScoped<GetWebhookSubscriptionsHandler>();
+
+        services.AddScoped<CreateRecruiterCompanyRequestHandler>();
+        services.AddScoped<GetRecruiterCompaniesHandler>();
+        services.AddScoped<CancelRecruiterCompanyRequestHandler>();
+
+        services.AddScoped<GetCompanyRecruitersHandler>();
+        services.AddScoped<GetPendingCompanyRecruitersHandler>();
+        services.AddScoped<CreateCompanyRecruiterInviteHandler>();
+        services.AddScoped<ApproveCompanyRecruiterHandler>();
+        services.AddScoped<RejectCompanyRecruiterHandler>();
+        services.AddScoped<SuspendCompanyRecruiterHandler>();
+
+        services.AddScoped<CreateRecruiterJobDraftHandler>();
+        services.AddScoped<GetRecruiterJobsHandler>();
+        services.AddScoped<UpdateRecruiterJobDraftHandler>();
+        services.AddScoped<SubmitRecruiterJobForApprovalHandler>();
+
+        services.AddScoped<GetPendingJobApprovalsHandler>();
+        services.AddScoped<ApproveRecruiterJobHandler>();
+        services.AddScoped<RejectRecruiterJobHandler>();
 
         return services;
     }

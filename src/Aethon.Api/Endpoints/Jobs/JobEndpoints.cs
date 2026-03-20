@@ -1,8 +1,14 @@
 using Aethon.Api.Common;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
+using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
+using Aethon.Application.Jobs.Commands.PublishJob;
+using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
+using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
+using Aethon.Application.Jobs.Queries.GetMyOrgJobs;
 using Aethon.Shared.Enums;
+using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Jobs;
@@ -43,6 +49,56 @@ public static class JobEndpoints
                 },
                 ct);
 
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/jobs/my-org  — must be before /{jobId:guid} to avoid routing conflict
+        group.MapGet("/my-org", async (
+            [FromServices] GetMyOrgJobsHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPut("/{jobId:guid}", async (
+            [FromServices] UpdateJobHandler handler,
+            HttpContext ctx,
+            Guid jobId,
+            UpdateJobRequestDto request,
+            CancellationToken ct) =>
+        {
+            var validation = await ctx.ValidateAsync(request, ct);
+            if (validation is not null) return validation;
+
+            var result = await handler.HandleAsync(jobId, request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{jobId:guid}/publish", async (
+            [FromServices] PublishJobHandler handler,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{jobId:guid}/close", async (
+            [FromServices] CloseJobHandler handler,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{jobId:guid}/return-to-draft", async (
+            [FromServices] ReturnJobToDraftHandler handler,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, ct);
             return result.ToMinimalApiResult();
         });
 

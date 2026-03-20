@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
+@using Aethon.Shared.Candidates
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Files
 @using Aethon.Shared.Jobs
@@ -138,7 +139,7 @@ else
     private bool _uploadingResume;
     private string? _message;
     private string? _error;
-    private JobSeekerProfileDto? _profile;
+    private CandidateProfileDto? _profile;
     private UpdateJobSeekerProfileRequestDto _model = new();
     private StoredFileDto? _resumeFile;
     private IBrowserFile? _selectedResume;
@@ -153,7 +154,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            _profile = await client.GetFromJsonAsync<JobSeekerProfileDto>("/jobseeker/profile");
+            _profile = await client.GetFromJsonAsync<CandidateProfileDto>("/api/v1/me/profile");
 
             if (_profile is not null)
             {
@@ -170,9 +171,19 @@ else
                     DesiredSalaryCurrency = _profile.DesiredSalaryCurrency
                 };
 
-                _resumeFile = _profile.Resumes
-                    .FirstOrDefault(r => r.IsDefault && r.IsActive)?.File
-                    ?? _profile.Resumes.FirstOrDefault(r => r.IsActive)?.File;
+                var resume = _profile.Resumes.FirstOrDefault(r => r.IsDefault && r.IsActive)
+                             ?? _profile.Resumes.FirstOrDefault(r => r.IsActive);
+                if (resume is not null)
+                {
+                    _resumeFile = new StoredFileDto
+                    {
+                        Id = resume.StoredFileId,
+                        OriginalFileName = resume.OriginalFileName,
+                        ContentType = resume.ContentType,
+                        LengthBytes = resume.LengthBytes,
+                        DownloadUrl = $"/api/v1/files/{resume.StoredFileId}/download"
+                    };
+                }
             }
         }
         catch
@@ -194,7 +205,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PutAsJsonAsync("/jobseeker/profile", _model);
+            var response = await client.PutAsJsonAsync("/api/v1/me/profile", _model);
 
             if (response.IsSuccessStatusCode)
             {
@@ -246,7 +257,7 @@ else
             fileContent.Headers.ContentType = new MediaTypeHeaderValue(_selectedResume.ContentType);
             content.Add(fileContent, "file", _selectedResume.Name);
 
-            var uploadResponse = await client.PostAsync("/files/resume", content);
+            var uploadResponse = await client.PostAsync("/api/v1/files", content);
             if (!uploadResponse.IsSuccessStatusCode)
             {
                 _error = "Resume upload failed.";
@@ -260,7 +271,7 @@ else
                 return;
             }
 
-            var linkResponse = await client.PostAsync($"/jobseeker/profile/resume/{uploaded.Id}", null);
+            var linkResponse = await client.PostAsync($"/api/v1/me/profile/resume/{uploaded.Id}", null);
             if (!linkResponse.IsSuccessStatusCode)
             {
                 _error = "Resume uploaded but could not be linked to your profile.";

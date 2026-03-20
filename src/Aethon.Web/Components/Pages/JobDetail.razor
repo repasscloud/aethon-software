@@ -160,7 +160,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync($"/jobs/{Id}");
+            var response = await client.GetAsync($"/api/v1/jobs/{Id}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -194,17 +194,17 @@ else
 
     private async Task PublishAsync()
     {
-        await RunActionAsync($"/jobs/{Id}/publish", "Job published.");
+        await RunActionAsync($"/api/v1/jobs/{Id}/publish", "Job published.");
     }
 
     private async Task CloseAsync()
     {
-        await RunActionAsync($"/jobs/{Id}/close", "Job closed.");
+        await RunActionAsync($"/api/v1/jobs/{Id}/close", "Job closed.");
     }
 
     private async Task ReturnToDraftAsync()
     {
-        await RunActionAsync($"/jobs/{Id}/return-to-draft", "Job returned to draft.");
+        await RunActionAsync($"/api/v1/jobs/{Id}/return-to-draft", "Job returned to draft.");
     }
 
     private async Task RunActionAsync(string url, string successMessage)

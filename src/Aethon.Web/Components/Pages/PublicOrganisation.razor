@@ -67,7 +67,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync($"/public/organisations/{Slug}");
+            var response = await client.GetAsync($"/api/v1/public/organisations/{Slug}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {

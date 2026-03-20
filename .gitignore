@@ -482,5 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
-_next_steps.txt
-_instructions.txt
+
+_smtpapi-test/
+*.txt
+*.md

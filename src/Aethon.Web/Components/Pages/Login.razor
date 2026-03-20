@@ -74,6 +74,13 @@
                             </div>
                         }
 
+                        @if (!string.IsNullOrWhiteSpace(InfoMessage))
+                        {
+                            <div class="alert alert-info rounded-4 mb-4" role="alert">
+                                @InfoMessage
+                            </div>
+                        }
+
                         @if (!string.IsNullOrWhiteSpace(ErrorMessage))
                         {
                             <div class="alert alert-danger rounded-4 mb-4" role="alert">
@@ -81,7 +88,7 @@
                             </div>
                         }
 
-                        <form method="post" action="http://localhost:5201/auth/browser-login">
+                        <form method="post" action="/account/login">
                             <input type="hidden" name="returnPath" value="@ReturnPath" />
 
                             <div class="mb-3">
@@ -158,6 +165,7 @@
 
 @code {
     private string? ErrorMessage;
+    private string? InfoMessage;
     private bool RegistrationSuccess;
     private string ReturnPath = "/";
 
@@ -181,6 +189,11 @@
         if (query.ContainsKey("registered"))
         {
             RegistrationSuccess = true;
+        }
+
+        if (query.TryGetValue("message", out var message))
+        {
+            InfoMessage = message.ToString();
         }
 
         var rawReturnUrl =

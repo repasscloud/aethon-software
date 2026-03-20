@@ -60,7 +60,7 @@ else
 
     private async Task LoadAsync()
     {
-        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/recruiter/companies") ?? [];
+        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/v1/recruiter/companies") ?? [];
     }
 
     private void CreateNew()
@@ -70,7 +70,7 @@ else
 
     private async Task CancelAsync(Guid relationshipId)
     {
-        var response = await Http.PostAsync($"api/recruiter/companies/requests/{relationshipId}/cancel", null);
+        var response = await Http.PostAsync($"api/v1/recruiter/companies/requests/{relationshipId}/cancel", null);
         response.EnsureSuccessStatusCode();
         await LoadAsync();
     }

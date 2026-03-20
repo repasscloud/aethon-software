@@ -68,7 +68,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            _items = await client.GetFromJsonAsync<List<JobApplicationListItemDto>>("/applications/me") ?? [];
+            _items = await client.GetFromJsonAsync<List<JobApplicationListItemDto>>("/api/v1/applications/mine") ?? [];
         }
         catch
         {

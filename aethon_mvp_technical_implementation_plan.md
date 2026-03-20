@@ -316,3 +316,114 @@ What is missing is not “more pages” in general. What is missing is:
 The next stage should be to turn the existing model into a complete employer ↔ recruiter ↔ candidate workflow.
 
 If you want, I can turn this into a concrete staged build plan with file-by-file implementation order for API, Data, Shared, and Web.
+
+----
+
+Feedback with Claude goes from here, I edited this file myself:
+
+Email delivery:
+For the email, I had tested an another small project to send emails for me. Obviously I would need HTML/CSS all-in-one Outlook compatible email template, that includes the link as a button and text blah blah, but I added a folder in the root called _smtpapi-test that has a Program.cs in there, that is how I configured my tests of the API that I use to send transactional emails. If there is a way to set the API key for this service in the env vars of the API layer, can we do that, and explain to me which file it goes into (I am guessing a .env file?). Create template etc and put it into the code, or if you can, I would like it to use it from teh SQL, so we can replace the template OR use files on teh hard disk that go into the image that get copied across so we could "replace" them at a later stage - something that's easy and not so "baked in" - unless you think that's a bad idea - you lead the way.
+
+Password
+
+---
+  Where Each Item Stands Today
+
+  Recruiter workflow
+
+  Implemented — this is the work we just finished. All the pieces are now in place:
+  - Partnership creation, approval, rejection, suspension (both sides)
+  - Recruiter creates job drafts, edits them, submits for company approval
+  - Company approves or rejects submitted recruiter jobs
+  - All pages had their URLs corrected
+  - All 16 Application handlers built and wired
+
+  The recruiter workflow was the biggest gap in the plan. It's now structurally complete at the API/backend layer. The UI pages already existed and now have correct endpoints to call.
+
+  ---
+  Claim/domain ownership flow
+
+  Still not implemented. The schema has OrganisationClaimRequest, OrganisationDomain, DomainVerificationMethod, DomainTrustLevel etc. — none of that is exposed via API or UI. Registration auto-provisions an org from email domain, which
+  is fine for now. This is Stage 3 work per the plan.
+
+  ---
+  Email delivery
+
+  Not wired up at all. There is no outbound email abstraction, no SMTP/SendGrid/SES client, no template system. The current state:
+  - Registration: confirmation link is logged to API stdout, never emailed
+  - Invites: the token is returned in the API response body and has to be copy-pasted manually
+  - Applications: no notifications of any kind
+  - Password reset: dev-only hash-generator page, not a real reset flow
+
+  This is Stage 4 in the plan. You'd need to define an IEmailSender interface, wire a provider, and build templates before any user-facing email works.
+
+  ---
+  Password recovery
+
+  Not real. There is a dev page that generates a bcrypt hash and a raw SQL UPDATE statement. An actual forgot-password flow (request endpoint → token → email → reset page) doesn't exist anywhere in the codebase. Stage 4 work.
+
+  ---
+  ATS pipeline workflow
+
+  Thin but the foundation is there. The handlers for notes, comments, timeline, file attachments, interview scheduling, and status changes all exist and are wired. What's missing is the UI depth — ApplicationDetail.razor currently only
+  shows status change. The Phase 5 work (notes panel, comments thread, timeline view, interview scheduling UI) hasn't been built yet. The API surface is ready; the pages aren't.
+
+  ---
+  Resume analyzer
+
+  Nothing done. File upload and storage is in place (UploadStoredFileHandler, AddCandidateResumeHandler). Resume parsing, skill extraction, scoring, and ranking are entirely absent. This is the Stage 5 intelligence layer — it makes no
+  sense to build it before the workflow is stable. Nothing to do here yet.
+
+  ---
+  Test coverage
+
+  Effectively zero. There is one empty xUnit test project. No auth tests, no registration tests, no invite acceptance tests, no application authorization tests, nothing. This is Stage 1 stabilisation work — it's the thing most likely to
+   bite you as the logic grows.
+
+  ---
+  "Business logic is still controller-heavy"
+
+  This referred to the state of the codebase before the current session work. At that point, endpoints were calling AethonDbContext directly with inline LINQ — no Application layer separation. The work done across this session and the
+  previous one has moved almost everything into proper *Handler classes in Aethon.Application. The AuthEndpoints.cs login handler is still doing some direct DB work (querying OrganisationMembership) which is acceptable for auth, but the
+   rest of the business logic is now in the Application layer. This concern is largely resolved.
+
+  ---
+  "Deployment/config still brittle"
+
+  Also referred to the earlier state. Specifically: the web UI had hardcoded http://localhost:5201 URLs in form action attributes for login/logout. That's been replaced — login and logout now post to /account/login and /account/logout
+  on the same host, handled by the Web app itself, which then calls the API internally using the configured ApiBaseUrl. The ApiBaseUrl is an environment variable. That specific brittleness is gone. What remains: appsettings still
+  defaults to localhost:5201, but that's the expected dev default — you override it in Docker/prod via environment variables, which is normal.
+
+  ---
+  Claims refresh/state refresh edge cases
+
+  Not addressed. The scenario is: a user accepts an org invite (or is assigned to an org), but their auth cookie was issued before that change — so the cookie still has the old claims (or missing OrganisationId). Until they log out and
+  back in, the nav and routing will reflect the old state.
+
+  The same applies if a recruiter gets their partnership approved mid-session. Their cookie doesn't know.
+
+  This needs either:
+  1. A "refresh my claims" endpoint that re-issues the cookie silently
+  2. Or a forced re-login redirect when certain transitions occur (invite accept, first org assignment)
+
+  Nothing is implemented for this. It will surface as a UX bug the first time a real user accepts an invite without re-logging in.
+
+  ---
+  Stage Status
+
+  ┌─────────┬────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+  │  Stage  │                        Description                         │                                                    Status                                                     │
+  ├─────────┼────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Stage 1 │ Stabilise foundation (URL fixes, config, logging)          │ ~70% done — URLs fixed, config cleaned up. Test coverage still zero.                                          │
+  ├─────────┼────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Stage 2 │ Finish core ATS workflow (recruiter-company, job approval) │ ~85% done — all API/backend wired. ATS UI depth (notes/timeline/comments panels) still needs Phase 5 UI work. │
+  ├─────────┼────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Stage 3 │ Organisation ownership, domain verification, invite email  │ 0% — schema exists, no product layer                                                                          │
+  ├─────────┼────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Stage 4 │ Communications and notifications (email)                   │ 0% — no email infrastructure at all                                                                           │
+  ├─────────┼────────────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+  │ Stage 5 │ Intelligence layer (resume parsing, scoring, ranking)      │ 0% — file upload only                                                                                         │
+  └─────────┴────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+  We are at the tail end of Stage 2. The remaining Stage 2 items are the ApplicationDetail.razor expansion (notes panel, comments, timeline, interview scheduling UI) and the integration settings page. After that, the natural next move
+  is either Stage 1 test coverage or Stage 3/4 email infrastructure.

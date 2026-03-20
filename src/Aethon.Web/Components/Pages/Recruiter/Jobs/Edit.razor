@@ -57,7 +57,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var detail = await Http.GetFromJsonAsync<JobDetailDto>($"api/jobs/{JobId}");
+        var detail = await Http.GetFromJsonAsync<JobDetailDto>($"api/v1/jobs/{JobId}");
         if (detail is null)
         {
             return;
@@ -76,14 +76,14 @@ else
 
     private async Task SaveAsync()
     {
-        var response = await Http.PutAsJsonAsync($"api/recruiter/jobs/{JobId}", model);
+        var response = await Http.PutAsJsonAsync($"api/v1/recruiter/jobs/{JobId}", model);
         response.EnsureSuccessStatusCode();
         Nav.NavigateTo("/recruiter/jobs");
     }
 
     private async Task SubmitAsync()
     {
-        var response = await Http.PostAsync($"api/recruiter/jobs/{JobId}/submit", null);
+        var response = await Http.PostAsync($"api/v1/recruiter/jobs/{JobId}/submit", null);
         response.EnsureSuccessStatusCode();
         Nav.NavigateTo("/recruiter/jobs");
     }

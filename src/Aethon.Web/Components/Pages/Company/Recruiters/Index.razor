@@ -128,14 +128,14 @@ else
 
     private async Task LoadAsync()
     {
-        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/company/recruiters") ?? [];
+        items = await Http.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("api/v1/company/recruiters") ?? [];
     }
 
     private async Task InviteAsync()
     {
         inviteModel.RecruiterOrganisationId = Guid.Parse(recruiterOrganisationIdText);
 
-        var response = await Http.PostAsJsonAsync("api/company/recruiters/invites", inviteModel);
+        var response = await Http.PostAsJsonAsync("api/v1/company/recruiters/invites", inviteModel);
         response.EnsureSuccessStatusCode();
 
         recruiterOrganisationIdText = string.Empty;
@@ -158,7 +158,7 @@ else
 
     private async Task SuspendAsync(Guid relationshipId)
     {
-        var response = await Http.PostAsync($"api/company/recruiters/{relationshipId}/suspend", null);
+        var response = await Http.PostAsync($"api/v1/company/recruiters/{relationshipId}/suspend", null);
         response.EnsureSuccessStatusCode();
         await LoadAsync();
     }

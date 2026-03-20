@@ -1,10 +1,10 @@
 using System.Net.Http.Headers;
+using System.Security.Claims;
 
 namespace Aethon.Web.Infrastructure;
 
 public sealed class ApiAuthCookieHandler : DelegatingHandler
 {
-    private const string AuthCookieName = "Aethon.Auth";
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public ApiAuthCookieHandler(IHttpContextAccessor httpContextAccessor)
@@ -16,13 +16,15 @@ public sealed class ApiAuthCookieHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        var user = _httpContextAccessor.HttpContext?.User;
 
-        if (httpContext?.Request.Cookies.TryGetValue(AuthCookieName, out var authCookie) == true &&
-            !string.IsNullOrWhiteSpace(authCookie))
+        if (user?.Identity?.IsAuthenticated == true)
         {
-            request.Headers.Remove("Cookie");
-            request.Headers.Add("Cookie", $"{AuthCookieName}={authCookie}");
+            var token = user.FindFirstValue("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
         }
 
         if (request.Headers.Accept.Count == 0)

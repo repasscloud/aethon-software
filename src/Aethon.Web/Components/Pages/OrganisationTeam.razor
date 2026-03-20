@@ -6,6 +6,7 @@
 @using Aethon.Shared.Organisations
 @using Microsoft.AspNetCore.Authorization
 @inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager NavigationManager
 
 <PageTitle>Organisation team | Aethon</PageTitle>
 
@@ -249,7 +250,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync("/org/me/members");
+            var response = await client.GetAsync("/api/v1/organisations/me/members");
 
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
@@ -308,7 +309,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PostAsJsonAsync("/org/me/invites", _inviteModel);
+            var response = await client.PostAsJsonAsync("/api/v1/organisations/me/invites", _inviteModel);
 
             if (response.IsSuccessStatusCode)
             {
@@ -341,13 +342,14 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PostAsJsonAsync("/org/invites/accept", _acceptModel);
+            var response = await client.PostAsJsonAsync("/api/v1/organisations/invites/accept", _acceptModel);
 
             if (response.IsSuccessStatusCode)
             {
-                _acceptSuccess = "Invite accepted successfully. Sign out and sign in again to refresh your app context if needed.";
-                _inviteSuccess = null;
-                await LoadAsync();
+                // Force re-login so the new org claims are reflected in the cookie immediately
+                NavigationManager.NavigateTo(
+                    "/account/signout?reason=" + Uri.EscapeDataString("Invite accepted. Please sign in again to update your session."),
+                    forceLoad: true);
                 return;
             }
 

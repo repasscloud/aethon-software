@@ -5,6 +5,7 @@ using Aethon.Data.Identity;
 using Aethon.Shared.Auth;
 using Aethon.Shared.Enums;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Endpoints.Auth;
 
@@ -18,11 +19,9 @@ public static class AuthEndpoints
         group.MapPost("/register", async (
             UserManager<ApplicationUser> userManager,
             AethonDbContext db,
-            JwtTokenService tokenService,
             RegisterRequest request) =>
         {
             var now = DateTime.UtcNow;
-
             var normalizedType = request.RegistrationType.Trim().ToLowerInvariant();
 
             var userType = normalizedType switch
@@ -34,129 +33,191 @@ public static class AuthEndpoints
 
             var displayName = $"{request.FirstName.Trim()} {request.LastName.Trim()}".Trim();
 
-            var user = new ApplicationUser
+            await using var transaction = await db.Database.BeginTransactionAsync();
+
+            try
             {
-                Id = Guid.NewGuid(),
-                UserName = request.Email,
-                Email = request.Email,
-                DisplayName = displayName,
-                UserType = userType
-            };
-
-            var result = await userManager.CreateAsync(user, request.Password);
-
-            if (!result.Succeeded)
-            {
-                var errors = result.Errors
-                    .GroupBy(e => e.Code)
-                    .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray());
-                return Results.ValidationProblem(errors);
-            }
-
-            if (normalizedType is "company" or "recruiter")
-            {
-                var orgType = normalizedType == "company"
-                    ? OrganisationType.Company
-                    : OrganisationType.RecruiterAgency;
-
-                var domainId = Guid.NewGuid();
-                var orgId = Guid.NewGuid();
-
-                var emailDomain = request.Email.Contains('@')
-                    ? request.Email.Split('@')[1].Trim().ToLowerInvariant()
-                    : string.Empty;
-
-                var org = new Organisation
+                var user = new ApplicationUser
                 {
-                    Id = orgId,
-                    Type = orgType,
-                    Status = OrganisationStatus.Active,
-                    ClaimStatus = OrganisationClaimStatus.NotApplicable,
-                    Name = request.OrganisationName!.Trim(),
-                    NormalizedName = request.OrganisationName!.Trim().ToUpperInvariant(),
-                    IsPublicProfileEnabled = false,
-                    IsVerified = false,
-                    ClaimedByUserId = user.Id,
-                    ClaimedUtc = now,
-                    PrimaryDomainId = string.IsNullOrEmpty(emailDomain) ? null : domainId,
-                    CreatedByUserId = user.Id,
-                    CreatedUtc = now
+                    Id = Guid.NewGuid(),
+                    UserName = request.Email,
+                    Email = request.Email,
+                    DisplayName = displayName,
+                    UserType = userType
                 };
 
-                db.Set<Organisation>().Add(org);
+                var result = await userManager.CreateAsync(user, request.Password);
 
-                if (!string.IsNullOrEmpty(emailDomain))
+                if (!result.Succeeded)
                 {
-                    var domain = new OrganisationDomain
+                    await transaction.RollbackAsync();
+                    var errors = result.Errors
+                        .GroupBy(e => e.Code)
+                        .ToDictionary(g => g.Key, g => g.Select(e => e.Description).ToArray());
+                    return Results.ValidationProblem(errors);
+                }
+
+                if (normalizedType is "company" or "recruiter")
+                {
+                    var orgType = normalizedType == "company"
+                        ? OrganisationType.Company
+                        : OrganisationType.RecruiterAgency;
+
+                    var orgId = Guid.NewGuid();
+
+                    var emailDomain = request.Email.Contains('@')
+                        ? request.Email.Split('@')[1].Trim().ToLowerInvariant()
+                        : string.Empty;
+
+                    // Save org first without PrimaryDomainId to avoid circular FK dependency
+                    var org = new Organisation
                     {
-                        Id = domainId,
-                        OrganisationId = orgId,
-                        Domain = emailDomain,
-                        NormalizedDomain = emailDomain.ToUpperInvariant(),
-                        IsPrimary = true,
-                        Status = DomainStatus.Pending,
-                        VerificationMethod = DomainVerificationMethod.None,
-                        TrustLevel = DomainTrustLevel.Low,
+                        Id = orgId,
+                        Type = orgType,
+                        Status = OrganisationStatus.Active,
+                        ClaimStatus = OrganisationClaimStatus.NotApplicable,
+                        Name = request.OrganisationName!.Trim(),
+                        NormalizedName = request.OrganisationName!.Trim().ToUpperInvariant(),
+                        IsPublicProfileEnabled = false,
+                        IsVerified = false,
+                        ClaimedByUserId = user.Id,
+                        ClaimedUtc = now,
+                        PrimaryDomainId = null,
                         CreatedByUserId = user.Id,
                         CreatedUtc = now
                     };
 
-                    db.Set<OrganisationDomain>().Add(domain);
+                    db.Set<Organisation>().Add(org);
+
+                    var membership = new OrganisationMembership
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganisationId = orgId,
+                        UserId = user.Id,
+                        Status = MembershipStatus.Active,
+                        IsOwner = true,
+                        CompanyRole = orgType == OrganisationType.Company ? CompanyRole.Owner : null,
+                        RecruiterRole = orgType == OrganisationType.RecruiterAgency ? RecruiterRole.Owner : null,
+                        JoinedUtc = now,
+                        CreatedByUserId = user.Id,
+                        CreatedUtc = now
+                    };
+
+                    db.Set<OrganisationMembership>().Add(membership);
+
+                    // First save: org + membership (no circular dep)
+                    await db.SaveChangesAsync();
+
+                    // Now add the domain and link it back
+                    if (!string.IsNullOrEmpty(emailDomain))
+                    {
+                        var domainId = Guid.NewGuid();
+
+                        var domain = new OrganisationDomain
+                        {
+                            Id = domainId,
+                            OrganisationId = orgId,
+                            Domain = emailDomain,
+                            NormalizedDomain = emailDomain.ToUpperInvariant(),
+                            IsPrimary = true,
+                            Status = DomainStatus.Pending,
+                            VerificationMethod = DomainVerificationMethod.None,
+                            TrustLevel = DomainTrustLevel.Low,
+                            CreatedByUserId = user.Id,
+                            CreatedUtc = now
+                        };
+
+                        db.Set<OrganisationDomain>().Add(domain);
+                        await db.SaveChangesAsync();
+
+                        // Second save: update org's PrimaryDomainId now that domain exists
+                        await db.Set<Organisation>()
+                            .Where(o => o.Id == orgId)
+                            .ExecuteUpdateAsync(s => s.SetProperty(o => o.PrimaryDomainId, domainId));
+                    }
                 }
 
-                var membership = new OrganisationMembership
+                await transaction.CommitAsync();
+
+                return Results.Ok(new RegisterResultDto
                 {
-                    Id = Guid.NewGuid(),
-                    OrganisationId = orgId,
-                    UserId = user.Id,
-                    Status = MembershipStatus.Active,
-                    IsOwner = true,
-                    CompanyRole = orgType == OrganisationType.Company ? CompanyRole.Owner : null,
-                    RecruiterRole = orgType == OrganisationType.RecruiterAgency ? RecruiterRole.Owner : null,
-                    JoinedUtc = now,
-                    CreatedByUserId = user.Id,
-                    CreatedUtc = now
-                };
-
-                db.Set<OrganisationMembership>().Add(membership);
-
-                await db.SaveChangesAsync();
+                    Succeeded = true,
+                    RequiresEmailConfirmation = false,
+                    Email = request.Email,
+                    DisplayName = displayName,
+                    RegistrationType = normalizedType
+                });
             }
-
-            return Results.Ok(new RegisterResultDto
+            catch
             {
-                Succeeded = true,
-                RequiresEmailConfirmation = false,
-                Email = user.Email!,
-                DisplayName = user.DisplayName,
-                RegistrationType = normalizedType
-            });
+                await transaction.RollbackAsync();
+                throw;
+            }
         });
 
         group.MapPost("/login", async (
             UserManager<ApplicationUser> userManager,
             JwtTokenService tokenService,
+            AethonDbContext db,
             LoginRequest request) =>
         {
             var user = await userManager.FindByEmailAsync(request.Email);
 
-            if (user is null)
+            if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
             {
-                return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid credentials." });
-            }
-
-            var valid = await userManager.CheckPasswordAsync(user, request.Password);
-
-            if (!valid)
-            {
-                return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid credentials." });
+                return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid email or password." });
             }
 
             var token = tokenService.GenerateToken(user);
 
-            return Results.Ok(new AuthTokenResponse
+            // Determine app type from user type and org membership
+            var appType = user.UserType switch
             {
-                Token = token
+                UserAccountType.JobSeeker => "jobseeker",
+                UserAccountType.Company => "employer",
+                UserAccountType.RecruiterAgency => "recruiter",
+                _ => "jobseeker"
+            };
+
+            string? organisationId = null;
+            string? organisationName = null;
+            string? organisationType = null;
+            string? companyRole = null;
+            string? recruiterRole = null;
+            bool isOwner = false;
+
+            if (user.UserType is UserAccountType.Company or UserAccountType.RecruiterAgency)
+            {
+                var membership = await db.Set<OrganisationMembership>()
+                    .Include(m => m.Organisation)
+                    .Where(m => m.UserId == user.Id && m.Status == MembershipStatus.Active)
+                    .OrderByDescending(m => m.IsOwner)
+                    .FirstOrDefaultAsync();
+
+                if (membership is not null)
+                {
+                    organisationId = membership.OrganisationId.ToString();
+                    organisationName = membership.Organisation.Name;
+                    organisationType = membership.Organisation.Type.ToString().ToLowerInvariant();
+                    isOwner = membership.IsOwner;
+                    companyRole = membership.CompanyRole?.ToString();
+                    recruiterRole = membership.RecruiterRole?.ToString();
+                }
+            }
+
+            return Results.Ok(new LoginResponse
+            {
+                Token = token,
+                UserId = user.Id.ToString(),
+                Email = user.Email!,
+                DisplayName = user.DisplayName,
+                AppType = appType,
+                OrganisationId = organisationId,
+                OrganisationName = organisationName,
+                OrganisationType = organisationType,
+                CompanyRole = companyRole,
+                RecruiterRole = recruiterRole,
+                IsOrganisationOwner = isOwner
             });
         });
     }
@@ -177,8 +238,18 @@ public static class AuthEndpoints
         public string Password { get; set; } = string.Empty;
     }
 
-    public sealed class AuthTokenResponse
+    public sealed class LoginResponse
     {
         public string Token { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string AppType { get; set; } = string.Empty;
+        public string? OrganisationId { get; set; }
+        public string? OrganisationName { get; set; }
+        public string? OrganisationType { get; set; }
+        public string? CompanyRole { get; set; }
+        public string? RecruiterRole { get; set; }
+        public bool IsOrganisationOwner { get; set; }
     }
 }

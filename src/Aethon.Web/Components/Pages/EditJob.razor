@@ -163,7 +163,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync($"/jobs/{Id}");
+            var response = await client.GetAsync($"/api/v1/jobs/{Id}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -214,7 +214,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PutAsJsonAsync($"/jobs/{Id}", _model);
+            var response = await client.PutAsJsonAsync($"/api/v1/jobs/{Id}", _model);
 
             if (response.IsSuccessStatusCode)
             {

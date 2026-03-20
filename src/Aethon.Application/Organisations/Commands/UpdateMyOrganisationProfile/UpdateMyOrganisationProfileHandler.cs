@@ -1,0 +1,76 @@
+using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Common.Results;
+using Aethon.Data;
+using Aethon.Shared.Enums;
+using Aethon.Shared.Organisations;
+using Microsoft.EntityFrameworkCore;
+
+namespace Aethon.Application.Organisations.Commands.UpdateMyOrganisationProfile;
+
+public sealed class UpdateMyOrganisationProfileHandler
+{
+    private readonly AethonDbContext _db;
+    private readonly ICurrentUserAccessor _currentUser;
+
+    public UpdateMyOrganisationProfileHandler(AethonDbContext db, ICurrentUserAccessor currentUser)
+    {
+        _db = db;
+        _currentUser = currentUser;
+    }
+
+    public async Task<Result<OrganisationProfileDto>> HandleAsync(
+        UpdateOrganisationProfileRequestDto request,
+        CancellationToken ct = default)
+    {
+        if (!_currentUser.IsAuthenticated)
+            return Result<OrganisationProfileDto>.Failure("auth.unauthenticated", "Not authenticated.");
+
+        var membership = await _db.OrganisationMemberships
+            .Include(m => m.Organisation)
+            .Where(m => m.UserId == _currentUser.UserId && m.Status == MembershipStatus.Active)
+            .OrderByDescending(m => m.IsOwner)
+            .FirstOrDefaultAsync(ct);
+
+        if (membership is null)
+            return Result<OrganisationProfileDto>.Failure("organisations.not_found", "No active organisation membership found.");
+
+        if (!membership.IsOwner &&
+            membership.CompanyRole is not (CompanyRole.Owner or CompanyRole.Admin) &&
+            membership.RecruiterRole is not (RecruiterRole.Owner or RecruiterRole.Admin))
+        {
+            return Result<OrganisationProfileDto>.Failure("organisations.forbidden", "Insufficient permissions to update organisation profile.");
+        }
+
+        var org = membership.Organisation;
+
+        org.Name = request.Name.Trim();
+        org.NormalizedName = request.Name.Trim().ToUpperInvariant();
+        org.LegalName = request.LegalName?.Trim();
+        org.WebsiteUrl = request.WebsiteUrl?.Trim();
+        org.Slug = string.IsNullOrWhiteSpace(request.Slug) ? null : request.Slug.Trim().ToLowerInvariant();
+        org.LogoUrl = request.LogoUrl?.Trim();
+        org.Summary = request.Summary?.Trim();
+        org.PublicLocationText = request.PublicLocationText?.Trim();
+        org.PublicContactEmail = request.PublicContactEmail?.Trim();
+        org.PublicContactPhone = request.PublicContactPhone?.Trim();
+        org.IsPublicProfileEnabled = request.IsPublicProfileEnabled;
+
+        await _db.SaveChangesAsync(ct);
+
+        return Result<OrganisationProfileDto>.Success(new OrganisationProfileDto
+        {
+            OrganisationId = org.Id,
+            OrganisationType = org.Type.ToString().ToLowerInvariant(),
+            Name = org.Name,
+            LegalName = org.LegalName,
+            WebsiteUrl = org.WebsiteUrl,
+            Slug = org.Slug,
+            LogoUrl = org.LogoUrl,
+            Summary = org.Summary,
+            PublicLocationText = org.PublicLocationText,
+            PublicContactEmail = org.PublicContactEmail,
+            PublicContactPhone = org.PublicContactPhone,
+            IsPublicProfileEnabled = org.IsPublicProfileEnabled
+        });
+    }
+}

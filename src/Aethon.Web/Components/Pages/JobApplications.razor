@@ -94,7 +94,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync($"/jobs/{JobId}/applications");
+            var response = await client.GetAsync($"/api/v1/jobs/{JobId}/applications");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {

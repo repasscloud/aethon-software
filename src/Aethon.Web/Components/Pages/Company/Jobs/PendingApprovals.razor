@@ -45,19 +45,19 @@ else
 
     private async Task ReloadAsync()
     {
-        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/company/jobs/approvals/pending");
+        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/v1/company/jobs/approvals/pending");
     }
 
     private async Task Approve(Guid id)
     {
-        var response = await Http.PostAsync($"api/company/jobs/approvals/{id}/approve", null);
+        var response = await Http.PostAsync($"api/v1/company/jobs/approvals/{id}/approve", null);
         response.EnsureSuccessStatusCode();
         await ReloadAsync();
     }
 
     private async Task Reject(Guid id)
     {
-        var response = await Http.PostAsJsonAsync($"api/company/jobs/approvals/{id}/reject", new RejectJobApprovalDto
+        var response = await Http.PostAsJsonAsync($"api/v1/company/jobs/approvals/{id}/reject", new RejectJobApprovalDto
         {
             Reason = "Rejected by company"
         });

@@ -126,7 +126,7 @@ else
             _isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
 
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.GetAsync($"/public/jobs/{Id}");
+            var response = await client.GetAsync($"/api/v1/public/jobs/{Id}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -161,7 +161,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PostAsJsonAsync($"/public/jobs/{Id}/apply", _applyModel);
+            var response = await client.PostAsJsonAsync($"/api/v1/public/jobs/{Id}/apply", _applyModel);
 
             if (response.IsSuccessStatusCode)
             {

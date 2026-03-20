@@ -39,7 +39,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/recruiter/jobs");
+        items = await Http.GetFromJsonAsync<List<JobSummaryDto>>("api/v1/recruiter/jobs");
     }
 
     private void CreateNew()

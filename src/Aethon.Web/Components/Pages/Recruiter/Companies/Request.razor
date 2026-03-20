@@ -29,7 +29,7 @@
     {
         model.CompanyOrganisationId = Guid.Parse(companyOrganisationIdText);
 
-        var response = await Http.PostAsJsonAsync("api/recruiter/companies/requests", model);
+        var response = await Http.PostAsJsonAsync("api/v1/recruiter/companies/requests", model);
         response.EnsureSuccessStatusCode();
 
         Nav.NavigateTo("/recruiter/companies");

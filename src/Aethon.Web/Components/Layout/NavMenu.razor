@@ -29,6 +29,21 @@
                 <span class="aethon-nav-icon">👥</span>
                 <span>Organisation team</span>
             </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/company/recruiters" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">🤝</span>
+                <span>Recruiter partners</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/company/jobs/pending-approvals" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">✓</span>
+                <span>Pending approvals</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/integrations" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">⚡</span>
+                <span>Integrations</span>
+            </NavLink>
         }
         else if (_isRecruiter)
         {
@@ -50,6 +65,21 @@
             <NavLink class="nav-link aethon-nav-link" href="/app/organisation/team" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon">👥</span>
                 <span>Organisation team</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/recruiter/companies" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">🏢</span>
+                <span>Client companies</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/recruiter/jobs" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">📋</span>
+                <span>Submitted jobs</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/integrations" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon">⚡</span>
+                <span>Integrations</span>
             </NavLink>
         }
         else if (_isJobSeeker)
@@ -95,7 +125,7 @@
             }
         </div>
 
-        <form method="post" action="http://localhost:5201/auth/browser-logout" class="mt-3">
+        <form method="post" action="/account/logout" class="mt-3">
             <input type="hidden" name="returnPath" value="/login" />
             <button type="submit" class="nav-link aethon-nav-link w-100 border-0 bg-transparent text-start">
                 <span class="aethon-nav-icon">×</span>

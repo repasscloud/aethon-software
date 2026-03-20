@@ -6,3 +6,7 @@
 .git
 .gitignore
 README.md
+_smtpapi-test/
+aethon_mvp_technical_implementation_plan.md
+*.txt
+*.md

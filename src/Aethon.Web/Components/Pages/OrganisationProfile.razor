@@ -127,7 +127,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var profile = await client.GetFromJsonAsync<OrganisationProfileDto>("/org/me/profile");
+            var profile = await client.GetFromJsonAsync<OrganisationProfileDto>("/api/v1/organisations/me/profile");
 
             if (profile is not null)
             {
@@ -165,7 +165,7 @@ else
         try
         {
             var client = HttpClientFactory.CreateClient("AethonApi");
-            var response = await client.PutAsJsonAsync("/org/me/profile", _model);
+            var response = await client.PutAsJsonAsync("/api/v1/organisations/me/profile", _model);
 
             if (response.IsSuccessStatusCode)
             {
