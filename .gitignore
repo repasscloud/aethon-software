@@ -487,3 +487,5 @@ _smtpapi-test/
 *.txt
 UI_PLAN.md
 aethon_mvp_technical_implementation_plan.md
+claude-resume.sh
+.claude/
