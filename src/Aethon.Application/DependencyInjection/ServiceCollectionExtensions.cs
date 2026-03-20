@@ -1,3 +1,4 @@
+using Aethon.Application.Abstractions.Integrations;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Commands.AddApplicationComment;
 using Aethon.Application.Applications.Commands.AddApplicationNote;
@@ -15,12 +16,13 @@ using Aethon.Application.Candidates.Commands.SetDefaultCandidateResume;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
 using Aethon.Application.Files.Commands.UploadStoredFile;
+using Aethon.Application.Integrations.Commands.CreateWebhookSubscription;
+using Aethon.Application.Integrations.Queries.GetWebhookSubscriptions;
+using Aethon.Application.Integrations.Services;
 using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Organisations.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Aethon.Application.Applications.Commands.AttachApplicationFile;
-using Aethon.Application.Applications.Queries.GetApplicationFiles;
 
 namespace Aethon.Application.DependencyInjection;
 
@@ -33,6 +35,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ActivityLogWriter>();
         services.AddScoped<ApplicationAccessService>();
         services.AddScoped<ApplicationWorkflowService>();
+
+        services.AddScoped<IWebhookEventDispatcher, WebhookEventDispatcher>();
 
         services.AddScoped<CreateJobHandler>();
         services.AddScoped<GetJobByIdHandler>();
@@ -55,8 +59,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<UploadStoredFileHandler>();
 
-        services.AddScoped<AttachApplicationFileHandler>();
-        services.AddScoped<GetApplicationFilesHandler>();
+        services.AddScoped<CreateWebhookSubscriptionHandler>();
+        services.AddScoped<GetWebhookSubscriptionsHandler>();
 
         return services;
     }

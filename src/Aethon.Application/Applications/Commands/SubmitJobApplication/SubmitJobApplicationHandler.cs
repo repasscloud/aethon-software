@@ -1,6 +1,8 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Integrations;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Results;
+using Aethon.Application.Integrations.Events;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
@@ -13,15 +15,18 @@ public sealed class SubmitJobApplicationHandler
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IWebhookEventDispatcher _webhookEventDispatcher;
 
     public SubmitJobApplicationHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IWebhookEventDispatcher webhookEventDispatcher)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _dateTimeProvider = dateTimeProvider;
+        _webhookEventDispatcher = webhookEventDispatcher;
     }
 
     public async Task<Result<SubmitJobApplicationResult>> HandleAsync(
@@ -159,6 +164,18 @@ public sealed class SubmitJobApplicationHandler
 
         _dbContext.JobApplications.Add(application);
         _dbContext.JobApplicationStatusHistoryEntries.Add(historyEntry);
+
+        await _webhookEventDispatcher.QueueAsync(
+            job.OwnedByOrganisationId,
+            IntegrationEventTypes.ApplicationSubmitted,
+            new
+            {
+                applicationId,
+                jobId = command.JobId,
+                applicantUserId = currentUserId,
+                submittedUtc = utcNow
+            },
+            cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

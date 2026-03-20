@@ -39,6 +39,8 @@ public sealed class AethonDbContext
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
     public DbSet<JobApplicationAttachment> JobApplicationAttachments => Set<JobApplicationAttachment>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -47,5 +49,7 @@ public sealed class AethonDbContext
         builder.ApplyConfigurationsFromAssembly(typeof(AethonDbContext).Assembly);
 
         builder.ApplyConfiguration(new JobApplicationAttachmentConfiguration());
+        builder.ApplyConfiguration(new WebhookSubscriptionConfiguration());
+        builder.ApplyConfiguration(new WebhookDeliveryConfiguration());
     }
 }

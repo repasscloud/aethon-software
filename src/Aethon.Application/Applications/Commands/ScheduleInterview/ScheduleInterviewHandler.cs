@@ -1,8 +1,10 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Integrations;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Services;
 using Aethon.Application.Common.Results;
+using Aethon.Application.Integrations.Events;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
@@ -18,6 +20,7 @@ public sealed class ScheduleInterviewHandler
     private readonly ApplicationAccessService _applicationAccessService;
     private readonly ApplicationWorkflowService _applicationWorkflowService;
     private readonly ActivityLogWriter _activityLogWriter;
+    private readonly IWebhookEventDispatcher _webhookEventDispatcher;
 
     public ScheduleInterviewHandler(
         AethonDbContext dbContext,
@@ -25,7 +28,8 @@ public sealed class ScheduleInterviewHandler
         IDateTimeProvider dateTimeProvider,
         ApplicationAccessService applicationAccessService,
         ApplicationWorkflowService applicationWorkflowService,
-        ActivityLogWriter activityLogWriter)
+        ActivityLogWriter activityLogWriter,
+        IWebhookEventDispatcher webhookEventDispatcher)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
@@ -33,6 +37,7 @@ public sealed class ScheduleInterviewHandler
         _applicationAccessService = applicationAccessService;
         _applicationWorkflowService = applicationWorkflowService;
         _activityLogWriter = activityLogWriter;
+        _webhookEventDispatcher = webhookEventDispatcher;
     }
 
     public async Task<Result<ScheduleInterviewResult>> HandleAsync(
@@ -161,6 +166,20 @@ public sealed class ScheduleInterviewHandler
             summary: $"Interview scheduled for {command.ScheduledStartUtc:u}.",
             details: BuildInterviewDetails(command.Type, normalizedTitle, normalizedLocation, normalizedMeetingUrl, normalizedNotes),
             cancellationToken: cancellationToken);
+
+        await _webhookEventDispatcher.QueueAsync(
+            application.Job.OwnedByOrganisationId,
+            IntegrationEventTypes.InterviewScheduled,
+            new
+            {
+                applicationId = application.Id,
+                jobId = application.JobId,
+                interviewId = interview.Id,
+                type = interview.Type.ToString(),
+                scheduledStartUtc = interview.ScheduledStartUtc,
+                scheduledEndUtc = interview.ScheduledEndUtc
+            },
+            cancellationToken);
 
         if (movedToInterview)
         {

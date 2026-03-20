@@ -1,8 +1,10 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Integrations;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Services;
 using Aethon.Application.Common.Results;
+using Aethon.Application.Integrations.Events;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +19,7 @@ public sealed class ChangeApplicationStatusHandler
     private readonly ApplicationAccessService _applicationAccessService;
     private readonly ApplicationWorkflowService _applicationWorkflowService;
     private readonly ActivityLogWriter _activityLogWriter;
+    private readonly IWebhookEventDispatcher _webhookEventDispatcher;
 
     public ChangeApplicationStatusHandler(
         AethonDbContext dbContext,
@@ -24,7 +27,8 @@ public sealed class ChangeApplicationStatusHandler
         IDateTimeProvider dateTimeProvider,
         ApplicationAccessService applicationAccessService,
         ApplicationWorkflowService applicationWorkflowService,
-        ActivityLogWriter activityLogWriter)
+        ActivityLogWriter activityLogWriter,
+        IWebhookEventDispatcher webhookEventDispatcher)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
@@ -32,6 +36,7 @@ public sealed class ChangeApplicationStatusHandler
         _applicationAccessService = applicationAccessService;
         _applicationWorkflowService = applicationWorkflowService;
         _activityLogWriter = activityLogWriter;
+        _webhookEventDispatcher = webhookEventDispatcher;
     }
 
     public async Task<Result> HandleAsync(
@@ -120,6 +125,20 @@ public sealed class ChangeApplicationStatusHandler
             summary: $"Application status changed from {previousStatus} to {command.Status}.",
             details: BuildDetails(previousStatus.ToString(), command.Status.ToString(), normalizedReason, normalizedNotes),
             cancellationToken: cancellationToken);
+
+        await _webhookEventDispatcher.QueueAsync(
+            application.Job.OwnedByOrganisationId,
+            IntegrationEventTypes.ApplicationStatusChanged,
+            new
+            {
+                applicationId = application.Id,
+                jobId = application.JobId,
+                fromStatus = previousStatus.ToString(),
+                toStatus = command.Status.ToString(),
+                changedUtc = utcNow,
+                reason = normalizedReason
+            },
+            cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
