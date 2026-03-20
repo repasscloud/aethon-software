@@ -39,7 +39,7 @@ else
                 <td>@item.Scope</td>
                 <td>@item.CreatedUtc.ToLocalTime()</td>
                 <td>
-                    @if (item.Status == CompanyRecruiterRelationshipStatus.Pending)
+                    @if (item.Status == OrganisationRecruitmentPartnershipStatus.Pending)
                     {
                         <button class="btn btn-outline-danger btn-sm" @onclick="() => CancelAsync(item.Id)">Cancel</button>
                     }

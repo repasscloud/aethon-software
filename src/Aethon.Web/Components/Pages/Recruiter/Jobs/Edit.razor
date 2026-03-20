@@ -68,9 +68,9 @@ else
             Title = detail.Title,
             Summary = detail.Summary ?? string.Empty,
             Description = detail.Description ?? string.Empty,
-            Location = detail.Location ?? string.Empty,
-            SalaryMin = detail.SalaryMin ?? 0,
-            SalaryMax = detail.SalaryMax ?? 0
+            Location = detail.LocationText ?? string.Empty,
+            SalaryMin = detail.SalaryFrom ?? 0,
+            SalaryMax = detail.SalaryTo ?? 0
         };
     }
 

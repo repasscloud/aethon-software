@@ -62,6 +62,9 @@ public sealed class GetApplicationByIdHandler
                         Status = x.Status,
                         StatusReason = x.StatusReason,
                         ResumeFileId = x.ResumeFileId,
+                        ResumeDownloadUrl = x.ResumeFileId.HasValue
+                            ? $"/api/v1/files/{x.ResumeFileId}/download"
+                            : null,
                         CoverLetter = x.CoverLetter,
                         Source = x.Source ?? string.Empty,
                         SubmittedUtc = x.SubmittedUtc,

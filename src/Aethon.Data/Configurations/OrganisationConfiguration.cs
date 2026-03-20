@@ -74,7 +74,7 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
         builder.HasIndex(x => x.NormalizedName);
         builder.HasIndex(x => x.Slug)
             .IsUnique()
-            .HasFilter("[Slug] IS NOT NULL");
+            .HasFilter("\"Slug\" IS NOT NULL");
         builder.HasIndex(x => x.PrimaryDomainId);
         builder.HasIndex(x => new { x.Type, x.Status });
         builder.HasIndex(x => x.IsVerified);

@@ -170,7 +170,9 @@ else
                     DesiredSalaryCurrency = _profile.DesiredSalaryCurrency
                 };
 
-                _resumeFile = _profile.ResumeFile;
+                _resumeFile = _profile.Resumes
+                    .FirstOrDefault(r => r.IsDefault && r.IsActive)?.File
+                    ?? _profile.Resumes.FirstOrDefault(r => r.IsActive)?.File;
             }
         }
         catch

@@ -9,6 +9,7 @@ using Aethon.Application.Applications.Queries.GetApplicationById;
 using Aethon.Application.Applications.Queries.GetApplicationFiles;
 using Aethon.Application.Applications.Queries.GetApplicationTimeline;
 using Aethon.Application.Applications.Queries.GetMyApplications;
+using Aethon.Shared.Enums;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Applications;
@@ -20,6 +21,12 @@ public static class ApplicationEndpoints
         var group = app.MapGroup("/applications")
             .RequireAuthorization()
             .WithTags("Applications");
+
+        group.MapGet("/status-options", () =>
+        {
+            var options = Enum.GetNames<ApplicationStatus>();
+            return Results.Ok(options);
+        });
 
         group.MapPost(string.Empty, async (
             [FromServices] SubmitJobApplicationHandler handler,

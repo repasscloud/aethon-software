@@ -82,7 +82,7 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
         builder.HasIndex(x => x.IsSearchable);
         builder.HasIndex(x => x.Slug)
             .IsUnique()
-            .HasFilter("[Slug] IS NOT NULL");
+            .HasFilter("\"Slug\" IS NOT NULL");
 
         builder.HasOne(x => x.User)
             .WithMany()

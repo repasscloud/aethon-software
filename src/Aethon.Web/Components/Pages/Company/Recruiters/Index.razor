@@ -105,7 +105,7 @@ else
                 <td>@item.Status</td>
                 <td>@item.Scope</td>
                 <td>
-                    @if (item.Status == CompanyRecruiterRelationshipStatus.Active || item.Status == CompanyRecruiterRelationshipStatus.Pending)
+                    @if (item.Status == OrganisationRecruitmentPartnershipStatus.Active || item.Status == OrganisationRecruitmentPartnershipStatus.Pending)
                     {
                         <button class="btn btn-warning btn-sm" @onclick="() => SuspendAsync(item.Id)">Suspend</button>
                     }

@@ -2,10 +2,12 @@ using Aethon.Application.Abstractions.Integrations;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Commands.AddApplicationComment;
 using Aethon.Application.Applications.Commands.AddApplicationNote;
+using Aethon.Application.Applications.Commands.AttachApplicationFile;
 using Aethon.Application.Applications.Commands.ChangeApplicationStatus;
 using Aethon.Application.Applications.Commands.ScheduleInterview;
 using Aethon.Application.Applications.Commands.SubmitJobApplication;
 using Aethon.Application.Applications.Queries.GetApplicationById;
+using Aethon.Application.Applications.Queries.GetApplicationFiles;
 using Aethon.Application.Applications.Queries.GetApplicationTimeline;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Applications.Queries.GetMyApplications;
@@ -50,6 +52,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ScheduleInterviewHandler>();
         services.AddScoped<GetApplicationsForJobHandler>();
         services.AddScoped<GetApplicationTimelineHandler>();
+        services.AddScoped<AttachApplicationFileHandler>();
+        services.AddScoped<GetApplicationFilesHandler>();
 
         services.AddScoped<GetMyCandidateProfileHandler>();
         services.AddScoped<UpsertMyCandidateProfileHandler>();

@@ -1,6 +1,7 @@
 using Aethon.Api.Endpoints.Applications;
 using Aethon.Api.Endpoints.Auth;
 using Aethon.Api.Endpoints.Candidates;
+using Aethon.Api.Endpoints.Files;
 using Aethon.Api.Endpoints.Integrations;
 using Aethon.Api.Endpoints.Jobs;
 
@@ -16,6 +17,7 @@ public static class EndpointRouteBuilderExtensions
         api.MapJobEndpoints();
         api.MapApplicationEndpointsGroup();
         api.MapCandidateEndpoints();
+        api.MapFileEndpoints();
         api.MapIntegrationEndpoints();
     }
 }
