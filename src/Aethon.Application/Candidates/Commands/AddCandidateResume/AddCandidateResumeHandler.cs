@@ -1,5 +1,7 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Data.Entities;
@@ -13,15 +15,18 @@ public sealed class AddCandidateResumeHandler
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IAppCache _cache;
 
     public AddCandidateResumeHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _dateTimeProvider = dateTimeProvider;
+        _cache = cache;
     }
 
     public async Task<Result<CandidateResumeDto>> HandleAsync(
@@ -110,6 +115,7 @@ public sealed class AddCandidateResumeHandler
         profile.UpdatedByUserId = currentUserId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.CandidateProfile(currentUserId), cancellationToken);
 
         return Result<CandidateResumeDto>.Success(new CandidateResumeDto
         {

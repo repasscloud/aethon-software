@@ -1,5 +1,7 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Microsoft.EntityFrameworkCore;
@@ -11,15 +13,18 @@ public sealed class RemoveCandidateResumeHandler
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IAppCache _cache;
 
     public RemoveCandidateResumeHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _dateTimeProvider = dateTimeProvider;
+        _cache = cache;
     }
 
     public async Task<Result> HandleAsync(
@@ -79,6 +84,7 @@ public sealed class RemoveCandidateResumeHandler
         profile.UpdatedByUserId = currentUserId;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.CandidateProfile(currentUserId), cancellationToken);
 
         return Result.Success();
     }

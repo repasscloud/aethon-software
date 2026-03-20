@@ -1,5 +1,7 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Applications.Services;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Shared.Applications;
@@ -10,18 +12,23 @@ namespace Aethon.Application.Applications.Queries.GetApplicationsForJob;
 
 public sealed class GetApplicationsForJobHandler
 {
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(2);
+
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly ApplicationAccessService _applicationAccessService;
+    private readonly IAppCache _cache;
 
     public GetApplicationsForJobHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        ApplicationAccessService applicationAccessService)
+        ApplicationAccessService applicationAccessService,
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _applicationAccessService = applicationAccessService;
+        _cache = cache;
     }
 
     public async Task<Result<PagedResult<ApplicationSummaryDto>>> HandleAsync(
@@ -59,46 +66,58 @@ public sealed class GetApplicationsForJobHandler
         }
 
         var page = query.Page <= 0 ? 1 : query.Page;
-        var pageSize = query.PageSize <= 0 ? 20 : query.PageSize;
+        var pageSize = query.PageSize <= 0 ? 20 : Math.Min(query.PageSize, 100);
+        var statusKey = query.Status?.ToString() ?? "all";
 
-        var baseQuery = _dbContext.JobApplications
-            .AsNoTracking()
-            .Where(x => x.JobId == query.JobId);
+        var cacheKey = CacheKeys.JobApplications(query.JobId, statusKey, page, pageSize);
 
-        if (query.Status.HasValue)
-        {
-            baseQuery = baseQuery.Where(x => x.Status == query.Status.Value);
-        }
-
-        var totalCount = await baseQuery.CountAsync(cancellationToken);
-
-        var items = await baseQuery
-            .OrderByDescending(x => x.SubmittedUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(x => new ApplicationSummaryDto
+        var result = await _cache.GetOrCreateAsync(
+            cacheKey,
+            async ct =>
             {
-                Id = x.Id,
-                JobId = x.JobId,
-                JobTitle = x.Job.Title,
-                Status = x.Status,
-                StatusReason = x.StatusReason,
-                Source = x.Source ?? string.Empty,
-                SubmittedUtc = x.SubmittedUtc,
-                LastStatusChangedUtc = x.LastStatusChangedUtc,
-                LastActivityUtc = x.LastActivityUtc,
-                IsRejected = x.IsRejected,
-                IsWithdrawn = x.IsWithdrawn,
-                IsHired = x.IsHired
-            })
-            .ToListAsync(cancellationToken);
+                var baseQuery = _dbContext.JobApplications
+                    .AsNoTracking()
+                    .Where(x => x.JobId == query.JobId);
 
-        return Result<PagedResult<ApplicationSummaryDto>>.Success(new PagedResult<ApplicationSummaryDto>
-        {
-            Items = items,
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = totalCount
-        });
+                if (query.Status.HasValue)
+                {
+                    baseQuery = baseQuery.Where(x => x.Status == query.Status.Value);
+                }
+
+                var totalCount = await baseQuery.CountAsync(ct);
+
+                var items = await baseQuery
+                    .OrderByDescending(x => x.SubmittedUtc)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(x => new ApplicationSummaryDto
+                    {
+                        Id = x.Id,
+                        JobId = x.JobId,
+                        JobTitle = x.Job.Title,
+                        Status = x.Status,
+                        StatusReason = x.StatusReason,
+                        Source = x.Source ?? string.Empty,
+                        SubmittedUtc = x.SubmittedUtc,
+                        LastStatusChangedUtc = x.LastStatusChangedUtc,
+                        LastActivityUtc = x.LastActivityUtc,
+                        IsRejected = x.IsRejected,
+                        IsWithdrawn = x.IsWithdrawn,
+                        IsHired = x.IsHired
+                    })
+                    .ToListAsync(ct);
+
+                return new PagedResult<ApplicationSummaryDto>
+                {
+                    Items = items,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount
+                };
+            },
+            CacheTtl,
+            cancellationToken);
+
+        return Result<PagedResult<ApplicationSummaryDto>>.Success(result);
     }
 }

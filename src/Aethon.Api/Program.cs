@@ -1,7 +1,9 @@
 using Aethon.Api.Auth;
 using Aethon.Api.Endpoints;
 using Aethon.Api.Infrastructure;
+using Aethon.Api.Infrastructure.Caching;
 using Aethon.Api.Middleware;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
@@ -30,6 +32,9 @@ services
     .AddEntityFrameworkStores<AethonDbContext>();
 
 services.AddAethonAuth(configuration);
+
+services.AddMemoryCache();
+services.AddSingleton<IAppCache, MemoryAppCache>();
 
 services.AddScoped<IDateTimeProvider, SystemDateTimeProvider>();
 services.AddScoped<JwtTokenService>();

@@ -1,6 +1,7 @@
 using Aethon.Api.Common;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Aethon.Api.Endpoints.Candidates;
 

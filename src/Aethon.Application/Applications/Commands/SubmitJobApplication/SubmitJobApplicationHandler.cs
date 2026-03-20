@@ -1,8 +1,8 @@
 using Aethon.Application.Abstractions.Authentication;
-using Aethon.Application.Abstractions.Integrations;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
-using Aethon.Application.Integrations.Events;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
@@ -15,18 +15,18 @@ public sealed class SubmitJobApplicationHandler
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly IWebhookEventDispatcher _webhookEventDispatcher;
+    private readonly IAppCache _cache;
 
     public SubmitJobApplicationHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
         IDateTimeProvider dateTimeProvider,
-        IWebhookEventDispatcher webhookEventDispatcher)
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _dateTimeProvider = dateTimeProvider;
-        _webhookEventDispatcher = webhookEventDispatcher;
+        _cache = cache;
     }
 
     public async Task<Result<SubmitJobApplicationResult>> HandleAsync(
@@ -63,11 +63,11 @@ public sealed class SubmitJobApplicationHandler
                 "Applications are closed for this job.");
         }
 
-        var profile = await _dbContext.JobSeekerProfiles
+        var profileExists = await _dbContext.JobSeekerProfiles
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.UserId == currentUserId, cancellationToken);
+            .AnyAsync(x => x.UserId == currentUserId, cancellationToken);
 
-        if (profile is null)
+        if (!profileExists)
         {
             return Result<SubmitJobApplicationResult>.Failure(
                 "applications.profile_required",
@@ -85,48 +85,17 @@ public sealed class SubmitJobApplicationHandler
                 "The current user has already applied for this job.");
         }
 
-        Guid? resumeFileId = command.ResumeFileId;
-
-        if (!resumeFileId.HasValue)
+        if (command.ResumeFileId.HasValue)
         {
-            resumeFileId = await _dbContext.JobSeekerResumes
+            var resumeExists = await _dbContext.StoredFiles
                 .AsNoTracking()
-                .Where(x =>
-                    x.JobSeekerProfileId == profile.Id &&
-                    x.IsActive &&
-                    x.IsDefault)
-                .Select(x => (Guid?)x.StoredFileId)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (!resumeFileId.HasValue)
-            {
-                resumeFileId = await _dbContext.JobSeekerResumes
-                    .AsNoTracking()
-                    .Where(x =>
-                        x.JobSeekerProfileId == profile.Id &&
-                        x.IsActive)
-                    .OrderByDescending(x => x.IsDefault)
-                    .ThenBy(x => x.CreatedUtc)
-                    .Select(x => (Guid?)x.StoredFileId)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-        }
-
-        if (resumeFileId.HasValue)
-        {
-            var resumeExists = await _dbContext.JobSeekerResumes
-                .AsNoTracking()
-                .AnyAsync(
-                    x => x.JobSeekerProfileId == profile.Id &&
-                         x.StoredFileId == resumeFileId.Value &&
-                         x.IsActive,
-                    cancellationToken);
+                .AnyAsync(x => x.Id == command.ResumeFileId.Value, cancellationToken);
 
             if (!resumeExists)
             {
                 return Result<SubmitJobApplicationResult>.Failure(
                     "applications.resume_not_found",
-                    "The selected resume was not found for the current candidate.");
+                    "The selected resume file was not found.");
             }
         }
 
@@ -139,7 +108,7 @@ public sealed class SubmitJobApplicationHandler
             JobId = command.JobId,
             UserId = currentUserId,
             Status = ApplicationStatus.Submitted,
-            ResumeFileId = resumeFileId,
+            ResumeFileId = command.ResumeFileId,
             CoverLetter = Normalize(command.CoverLetter),
             Source = Normalize(command.Source) ?? "AethonJobBoard",
             SubmittedUtc = utcNow,
@@ -165,19 +134,10 @@ public sealed class SubmitJobApplicationHandler
         _dbContext.JobApplications.Add(application);
         _dbContext.JobApplicationStatusHistoryEntries.Add(historyEntry);
 
-        await _webhookEventDispatcher.QueueAsync(
-            job.OwnedByOrganisationId,
-            IntegrationEventTypes.ApplicationSubmitted,
-            new
-            {
-                applicationId,
-                jobId = command.JobId,
-                applicantUserId = currentUserId,
-                submittedUtc = utcNow
-            },
-            cancellationToken);
-
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _cache.RemoveByPrefixAsync(CacheKeys.MyApplicationsPrefix(currentUserId), cancellationToken);
+        await _cache.RemoveByPrefixAsync(CacheKeys.JobApplicationsPrefix(command.JobId), cancellationToken);
 
         return Result<SubmitJobApplicationResult>.Success(new SubmitJobApplicationResult
         {

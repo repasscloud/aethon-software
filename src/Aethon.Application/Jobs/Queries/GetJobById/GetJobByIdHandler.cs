@@ -1,4 +1,6 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
 using Aethon.Application.Organisations.Services;
 using Aethon.Data;
@@ -9,18 +11,23 @@ namespace Aethon.Application.Jobs.Queries.GetJobById;
 
 public sealed class GetJobByIdHandler
 {
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+
     private readonly AethonDbContext _dbContext;
     private readonly ICurrentUserAccessor _currentUserAccessor;
     private readonly OrganisationAccessService _organisationAccessService;
+    private readonly IAppCache _cache;
 
     public GetJobByIdHandler(
         AethonDbContext dbContext,
         ICurrentUserAccessor currentUserAccessor,
-        OrganisationAccessService organisationAccessService)
+        OrganisationAccessService organisationAccessService,
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
         _organisationAccessService = organisationAccessService;
+        _cache = cache;
     }
 
     public async Task<Result<JobDetailDto>> HandleAsync(
@@ -34,52 +41,61 @@ public sealed class GetJobByIdHandler
                 "The current user is not authenticated.");
         }
 
-        var job = await _dbContext.Jobs
-            .AsNoTracking()
-            .Where(x => x.Id == query.JobId)
-            .Select(x => new JobDetailDto
+        var cacheKey = CacheKeys.JobDetail(query.JobId);
+
+        var job = await _cache.GetOrCreateAsync(
+            cacheKey,
+            async ct =>
             {
-                Id = x.Id,
-                OwnedByOrganisationId = x.OwnedByOrganisationId,
-                OwnedByOrganisationName = x.OwnedByOrganisation.Name,
-                ManagedByOrganisationId = x.ManagedByOrganisationId,
-                ManagedByOrganisationName = x.ManagedByOrganisation != null
-                    ? x.ManagedByOrganisation.Name
-                    : null,
-                ManagedByUserId = x.ManagedByUserId,
-                OrganisationRecruitmentPartnershipId = x.OrganisationRecruitmentPartnershipId,
-                CreatedByType = x.CreatedByType,
-                Status = x.Status,
-                StatusReason = x.StatusReason,
-                Visibility = x.Visibility,
-                Title = x.Title,
-                ReferenceCode = x.ReferenceCode,
-                ExternalReference = x.ExternalReference,
-                Department = x.Department,
-                LocationText = x.LocationText,
-                WorkplaceType = x.WorkplaceType,
-                EmploymentType = x.EmploymentType,
-                Description = x.Description,
-                Requirements = x.Requirements,
-                Benefits = x.Benefits,
-                Summary = x.Summary,
-                SalaryFrom = x.SalaryFrom,
-                SalaryTo = x.SalaryTo,
-                SalaryCurrency = x.SalaryCurrency,
-                PublishedUtc = x.PublishedUtc,
-                ApplyByUtc = x.ApplyByUtc,
-                ClosedUtc = x.ClosedUtc,
-                SubmittedForApprovalUtc = x.SubmittedForApprovalUtc,
-                ApprovedByUserId = x.ApprovedByUserId,
-                ApprovedUtc = x.ApprovedUtc,
-                ExternalApplicationUrl = x.ExternalApplicationUrl,
-                ApplicationEmail = x.ApplicationEmail,
-                CreatedForUnclaimedCompany = x.CreatedForUnclaimedCompany,
-                CreatedUtc = x.CreatedUtc,
-                CreatedByIdentityUserId = x.CreatedByIdentityUserId,
-                ApplicationCount = x.Applications.Count
-            })
-            .SingleOrDefaultAsync(cancellationToken);
+                return await _dbContext.Jobs
+                    .AsNoTracking()
+                    .Where(x => x.Id == query.JobId)
+                    .Select(x => new JobDetailDto
+                    {
+                        Id = x.Id,
+                        OwnedByOrganisationId = x.OwnedByOrganisationId,
+                        OwnedByOrganisationName = x.OwnedByOrganisation.Name,
+                        ManagedByOrganisationId = x.ManagedByOrganisationId,
+                        ManagedByOrganisationName = x.ManagedByOrganisation != null
+                            ? x.ManagedByOrganisation.Name
+                            : null,
+                        ManagedByUserId = x.ManagedByUserId,
+                        OrganisationRecruitmentPartnershipId = x.OrganisationRecruitmentPartnershipId,
+                        CreatedByType = x.CreatedByType,
+                        Status = x.Status,
+                        StatusReason = x.StatusReason,
+                        Visibility = x.Visibility,
+                        Title = x.Title,
+                        ReferenceCode = x.ReferenceCode,
+                        ExternalReference = x.ExternalReference,
+                        Department = x.Department,
+                        LocationText = x.LocationText,
+                        WorkplaceType = x.WorkplaceType,
+                        EmploymentType = x.EmploymentType,
+                        Description = x.Description,
+                        Requirements = x.Requirements,
+                        Benefits = x.Benefits,
+                        Summary = x.Summary,
+                        SalaryFrom = x.SalaryFrom,
+                        SalaryTo = x.SalaryTo,
+                        SalaryCurrency = x.SalaryCurrency,
+                        PublishedUtc = x.PublishedUtc,
+                        ApplyByUtc = x.ApplyByUtc,
+                        ClosedUtc = x.ClosedUtc,
+                        SubmittedForApprovalUtc = x.SubmittedForApprovalUtc,
+                        ApprovedByUserId = x.ApprovedByUserId,
+                        ApprovedUtc = x.ApprovedUtc,
+                        ExternalApplicationUrl = x.ExternalApplicationUrl,
+                        ApplicationEmail = x.ApplicationEmail,
+                        CreatedForUnclaimedCompany = x.CreatedForUnclaimedCompany,
+                        CreatedUtc = x.CreatedUtc,
+                        CreatedByIdentityUserId = x.CreatedByIdentityUserId,
+                        ApplicationCount = x.Applications.Count
+                    })
+                    .SingleOrDefaultAsync(ct);
+            },
+            CacheTtl,
+            cancellationToken);
 
         if (job is null)
         {

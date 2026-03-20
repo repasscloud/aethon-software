@@ -1,10 +1,10 @@
 using Aethon.Application.Abstractions.Authentication;
-using Aethon.Application.Abstractions.Integrations;
+using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Services;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
-using Aethon.Application.Integrations.Events;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +19,7 @@ public sealed class ChangeApplicationStatusHandler
     private readonly ApplicationAccessService _applicationAccessService;
     private readonly ApplicationWorkflowService _applicationWorkflowService;
     private readonly ActivityLogWriter _activityLogWriter;
-    private readonly IWebhookEventDispatcher _webhookEventDispatcher;
+    private readonly IAppCache _cache;
 
     public ChangeApplicationStatusHandler(
         AethonDbContext dbContext,
@@ -28,7 +28,7 @@ public sealed class ChangeApplicationStatusHandler
         ApplicationAccessService applicationAccessService,
         ApplicationWorkflowService applicationWorkflowService,
         ActivityLogWriter activityLogWriter,
-        IWebhookEventDispatcher webhookEventDispatcher)
+        IAppCache cache)
     {
         _dbContext = dbContext;
         _currentUserAccessor = currentUserAccessor;
@@ -36,7 +36,7 @@ public sealed class ChangeApplicationStatusHandler
         _applicationAccessService = applicationAccessService;
         _applicationWorkflowService = applicationWorkflowService;
         _activityLogWriter = activityLogWriter;
-        _webhookEventDispatcher = webhookEventDispatcher;
+        _cache = cache;
     }
 
     public async Task<Result> HandleAsync(
@@ -126,23 +126,21 @@ public sealed class ChangeApplicationStatusHandler
             details: BuildDetails(previousStatus.ToString(), command.Status.ToString(), normalizedReason, normalizedNotes),
             cancellationToken: cancellationToken);
 
-        await _webhookEventDispatcher.QueueAsync(
-            application.Job.OwnedByOrganisationId,
-            IntegrationEventTypes.ApplicationStatusChanged,
-            new
-            {
-                applicationId = application.Id,
-                jobId = application.JobId,
-                fromStatus = previousStatus.ToString(),
-                toStatus = command.Status.ToString(),
-                changedUtc = utcNow,
-                reason = normalizedReason
-            },
-            cancellationToken);
-
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await InvalidateAsync(application, cancellationToken);
+
         return Result.Success();
+    }
+
+    private async Task InvalidateAsync(
+        JobApplication application,
+        CancellationToken cancellationToken)
+    {
+        await _cache.RemoveAsync(CacheKeys.ApplicationDetail(application.Id), cancellationToken);
+        await _cache.RemoveAsync(CacheKeys.ApplicationTimeline(application.Id), cancellationToken);
+        await _cache.RemoveByPrefixAsync(CacheKeys.MyApplicationsPrefix(application.UserId), cancellationToken);
+        await _cache.RemoveByPrefixAsync(CacheKeys.JobApplicationsPrefix(application.JobId), cancellationToken);
     }
 
     private static string BuildDetails(
