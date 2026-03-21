@@ -211,6 +211,64 @@ public class Job : EntityBase
     /// </summary>
     public bool CreatedForUnclaimedCompany { get; set; }
 
+    // ─── Extended classification ────────────────────────────────────────────
+
+    /// <summary>Industry / department category.</summary>
+    public JobCategory? Category { get; set; }
+
+    /// <summary>JSON-serialised list of JobRegion values for this role.</summary>
+    public string? Regions { get; set; }
+
+    /// <summary>
+    /// JSON-serialised list of country names associated with this job.
+    /// </summary>
+    public string? Countries { get; set; }
+
+    /// <summary>
+    /// When this job posting expires and becomes invisible on the public board.
+    /// After this date no new applications are accepted and the listing is hidden.
+    /// </summary>
+    public DateTime? PostingExpiresUtc { get; set; }
+
+    // ─── Display & promotion ─────────────────────────────────────────────────
+
+    /// <summary>Whether to show the owning organisation logo on the public listing.</summary>
+    public bool IncludeCompanyLogo { get; set; }
+
+    /// <summary>Whether this job is highlighted in search results.</summary>
+    public bool IsHighlighted { get; set; }
+
+    /// <summary>When the sticky-to-top promotion expires. Null means not sticky.</summary>
+    public DateTime? StickyUntilUtc { get; set; }
+
+    // ─── Application options ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// JSON-serialised list of selected benefit tag strings.
+    /// </summary>
+    public string? BenefitsTags { get; set; }
+
+    /// <summary>Free-text special requirements for applicants.</summary>
+    public string? ApplicationSpecialRequirements { get; set; }
+
+    // ─── ATS / search ────────────────────────────────────────────────────────
+
+    /// <summary>Comma-separated or space-separated keywords used for ATS matching.</summary>
+    public string? Keywords { get; set; }
+
+    /// <summary>Internal purchase-order / posting-reference number.</summary>
+    public string? PoNumber { get; set; }
+
+    // ─── Auto-match & short URL ───────────────────────────────────────────────
+
+    /// <summary>Whether the job should be auto-matched to candidate profiles.</summary>
+    public bool AllowAutoMatch { get; set; }
+
+    /// <summary>Short URL slug generated for this job posting.</summary>
+    public string? ShortUrlCode { get; set; }
+
+    // ─── Relationships ────────────────────────────────────────────────────────
+
     /// <summary>
     /// Applications submitted against this job.
     /// </summary>

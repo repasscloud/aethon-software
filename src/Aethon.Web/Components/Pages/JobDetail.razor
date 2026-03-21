@@ -6,7 +6,7 @@
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 @inject NavigationManager NavigationManager
 
 <PageTitle>Job details | Aethon</PageTitle>
@@ -116,23 +116,39 @@ else
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
                 <h2 class="h5 fw-bold mb-3">Description</h2>
-                <div style="white-space: pre-wrap;">@_job.Description</div>
+                <div class="rich-content">@((MarkupString)(_job.Description ?? ""))</div>
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">Requirements</h2>
-                <div style="white-space: pre-wrap;">@(!string.IsNullOrWhiteSpace(_job.Requirements) ? _job.Requirements : "-")</div>
+        @if (!string.IsNullOrWhiteSpace(_job.Requirements))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Requirements</h2>
+                    <div class="rich-content">@((MarkupString)_job.Requirements)</div>
+                </div>
             </div>
-        </div>
+        }
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">Benefits</h2>
-                <div style="white-space: pre-wrap;">@(!string.IsNullOrWhiteSpace(_job.Benefits) ? _job.Benefits : "-")</div>
+        @if (!string.IsNullOrWhiteSpace(_job.Benefits))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Benefits</h2>
+                    <div class="rich-content">@((MarkupString)_job.Benefits)</div>
+                </div>
             </div>
-        </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_job.ApplicationSpecialRequirements))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Special requirements for applicants</h2>
+                    <div class="rich-content">@((MarkupString)_job.ApplicationSpecialRequirements)</div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -159,7 +175,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.GetAsync($"/api/v1/jobs/{Id}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -180,7 +196,7 @@ else
                 return;
             }
 
-            _job = await response.Content.ReadFromJsonAsync<JobDetailDto>();
+            _job = await response.Content.ReadFromJsonAsync<JobDetailDto>(AethonApiClient.JsonOptions);
         }
         catch
         {
@@ -215,22 +231,18 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsync(url, null);
 
             if (!response.IsSuccessStatusCode)
             {
-                _pageError = await response.Content.ReadAsStringAsync();
-                if (string.IsNullOrWhiteSpace(_pageError))
-                {
-                    _pageError = "Action failed.";
-                }
-
+                var body = await response.Content.ReadAsStringAsync();
+                _pageError = string.IsNullOrWhiteSpace(body) ? "Action failed." : body;
                 return;
             }
 
-            _job = await response.Content.ReadFromJsonAsync<JobDetailDto>();
             _actionMessage = successMessage;
+            await LoadAsync();
         }
         catch
         {

@@ -1,65 +1,143 @@
 @page "/recruiter/jobs/create"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @using Aethon.Shared.Jobs
-@inject HttpClient Http
+@using Aethon.Shared.RecruiterCompanies
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
 @inject NavigationManager Nav
 
-<PageTitle>Create Recruiter Job</PageTitle>
+<PageTitle>Create draft job | Aethon</PageTitle>
 
-<h3>Create Draft Job</h3>
+<div class="d-flex flex-column gap-4">
 
-<EditForm Model="model" OnValidSubmit="SaveAsync">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
-
-    <div class="mb-3">
-        <label>Company Organisation Id</label>
-        <InputText class="form-control" @bind-Value="companyOrganisationIdText" />
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-1">Create draft job</h1>
+            <p class="text-secondary mb-0">Draft a job on behalf of a client company.</p>
+        </div>
     </div>
 
-    <div class="mb-3">
-        <label>Title</label>
-        <InputText class="form-control" @bind-Value="model.Title" />
-    </div>
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
 
-    <div class="mb-3">
-        <label>Summary</label>
-        <InputTextArea class="form-control" @bind-Value="model.Summary" />
-    </div>
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
 
-    <div class="mb-3">
-        <label>Description</label>
-        <InputTextArea class="form-control" @bind-Value="model.Description" />
-    </div>
+                <div class="row g-3">
+                    <div class="col-12 col-lg-8">
+                        <label class="form-label fw-semibold">Client company organisation ID</label>
+                        <input class="form-control rounded-4"
+                               @bind="_companyOrgIdText"
+                               placeholder="Paste the company's organisation GUID" />
+                        <div class="form-text">Enter the GUID of the company you are creating this job for.</div>
+                    </div>
 
-    <div class="mb-3">
-        <label>Location</label>
-        <InputText class="form-control" @bind-Value="model.Location" />
-    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Job title</label>
+                        <InputText class="form-control rounded-4" @bind-Value="_model.Title"
+                                   placeholder="e.g. Senior Software Engineer" />
+                        <ValidationMessage For="@(() => _model.Title)" />
+                    </div>
 
-    <div class="mb-3">
-        <label>Salary Min</label>
-        <InputNumber class="form-control" @bind-Value="model.SalaryMin" />
-    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Summary</label>
+                        <InputTextArea class="form-control rounded-4" @bind-Value="_model.Summary" rows="2" />
+                    </div>
 
-    <div class="mb-3">
-        <label>Salary Max</label>
-        <InputNumber class="form-control" @bind-Value="model.SalaryMax" />
-    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <InputTextArea class="form-control rounded-4" @bind-Value="_model.Description" rows="6" />
+                    </div>
 
-    <button type="submit" class="btn btn-primary">Save Draft</button>
-</EditForm>
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Location</label>
+                        <InputText class="form-control rounded-4" @bind-Value="_model.Location" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary min</label>
+                        <InputNumber class="form-control rounded-4" @bind-Value="_model.SalaryMin" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary max</label>
+                        <InputNumber class="form-control rounded-4" @bind-Value="_model.SalaryMax" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                        @(_saving ? "Saving…" : "Save draft")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary rounded-4 px-4"
+                            @onclick='() => Nav.NavigateTo("/recruiter/jobs")'>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
 
 @code {
-    private readonly RecruiterCreateJobDraftDto model = new();
-    private string companyOrganisationIdText = string.Empty;
+    private readonly RecruiterCreateJobDraftDto _model = new();
+    private string _companyOrgIdText = string.Empty;
+    private string? _error;
+    private bool _saving;
 
     private async Task SaveAsync()
     {
-        model.CompanyOrganisationId = Guid.Parse(companyOrganisationIdText);
+        if (!Guid.TryParse(_companyOrgIdText, out var orgId))
+        {
+            _error = "Please enter a valid company organisation ID (GUID).";
+            return;
+        }
 
-        var response = await Http.PostAsJsonAsync("api/v1/recruiter/jobs", model);
-        response.EnsureSuccessStatusCode();
+        _model.CompanyOrganisationId = orgId;
+        _saving = true;
+        _error = null;
 
-        Nav.NavigateTo("/recruiter/jobs");
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync("/api/v1/recruiter/jobs", _model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ReadErrorAsync(response) ?? "Could not create job draft.";
+                return;
+            }
+
+            Nav.NavigateTo("/recruiter/jobs");
+        }
+        catch
+        {
+            _error = "Could not create job draft.";
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
+
+    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(AethonApiClient.JsonOptions);
+            if (!string.IsNullOrWhiteSpace(problem?.Detail)) return problem.Detail;
+        }
+        catch { }
+
+        var raw = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    private sealed class ProblemResponse { public string? Detail { get; set; } }
 }

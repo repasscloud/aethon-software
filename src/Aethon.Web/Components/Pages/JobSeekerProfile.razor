@@ -9,7 +9,7 @@
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 @inject NavigationManager NavigationManager
 
 <PageTitle>Job seeker profile | Aethon</PageTitle>
@@ -246,8 +246,8 @@ else
     {
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
-            _profile = await client.GetFromJsonAsync<CandidateProfileDto>("/api/v1/me/profile");
+            var client = await Api.CreateAsync();
+            _profile = await client.GetFromJsonAsync<CandidateProfileDto>("/api/v1/me/profile", AethonApiClient.JsonOptions);
 
             if (_profile is not null)
             {
@@ -299,7 +299,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PutAsJsonAsync("/api/v1/me/profile", _model);
 
             if (response.IsSuccessStatusCode)
@@ -330,7 +330,7 @@ else
         {
             var response = await client.GetAsync($"/api/v1/me/resumes/{resumeId}/analysis");
             if (response.IsSuccessStatusCode)
-                _analysis = await response.Content.ReadFromJsonAsync<ResumeAnalysisDto>();
+                _analysis = await response.Content.ReadFromJsonAsync<ResumeAnalysisDto>(AethonApiClient.JsonOptions);
             else
                 _analysis = null;
         }
@@ -346,7 +346,7 @@ else
         _triggeringAnalysis = true;
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             await client.PostAsync($"/api/v1/me/resumes/{_activeResumeId}/analysis/trigger", null);
             _message = "Analysis queued. Refresh in a moment to see results.";
             await LoadAnalysisAsync(client, _activeResumeId.Value);
@@ -375,7 +375,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
 
             using var content = new MultipartFormDataContent();
             await using var stream = _selectedResume.OpenReadStream(10_000_000);
@@ -390,7 +390,7 @@ else
                 return;
             }
 
-            var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadFileResultDto>();
+            var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadFileResultDto>(AethonApiClient.JsonOptions);
             if (uploaded is null)
             {
                 _error = "Resume upload failed.";

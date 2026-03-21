@@ -9,7 +9,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Recruiter dashboard | Aethon</PageTitle>
 
@@ -121,18 +121,18 @@
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-        var client = HttpClientFactory.CreateClient("AethonApi");
+        var client = await Api.CreateAsync();
 
         try
         {
-            var partners = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/recruiter/companies") ?? [];
+            var partners = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/recruiter/companies", AethonApiClient.JsonOptions) ?? [];
             _companyPartnerCount = partners.Count;
         }
         catch { }
 
         try
         {
-            var jobs = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/recruiter/jobs") ?? [];
+            var jobs = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/recruiter/jobs", AethonApiClient.JsonOptions) ?? [];
             _submittedJobCount = jobs.Count;
             _recentJobs = jobs.Take(5).ToList();
         }

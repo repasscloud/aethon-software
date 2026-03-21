@@ -6,8 +6,8 @@ public sealed class CreateJobValidator : AbstractValidator<CreateJobCommand>
 {
     public CreateJobValidator()
     {
-        RuleFor(x => x.OwnedByOrganisationId)
-            .NotEmpty();
+        // OwnedByOrganisationId is optional from the client — the handler derives it
+        // from the authenticated user's active organisation membership when not supplied.
 
         RuleFor(x => x.Title)
             .NotEmpty()

@@ -6,7 +6,7 @@
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Organisations
 @using Microsoft.AspNetCore.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Organisation domains | Aethon</PageTitle>
 
@@ -158,6 +158,23 @@ else
                     <div class="alert alert-success rounded-4 mb-3">@_addSuccess</div>
                 }
 
+                @if (_lastAddedDomain is not null && _lastAddedDomain.VerificationMethod == DomainVerificationMethod.DnsTxt)
+                {
+                    <div class="alert alert-info rounded-4 mb-3">
+                        <h6 class="fw-bold mb-2">Add this DNS TXT record to verify <strong>@_lastAddedDomain.Domain</strong></h6>
+                        <p class="mb-2 small">Log in to your DNS provider and create a TXT record with these exact values:</p>
+                        <div class="mb-2">
+                            <span class="fw-semibold small">Name / Host:</span><br />
+                            <code class="d-block bg-white rounded-3 p-2 mt-1 border">@_lastAddedDomain.VerificationDnsRecordName</code>
+                        </div>
+                        <div class="mb-2">
+                            <span class="fw-semibold small">Value / Content:</span><br />
+                            <code class="d-block bg-white rounded-3 p-2 mt-1 border">@_lastAddedDomain.VerificationDnsRecordValue</code>
+                        </div>
+                        <p class="mb-0 small text-secondary">DNS changes can take up to 24 hours to propagate. The domain will be automatically verified once the record is detected.</p>
+                    </div>
+                }
+
                 <EditForm Model="_addModel" OnValidSubmit="AddDomainAsync">
                     <DataAnnotationsValidator />
 
@@ -174,7 +191,6 @@ else
                             <label class="form-label fw-semibold">Verification method</label>
                             <InputSelect @bind-Value="_addModel.VerificationMethod" class="form-select rounded-4">
                                 <option value="@DomainVerificationMethod.DnsTxt">DNS TXT record</option>
-                                <option value="@DomainVerificationMethod.Manual">Manual (admin)</option>
                             </InputSelect>
                         </div>
 
@@ -195,6 +211,7 @@ else
     private bool _loaded;
     private string? _pageError;
     private string? _addSuccess;
+    private OrganisationDomainDto? _lastAddedDomain;
     private bool _adding;
     private bool _verifying;
     private bool _regenerating;
@@ -216,7 +233,7 @@ else
         _pageError = null;
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.GetAsync("/api/v1/organisations/me/domains");
 
             if (!response.IsSuccessStatusCode)
@@ -226,7 +243,7 @@ else
                 return;
             }
 
-            _domains = await response.Content.ReadFromJsonAsync<List<OrganisationDomainDto>>() ?? [];
+            _domains = await response.Content.ReadFromJsonAsync<List<OrganisationDomainDto>>(AethonApiClient.JsonOptions) ?? [];
         }
         catch
         {
@@ -261,13 +278,17 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsJsonAsync("/api/v1/organisations/me/domains", _addModel);
 
             if (response.IsSuccessStatusCode)
             {
-                var added = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>();
-                _addSuccess = $"Domain {added?.Domain} added. Use the Verify button to complete verification.";
+                var added = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>(AethonApiClient.JsonOptions);
+                if (added is not null)
+                {
+                    _lastAddedDomain = added;
+                    _addSuccess = $"Domain {added.Domain} added successfully.";
+                }
                 _addModel = new AddOrganisationDomainRequestDto();
                 await LoadAsync();
                 return;
@@ -293,7 +314,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsJsonAsync(
                 $"/api/v1/organisations/me/domains/{domain.Id}/confirm-verification",
                 new ConfirmDomainVerificationRequestDto { Token = _verifyToken });
@@ -325,13 +346,13 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsync(
                 $"/api/v1/organisations/me/domains/{domain.Id}/regenerate-token", null);
 
             if (response.IsSuccessStatusCode)
             {
-                var updated = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>();
+                var updated = await response.Content.ReadFromJsonAsync<OrganisationDomainDto>(AethonApiClient.JsonOptions);
                 if (updated is not null)
                 {
                     _verifyToken = updated.VerificationToken ?? "";
@@ -358,7 +379,7 @@ else
     {
         try
         {
-            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>();
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(AethonApiClient.JsonOptions);
             if (!string.IsNullOrWhiteSpace(problem?.Detail)) return problem.Detail;
         }
         catch { }

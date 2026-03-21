@@ -9,7 +9,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Integration settings</PageTitle>
@@ -165,9 +165,9 @@
         _loading = true;
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var result = await client.GetFromJsonAsync<List<WebhookSubscriptionDto>>(
-                $"/api/v1/integrations/organisations/{_orgId}/webhooks");
+                $"/api/v1/integrations/organisations/{_orgId}/webhooks", AethonApiClient.JsonOptions);
             _webhooks = result ?? new List<WebhookSubscriptionDto>();
         }
         catch
@@ -201,7 +201,7 @@
                 events
             };
 
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsJsonAsync(
                 $"/api/v1/integrations/organisations/{_orgId}/webhooks", payload);
 

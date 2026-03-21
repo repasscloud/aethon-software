@@ -5,7 +5,7 @@
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Organisations
 @using Microsoft.AspNetCore.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>My claim requests | Aethon</PageTitle>
 
@@ -141,12 +141,12 @@ else
         _error = null;
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.GetAsync("/api/v1/organisations/me/claim-requests");
 
             if (response.IsSuccessStatusCode)
             {
-                _claims = await response.Content.ReadFromJsonAsync<List<OrganisationClaimRequestDto>>() ?? [];
+                _claims = await response.Content.ReadFromJsonAsync<List<OrganisationClaimRequestDto>>(AethonApiClient.JsonOptions) ?? [];
             }
             else
             {
@@ -170,7 +170,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.DeleteAsync($"/api/v1/organisations/me/claim-requests/{claim.Id}");
 
             if (response.IsSuccessStatusCode)

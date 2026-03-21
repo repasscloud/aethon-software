@@ -2,9 +2,11 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.Net.Http.Json
-@using Aethon.Shared.Jobs
+@using Aethon.Shared.Applications
+@using Aethon.Shared.Common
+@using Aethon.Shared.Enums
 @using Microsoft.AspNetCore.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>My applications | Aethon</PageTitle>
 
@@ -35,7 +37,6 @@ else
                         <thead>
                             <tr>
                                 <th>Job</th>
-                                <th>Organisation</th>
                                 <th>Status</th>
                                 <th>Submitted</th>
                             </tr>
@@ -45,7 +46,6 @@ else
                             {
                                 <tr>
                                     <td><a href="/jobs/@item.JobId">@item.JobTitle</a></td>
-                                    <td>@item.OrganisationName</td>
                                     <td>@item.Status</td>
                                     <td>@item.SubmittedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
                                 </tr>
@@ -61,14 +61,15 @@ else
 @code {
     private bool _loaded;
     private string? _error;
-    private List<JobApplicationListItemDto> _items = [];
+    private IReadOnlyList<ApplicationSummaryDto> _items = [];
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
-            _items = await client.GetFromJsonAsync<List<JobApplicationListItemDto>>("/api/v1/applications/mine") ?? [];
+            var client = await Api.CreateAsync();
+            var paged = await client.GetFromJsonAsync<PagedResult<ApplicationSummaryDto>>("/api/v1/applications/mine", AethonApiClient.JsonOptions);
+            _items = paged?.Items ?? [];
         }
         catch
         {

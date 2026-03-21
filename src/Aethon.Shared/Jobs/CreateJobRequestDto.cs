@@ -31,12 +31,41 @@ public sealed class CreateJobRequestDto : IValidatableObject
     [MaxLength(20000)]
     public string? Benefits { get; set; }
 
+    [Required]
     public decimal? SalaryFrom { get; set; }
+
+    [Required]
     public decimal? SalaryTo { get; set; }
+
     public CurrencyCode? SalaryCurrency { get; set; }
 
     [Required]
     public JobStatus? Status { get; set; }
+
+    public string? ExternalApplicationUrl { get; set; }
+    public string? ApplicationEmail { get; set; }
+
+    public JobVisibility Visibility { get; set; } = JobVisibility.Public;
+    public JobCategory? Category { get; set; }
+    public List<JobRegion> Regions { get; set; } = [];
+    public List<string> Countries { get; set; } = [];
+    public DateTime? PostingExpiresUtc { get; set; }
+
+    public bool IncludeCompanyLogo { get; set; }
+    public bool IsHighlighted { get; set; }
+    public DateTime? StickyUntilUtc { get; set; }
+    public bool AllowAutoMatch { get; set; }
+
+    public List<string> BenefitsTags { get; set; } = [];
+
+    [MaxLength(2000)]
+    public string? ApplicationSpecialRequirements { get; set; }
+
+    [MaxLength(500)]
+    public string? Keywords { get; set; }
+
+    [MaxLength(100)]
+    public string? PoNumber { get; set; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

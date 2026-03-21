@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# TinyMCE self-hosted (downloaded at Docker build time)
+src/Aethon.Web/wwwroot/lib/tinymce/
+
 # User-specific files
 *.rsuser
 *.suo

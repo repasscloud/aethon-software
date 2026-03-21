@@ -55,11 +55,20 @@ builder.Services.AddHttpClient("AethonApi", client =>
     })
     .AddHttpMessageHandler<ApiAuthCookieHandler>();
 
+// Base client — no auth handler; used by AethonApiClient which attaches the token itself
+builder.Services.AddHttpClient("AethonApiBase", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+});
+
 // Unauthenticated client — used only by the login endpoint before a session exists
 builder.Services.AddHttpClient("AethonApiDirect", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
 });
+
+// Scoped API client — correctly attaches Bearer tokens in both prerender and SignalR phases
+builder.Services.AddScoped<AethonApiClient>();
 
 var app = builder.Build();
 

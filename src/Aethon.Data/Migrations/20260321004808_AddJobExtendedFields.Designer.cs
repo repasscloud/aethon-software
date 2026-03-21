@@ -3,6 +3,7 @@ using System;
 using Aethon.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    partial class AethonDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321004808_AddJobExtendedFields")]
+    partial class AddJobExtendedFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -187,9 +190,6 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("PoNumber")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("PostingExpiresUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime?>("PublishedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -197,8 +197,8 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("Regions")
-                        .HasColumnType("text");
+                    b.Property<int?>("Region")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Requirements")
                         .HasMaxLength(12000)

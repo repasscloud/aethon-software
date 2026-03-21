@@ -108,7 +108,9 @@ public static class AuthEndpoints
                     // First save: org + membership (no circular dep)
                     await db.SaveChangesAsync();
 
-                    // Now add the domain and link it back
+                    // Now add the domain and link it back.
+                    // Since RequiresEmailConfirmation = false (email is implicitly trusted at
+                    // registration), we mark the registration domain as Verified immediately.
                     if (!string.IsNullOrEmpty(emailDomain))
                     {
                         var domainId = Guid.NewGuid();
@@ -120,9 +122,11 @@ public static class AuthEndpoints
                             Domain = emailDomain,
                             NormalizedDomain = emailDomain.ToUpperInvariant(),
                             IsPrimary = true,
-                            Status = DomainStatus.Pending,
+                            Status = DomainStatus.Verified,
                             VerificationMethod = DomainVerificationMethod.None,
-                            TrustLevel = DomainTrustLevel.Low,
+                            TrustLevel = DomainTrustLevel.High,
+                            VerifiedUtc = now,
+                            VerifiedByUserId = user.Id,
                             CreatedByUserId = user.Id,
                             CreatedUtc = now
                         };

@@ -9,7 +9,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Register | Aethon</PageTitle>
 
@@ -327,7 +327,7 @@
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsJsonAsync("/api/v1/auth/register", Model);
 
             if (response.IsSuccessStatusCode)

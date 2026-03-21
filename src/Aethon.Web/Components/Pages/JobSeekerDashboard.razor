@@ -5,11 +5,12 @@
 @using System.Security.Claims
 @using Aethon.Shared.Auth
 @using Aethon.Shared.Applications
+@using Aethon.Shared.Common
 @using Aethon.Shared.Enums
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Job seeker dashboard | Aethon</PageTitle>
 
@@ -112,19 +113,20 @@
         _displayName = user.FindFirstValue(AppClaimTypes.DisplayName) ?? user.Identity?.Name ?? "Unknown";
         _email = user.FindFirstValue(ClaimTypes.Email) ?? "";
 
-        var client = HttpClientFactory.CreateClient("AethonApi");
+        var client = await Api.CreateAsync();
 
         try
         {
-            var profile = await client.GetFromJsonAsync<object>("/api/v1/me/profile");
+            var profile = await client.GetFromJsonAsync<object>("/api/v1/me/profile", AethonApiClient.JsonOptions);
             _hasProfile = profile is not null;
         }
         catch { }
 
         try
         {
-            var applications = await client.GetFromJsonAsync<List<ApplicationSummaryDto>>("/api/v1/applications/mine") ?? [];
-            _applicationCount = applications.Count;
+            var paged = await client.GetFromJsonAsync<PagedResult<ApplicationSummaryDto>>("/api/v1/applications/mine", AethonApiClient.JsonOptions);
+            var applications = paged?.Items ?? [];
+            _applicationCount = paged?.TotalCount ?? applications.Count;
             _recentApplications = applications.Take(5).ToList();
         }
         catch { }

@@ -1,5 +1,7 @@
 using Aethon.Api.Common;
 using Aethon.Application.Organisations.Commands.AcceptOrganisationInvite;
+using Aethon.Data;
+using Microsoft.EntityFrameworkCore;
 using Aethon.Application.Organisations.Commands.AddOrganisationDomain;
 using Aethon.Application.Organisations.Commands.CancelClaimRequest;
 using Aethon.Application.Organisations.Commands.ConfirmDomainVerification;
@@ -131,6 +133,22 @@ public static class OrganisationEndpoints
         {
             var result = await handler.HandleAsync(domainId, ct);
             return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/check-slug?slug=...
+        group.MapGet("/check-slug", async (
+            AethonDbContext db,
+            string slug,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(slug))
+                return Results.BadRequest(new { available = false, message = "Slug is required." });
+
+            var normalised = slug.Trim().ToLowerInvariant();
+            var taken = await db.Set<Aethon.Data.Entities.Organisation>()
+                .AnyAsync(o => o.Slug == normalised, ct);
+
+            return Results.Ok(new { available = !taken, slug = normalised });
         });
 
         // GET /api/v1/organisations/claimable

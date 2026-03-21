@@ -43,6 +43,9 @@ public sealed class PublishJobHandler
         if (job.Status is not (JobStatus.Draft or JobStatus.Approved or JobStatus.OnHold))
             return Result.Failure("jobs.invalid_status", $"Cannot publish a job in '{job.Status}' status.");
 
+        if (job.PostingExpiresUtc.HasValue && job.PostingExpiresUtc.Value <= DateTime.UtcNow)
+            return Result.Failure("jobs.posting_expired", "This job posting has expired and cannot be published. Please update the expiry date.");
+
         var now = DateTime.UtcNow;
         job.Status = JobStatus.Published;
         job.PublishedUtc ??= now;

@@ -9,7 +9,7 @@ public sealed class CreateJobCommand
     public Guid? ManagedByUserId { get; init; }
     public Guid? OrganisationRecruitmentPartnershipId { get; init; }
     public JobCreatedByType CreatedByType { get; init; } = JobCreatedByType.CompanyUser;
-    public JobVisibility Visibility { get; init; } = JobVisibility.Private;
+    public JobVisibility Visibility { get; init; } = JobVisibility.Public;
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public string? Summary { get; init; }
@@ -28,4 +28,17 @@ public sealed class CreateJobCommand
     public string? ExternalApplicationUrl { get; init; }
     public string? ApplicationEmail { get; init; }
     public bool CreatedForUnclaimedCompany { get; init; }
+
+    public JobCategory? Category { get; init; }
+    public List<JobRegion> Regions { get; init; } = [];
+    public List<string> Countries { get; init; } = [];
+    public DateTime? PostingExpiresUtc { get; init; }
+    public bool IncludeCompanyLogo { get; init; }
+    public bool IsHighlighted { get; init; }
+    public DateTime? StickyUntilUtc { get; init; }
+    public bool AllowAutoMatch { get; init; }
+    public List<string> BenefitsTags { get; init; } = [];
+    public string? ApplicationSpecialRequirements { get; init; }
+    public string? Keywords { get; init; }
+    public string? PoNumber { get; init; }
 }

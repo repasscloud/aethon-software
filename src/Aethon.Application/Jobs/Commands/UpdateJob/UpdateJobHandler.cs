@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Common.Results;
 using Aethon.Application.Organisations.Services;
@@ -51,6 +52,25 @@ public sealed class UpdateJobHandler
         job.SalaryFrom = request.SalaryFrom;
         job.SalaryTo = request.SalaryTo;
         job.SalaryCurrency = request.SalaryCurrency;
+        job.ExternalApplicationUrl = string.IsNullOrWhiteSpace(request.ExternalApplicationUrl) ? null : request.ExternalApplicationUrl.Trim();
+        job.ApplicationEmail = string.IsNullOrWhiteSpace(request.ApplicationEmail) ? null : request.ApplicationEmail.Trim();
+        job.Visibility = request.Visibility;
+        job.Category = request.Category;
+        job.Regions = request.Regions.Count > 0 ? JsonSerializer.Serialize(request.Regions) : null;
+        job.Countries = request.Countries.Count > 0 ? JsonSerializer.Serialize(request.Countries) : null;
+        job.PostingExpiresUtc = request.PostingExpiresUtc;
+        job.IncludeCompanyLogo = request.IncludeCompanyLogo;
+        job.IsHighlighted = request.IsHighlighted;
+        job.StickyUntilUtc = request.StickyUntilUtc;
+        job.AllowAutoMatch = request.AllowAutoMatch;
+        job.BenefitsTags = request.BenefitsTags.Count > 0
+            ? JsonSerializer.Serialize(request.BenefitsTags)
+            : null;
+        job.ApplicationSpecialRequirements = string.IsNullOrWhiteSpace(request.ApplicationSpecialRequirements)
+            ? null
+            : request.ApplicationSpecialRequirements.Trim();
+        job.Keywords = string.IsNullOrWhiteSpace(request.Keywords) ? null : request.Keywords.Trim();
+        job.PoNumber = string.IsNullOrWhiteSpace(request.PoNumber) ? null : request.PoNumber.Trim();
         job.UpdatedUtc = DateTime.UtcNow;
         job.UpdatedByUserId = _currentUser.UserId;
 

@@ -18,11 +18,14 @@ public sealed class GetPublicJobDetailHandler
 
     public async Task<Result<PublicJobDetailDto>> HandleAsync(Guid jobId, CancellationToken ct = default)
     {
+        var utcNow = DateTime.UtcNow;
+
         var job = await _db.Jobs
             .AsNoTracking()
             .Where(j => j.Id == jobId
                      && j.Status == JobStatus.Published
-                     && j.Visibility == JobVisibility.Public)
+                     && j.Visibility == JobVisibility.Public
+                     && (j.PostingExpiresUtc == null || j.PostingExpiresUtc > utcNow))
             .Select(j => new PublicJobDetailDto
             {
                 Id = j.Id,

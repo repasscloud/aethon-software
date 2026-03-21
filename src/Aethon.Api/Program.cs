@@ -63,6 +63,7 @@ services.AddHostedService<ResumeAnalysisWorker>();
 
 services.AddHttpClient();
 services.AddHostedService<WebhookDeliveryWorker>();
+services.AddHostedService<DomainVerificationWorker>();
 
 services.AddApplicationServices();
 services.AddValidatorsFromAssembly(typeof(ApplicationAssemblyMarker).Assembly);

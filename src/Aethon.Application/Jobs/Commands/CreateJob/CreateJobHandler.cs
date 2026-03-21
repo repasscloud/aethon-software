@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Results;
@@ -41,6 +42,28 @@ public sealed class CreateJobHandler
 
         var currentUserId = _currentUserAccessor.UserId;
 
+        // If OwnedByOrganisationId is not supplied by the client, derive it from the
+        // authenticated user's active organisation membership (company users creating
+        // jobs for their own organisation).
+        var ownedByOrgId = command.OwnedByOrganisationId;
+        if (ownedByOrgId == Guid.Empty)
+        {
+            var membership = await _dbContext.Set<OrganisationMembership>()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    m => m.UserId == currentUserId && m.Status == MembershipStatus.Active,
+                    cancellationToken);
+
+            if (membership is null)
+            {
+                return Result<Guid>.Failure(
+                    "organisations.not_member",
+                    "You are not a member of any organisation. Cannot create a job.");
+            }
+
+            ownedByOrgId = membership.OrganisationId;
+        }
+
         if (string.IsNullOrWhiteSpace(command.Title))
         {
             return Result<Guid>.Failure(
@@ -64,7 +87,7 @@ public sealed class CreateJobHandler
 
         var organisation = await _dbContext.Organisations
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == command.OwnedByOrganisationId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == ownedByOrgId, cancellationToken);
 
         if (organisation is null)
         {
@@ -75,7 +98,7 @@ public sealed class CreateJobHandler
 
         var canCreate = await _organisationAccessService.CanCreateJobsAsync(
             currentUserId,
-            command.OwnedByOrganisationId,
+            ownedByOrgId,
             cancellationToken);
 
         if (!canCreate)
@@ -121,7 +144,7 @@ public sealed class CreateJobHandler
         var job = new Job
         {
             Id = Guid.NewGuid(),
-            OwnedByOrganisationId = command.OwnedByOrganisationId,
+            OwnedByOrganisationId = ownedByOrgId,
             ManagedByOrganisationId = command.ManagedByOrganisationId,
             ManagedByUserId = command.ManagedByUserId,
             OrganisationRecruitmentPartnershipId = command.OrganisationRecruitmentPartnershipId,
@@ -148,6 +171,20 @@ public sealed class CreateJobHandler
             ExternalApplicationUrl = Normalize(command.ExternalApplicationUrl),
             ApplicationEmail = Normalize(command.ApplicationEmail),
             CreatedForUnclaimedCompany = command.CreatedForUnclaimedCompany,
+            Category = command.Category,
+            Regions = command.Regions.Count > 0 ? JsonSerializer.Serialize(command.Regions) : null,
+            Countries = command.Countries.Count > 0 ? JsonSerializer.Serialize(command.Countries) : null,
+            PostingExpiresUtc = command.PostingExpiresUtc,
+            IncludeCompanyLogo = command.IncludeCompanyLogo,
+            IsHighlighted = command.IsHighlighted,
+            StickyUntilUtc = command.StickyUntilUtc,
+            AllowAutoMatch = command.AllowAutoMatch,
+            BenefitsTags = command.BenefitsTags.Count > 0
+                ? JsonSerializer.Serialize(command.BenefitsTags)
+                : null,
+            ApplicationSpecialRequirements = Normalize(command.ApplicationSpecialRequirements),
+            Keywords = Normalize(command.Keywords),
+            PoNumber = Normalize(command.PoNumber),
             CreatedUtc = utcNow,
             CreatedByUserId = currentUserId
         };

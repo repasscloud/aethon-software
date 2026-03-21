@@ -9,7 +9,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Employer dashboard | Aethon</PageTitle>
 
@@ -120,11 +120,11 @@
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-        var client = HttpClientFactory.CreateClient("AethonApi");
+        var client = await Api.CreateAsync();
 
         try
         {
-            var jobs = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/jobs/my-org") ?? [];
+            var jobs = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/jobs/my-org", AethonApiClient.JsonOptions) ?? [];
             _openJobCount = jobs.Count(j => string.Equals(j.Status, "Published", StringComparison.OrdinalIgnoreCase));
             _recentJobs = jobs.Take(5).ToList();
         }
@@ -132,14 +132,14 @@
 
         try
         {
-            var approvals = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/company/jobs/approvals") ?? [];
+            var approvals = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/company/jobs/approvals", AethonApiClient.JsonOptions) ?? [];
             _pendingApprovalCount = approvals.Count;
         }
         catch { }
 
         try
         {
-            var partners = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/company/recruiters") ?? [];
+            var partners = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/company/recruiters", AethonApiClient.JsonOptions) ?? [];
             _recruiterPartnerCount = partners.Count;
         }
         catch { }

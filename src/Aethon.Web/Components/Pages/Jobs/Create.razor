@@ -1,50 +1,128 @@
 @page "/jobs/create"
+@rendermode InteractiveServer
+@attribute [Authorize]
 @using Aethon.Shared.Jobs
-@inject HttpClient Http
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
 @inject NavigationManager Nav
 
-<PageTitle>Create Job</PageTitle>
+<PageTitle>Create job | Aethon</PageTitle>
 
-@if (allowedCompanies is null)
-{
-    <p>Loading...</p>
-}
-else
-{
-    <EditForm Model="model" OnValidSubmit="SaveAsync">
-        <div class="mb-3">
-            <label>Company</label>
-            <select class="form-select" @bind="model.CompanyOrganisationId">
-                @foreach (var id in allowedCompanies)
-                {
-                    <option value="@id">@id</option>
-                }
-            </select>
+<div class="d-flex flex-column gap-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-1">Create job</h1>
+            <p class="text-secondary mb-0">Post a new job for your organisation.</p>
         </div>
+    </div>
 
-        <div class="mb-3">
-            <label>Title</label>
-            <InputText class="form-control" @bind-Value="model.Title" />
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Job title</label>
+                        <InputText class="form-control rounded-4" @bind-Value="_model.Title"
+                                   placeholder="e.g. Senior Software Engineer" />
+                        <ValidationMessage For="@(() => _model.Title)" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Summary</label>
+                        <InputTextArea class="form-control rounded-4" @bind-Value="_model.Summary" rows="2" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <InputTextArea class="form-control rounded-4" @bind-Value="_model.Description" rows="6" />
+                        <ValidationMessage For="@(() => _model.Description)" />
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Location</label>
+                        <InputText class="form-control rounded-4" @bind-Value="_model.Location" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary min</label>
+                        <InputNumber class="form-control rounded-4" @bind-Value="_model.SalaryMin" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary max</label>
+                        <InputNumber class="form-control rounded-4" @bind-Value="_model.SalaryMax" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                        @(_saving ? "Creating…" : "Create job")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary rounded-4 px-4"
+                            @onclick='() => Nav.NavigateTo("/jobs")'>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
         </div>
-
-        <button class="btn btn-primary" type="submit">Create</button>
-    </EditForm>
-}
+    </div>
+</div>
 
 @code {
-    private readonly CreateJobDto model = new();
-    private List<Guid>? allowedCompanies;
-
-    protected override async Task OnInitializedAsync()
-    {
-        allowedCompanies = await Http.GetFromJsonAsync<List<Guid>>("api/v1/jobs/allowed-companies") ?? [];
-    }
+    private readonly CreateJobDto _model = new();
+    private string? _error;
+    private bool _saving;
 
     private async Task SaveAsync()
     {
-        var response = await Http.PostAsJsonAsync("api/v1/jobs", model);
-        response.EnsureSuccessStatusCode();
+        _saving = true;
+        _error = null;
 
-        Nav.NavigateTo("/jobs");
+        try
+        {
+            var client = await Api.CreateAsync();
+            // OwnedByOrganisationId is derived server-side from the authenticated user's membership
+            var response = await client.PostAsJsonAsync("/api/v1/jobs", _model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ReadErrorAsync(response) ?? "Could not create job.";
+                return;
+            }
+
+            Nav.NavigateTo("/jobs");
+        }
+        catch
+        {
+            _error = "Could not create job.";
+        }
+        finally
+        {
+            _saving = false;
+        }
     }
+
+    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(AethonApiClient.JsonOptions);
+            if (!string.IsNullOrWhiteSpace(problem?.Detail)) return problem.Detail;
+        }
+        catch { }
+
+        var raw = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    private sealed class ProblemResponse { public string? Detail { get; set; } }
 }

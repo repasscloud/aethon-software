@@ -5,7 +5,7 @@
 @using System.Net.Http.Json
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 
 <PageTitle>Jobs | Aethon</PageTitle>
 
@@ -92,7 +92,7 @@ else
     {
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.GetAsync("/api/v1/jobs/my-org");
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
@@ -107,7 +107,7 @@ else
                 return;
             }
 
-            _jobs = await response.Content.ReadFromJsonAsync<List<JobListItemDto>>() ?? [];
+            _jobs = await response.Content.ReadFromJsonAsync<List<JobListItemDto>>(AethonApiClient.JsonOptions) ?? [];
         }
         catch
         {

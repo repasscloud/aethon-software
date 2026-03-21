@@ -51,6 +51,22 @@ public sealed class JobDetailDto
 
     public bool CreatedForUnclaimedCompany { get; set; }
 
+    public JobCategory? Category { get; set; }
+    public List<JobRegion> Regions { get; set; } = [];
+    public List<string> Countries { get; set; } = [];
+    public DateTime? PostingExpiresUtc { get; set; }
+
+    public bool IncludeCompanyLogo { get; set; }
+    public bool IsHighlighted { get; set; }
+    public DateTime? StickyUntilUtc { get; set; }
+    public bool AllowAutoMatch { get; set; }
+
+    public List<string> BenefitsTags { get; set; } = [];
+    public string? ApplicationSpecialRequirements { get; set; }
+    public string? Keywords { get; set; }
+    public string? PoNumber { get; set; }
+    public string? ShortUrlCode { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public Guid CreatedByIdentityUserId { get; set; }
 

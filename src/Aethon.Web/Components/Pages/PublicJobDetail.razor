@@ -6,7 +6,7 @@
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
-@inject IHttpClientFactory HttpClientFactory
+@inject AethonApiClient Api
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Job | Aethon</PageTitle>
@@ -44,23 +44,29 @@ else
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
                 <h2 class="h5 fw-bold mb-3">Description</h2>
-                <div style="white-space: pre-wrap;">@_job.Description</div>
+                <div class="rich-content">@((MarkupString)(_job.Description ?? ""))</div>
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">Requirements</h2>
-                <div style="white-space: pre-wrap;">@(_job.Requirements ?? "-")</div>
+        @if (!string.IsNullOrWhiteSpace(_job.Requirements))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Requirements</h2>
+                    <div class="rich-content">@((MarkupString)_job.Requirements)</div>
+                </div>
             </div>
-        </div>
+        }
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">Benefits</h2>
-                <div style="white-space: pre-wrap;">@(_job.Benefits ?? "-")</div>
+        @if (!string.IsNullOrWhiteSpace(_job.Benefits))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Benefits</h2>
+                    <div class="rich-content">@((MarkupString)_job.Benefits)</div>
+                </div>
             </div>
-        </div>
+        }
 
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
@@ -125,7 +131,7 @@ else
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             _isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
 
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.GetAsync($"/api/v1/public/jobs/{Id}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
@@ -140,7 +146,7 @@ else
                 return;
             }
 
-            _job = await response.Content.ReadFromJsonAsync<PublicJobDetailDto>();
+            _job = await response.Content.ReadFromJsonAsync<PublicJobDetailDto>(AethonApiClient.JsonOptions);
         }
         catch
         {
@@ -160,7 +166,7 @@ else
 
         try
         {
-            var client = HttpClientFactory.CreateClient("AethonApi");
+            var client = await Api.CreateAsync();
             var response = await client.PostAsJsonAsync($"/api/v1/public/jobs/{Id}/apply", _applyModel);
 
             if (response.IsSuccessStatusCode)

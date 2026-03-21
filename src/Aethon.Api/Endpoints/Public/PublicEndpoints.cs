@@ -3,6 +3,7 @@ using Aethon.Application.Applications.Commands.SubmitJobApplication;
 using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
+using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
 
@@ -29,9 +30,26 @@ public static class PublicEndpoints
         // GET /api/v1/public/jobs
         group.MapGet("/jobs", async (
             [FromServices] GetPublicJobsHandler handler,
+            string? city,
+            DateRangeFilter? dateRange,
+            JobCategory? category,
+            JobRegion? region,
+            string? country,
+            string? keywords,
+            string? organisationSlug,
             CancellationToken ct) =>
         {
-            var result = await handler.HandleAsync(ct);
+            var query = new GetPublicJobsQuery
+            {
+                City = city,
+                DateRange = dateRange,
+                Category = category,
+                Region = region,
+                Country = country,
+                Keywords = keywords,
+                OrganisationSlug = organisationSlug
+            };
+            var result = await handler.HandleAsync(query, ct);
             return result.ToMinimalApiResult();
         });
 

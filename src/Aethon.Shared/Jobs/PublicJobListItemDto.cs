@@ -17,4 +17,9 @@ public sealed class PublicJobListItemDto
     public decimal? SalaryTo { get; set; }
     public CurrencyCode? SalaryCurrency { get; set; }
     public DateTime? PublishedUtc { get; set; }
+    public JobCategory? Category { get; set; }
+    public List<JobRegion> Regions { get; set; } = [];
+    public List<string> BenefitsTags { get; set; } = [];
+    public bool IsHighlighted { get; set; }
+    public bool IncludeCompanyLogo { get; set; }
 }
