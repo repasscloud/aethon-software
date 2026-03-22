@@ -49,7 +49,18 @@ else
                             <h1 class="h3 fw-bold mb-0">@_org.Name</h1>
                             @if (_org.IsVerified)
                             {
-                                <span class="badge bg-primary rounded-pill" title="Verified employer"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
+                                @if (_org.VerificationTier == VerificationTier.EnhancedTrusted)
+                                {
+                                    <a href="/info/enhanced-verification" class="badge bg-success rounded-pill text-decoration-none" title="Enhanced Trusted Employer">
+                                        <i class="bi bi-shield-fill-check me-1"></i>Enhanced Trusted
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a href="/info/standard-verification" class="badge bg-primary rounded-pill text-decoration-none" title="Verified Employer">
+                                        <i class="bi bi-patch-check-fill me-1"></i>Verified
+                                    </a>
+                                }
                             }
                         </div>
 
@@ -113,7 +124,7 @@ else
                             }
                             @if (!string.IsNullOrWhiteSpace(_org.LinkedInUrl))
                             {
-                                <a href="@_org.LinkedInUrl" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-linkedin me-1 text-primary"></i>LinkedIn</a>
+                                <a href="@SocialUrl(_org.LinkedInUrl, "https://www.linkedin.com/company/")" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-linkedin me-1 text-primary"></i>LinkedIn</a>
                             }
                             @if (!string.IsNullOrWhiteSpace(_org.TwitterHandle))
                             {
@@ -121,7 +132,7 @@ else
                             }
                             @if (!string.IsNullOrWhiteSpace(_org.FacebookUrl))
                             {
-                                <a href="@_org.FacebookUrl" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-facebook me-1 text-primary"></i>Facebook</a>
+                                <a href="@SocialUrl(_org.FacebookUrl, "https://www.facebook.com/")" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-facebook me-1 text-primary"></i>Facebook</a>
                             }
                             @if (!string.IsNullOrWhiteSpace(_org.TikTokHandle))
                             {
@@ -133,7 +144,7 @@ else
                             }
                             @if (!string.IsNullOrWhiteSpace(_org.YouTubeUrl))
                             {
-                                <a href="@_org.YouTubeUrl" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-youtube me-1 text-danger"></i>YouTube</a>
+                                <a href="@SocialUrl(_org.YouTubeUrl, "https://www.youtube.com/channel/")" target="_blank" class="text-decoration-none text-secondary small"><i class="bi bi-youtube me-1 text-danger"></i>YouTube</a>
                             }
                         </div>
                     </div>
@@ -249,6 +260,15 @@ else
         {
             _loaded = true;
         }
+    }
+
+    private static string SocialUrl(string? handle, string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(handle)) return "#";
+        if (handle.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            handle.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return handle;
+        return baseUrl + handle.TrimStart('/');
     }
 
     private static string JobUrl(PublicJobListItemDto job)

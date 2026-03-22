@@ -7,16 +7,16 @@ using Aethon.Data;
 using Aethon.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Aethon.Application.Jobs.Commands.ReturnJobToDraft;
+namespace Aethon.Application.Jobs.Commands.PutJobOnHold;
 
-public sealed class ReturnJobToDraftHandler
+public sealed class PutJobOnHoldHandler
 {
     private readonly AethonDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly OrganisationAccessService _orgAccess;
     private readonly IAppCache _cache;
 
-    public ReturnJobToDraftHandler(
+    public PutJobOnHoldHandler(
         AethonDbContext db,
         ICurrentUserAccessor currentUser,
         OrganisationAccessService orgAccess,
@@ -46,10 +46,10 @@ public sealed class ReturnJobToDraftHandler
         if (!canEdit)
             return Result.Failure("jobs.forbidden", "Insufficient permissions to modify this job.");
 
-        if (job.Status is JobStatus.Cancelled)
-            return Result.Failure("jobs.invalid_status", $"Cannot return a '{job.Status}' job to draft.");
+        if (job.Status is not (JobStatus.Published or JobStatus.Approved))
+            return Result.Failure("jobs.invalid_status", $"Cannot put a '{job.Status}' job on hold.");
 
-        job.Status = JobStatus.Draft;
+        job.Status = JobStatus.OnHold;
         job.UpdatedUtc = DateTime.UtcNow;
         job.UpdatedByUserId = _currentUser.UserId;
 

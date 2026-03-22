@@ -59,8 +59,15 @@ else
                     }
                     else if (_job.Status == JobStatus.Published)
                     {
+                        <button class="btn btn-outline-dark rounded-4 px-4" @onclick="PutOnHoldAsync" disabled="@_working">Put on hold</button>
                         <button class="btn btn-outline-dark rounded-4 px-4" @onclick="ReturnToDraftAsync" disabled="@_working">Return to draft</button>
-                        <button class="btn btn-dark rounded-4 px-4" @onclick="CloseAsync" disabled="@_working">Close</button>
+                        <button class="btn btn-outline-danger rounded-4 px-4" @onclick="CloseAsync" disabled="@_working">Close</button>
+                    }
+                    else if (_job.Status == JobStatus.OnHold)
+                    {
+                        <button class="btn btn-dark rounded-4 px-4" @onclick="PublishAsync" disabled="@_working">Resume</button>
+                        <button class="btn btn-outline-dark rounded-4 px-4" @onclick="ReturnToDraftAsync" disabled="@_working">Return to draft</button>
+                        <button class="btn btn-outline-danger rounded-4 px-4" @onclick="CloseAsync" disabled="@_working">Close</button>
                     }
                     else if (_job.Status == JobStatus.Closed)
                     {
@@ -230,6 +237,11 @@ else
     private async Task ReturnToDraftAsync()
     {
         await RunActionAsync($"/api/v1/jobs/{Id}/return-to-draft", "Job returned to draft.");
+    }
+
+    private async Task PutOnHoldAsync()
+    {
+        await RunActionAsync($"/api/v1/jobs/{Id}/put-on-hold", "Job put on hold.");
     }
 
     private async Task RunActionAsync(string url, string successMessage)

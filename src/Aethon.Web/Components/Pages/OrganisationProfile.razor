@@ -2,11 +2,13 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.Net.Http.Json
+@using System.Text.RegularExpressions
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Organisations
 @using Microsoft.AspNetCore.Authorization
 @inject AethonApiClient Api
 @inject NavigationManager NavigationManager
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Organisation profile | Aethon</PageTitle>
 
@@ -62,6 +64,10 @@ else
                                 <span class="input-group-text rounded-start-4">https://</span>
                                 <InputText @bind-Value="_model.WebsiteUrl" class="form-control rounded-end-4" placeholder="www.yourcompany.com" />
                             </div>
+                            @if (_urlErrors.TryGetValue("WebsiteUrl", out var websiteErr))
+                            {
+                                <div class="form-text text-danger">@websiteErr</div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -92,6 +98,10 @@ else
                                 <InputText @bind-Value="_model.LogoUrl" class="form-control rounded-end-4" placeholder="example.com/logo.png" />
                             </div>
                             <div class="form-text">Square image, min 200×200px recommended.</div>
+                            @if (_urlErrors.TryGetValue("LogoUrl", out var logoErr))
+                            {
+                                <div class="form-text text-danger">@logoErr</div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -101,6 +111,10 @@ else
                                 <InputText @bind-Value="_model.BannerImageUrl" class="form-control rounded-end-4" placeholder="example.com/banner.jpg" />
                             </div>
                             <div class="form-text">Wide header image shown at the top of your public page (e.g. 1200×300px).</div>
+                            @if (_urlErrors.TryGetValue("BannerImageUrl", out var bannerErr))
+                            {
+                                <div class="form-text text-danger">@bannerErr</div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -217,11 +231,16 @@ else
                     <h2 class="h5 fw-bold mb-3">Social media</h2>
                     <div class="row g-3 mb-2">
                         <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold"><i class="bi bi-linkedin me-1 text-primary"></i> LinkedIn URL</label>
+                            <label class="form-label fw-semibold"><i class="bi bi-linkedin me-1 text-primary"></i> LinkedIn company slug</label>
                             <div class="input-group">
-                                <span class="input-group-text rounded-start-4">https://</span>
-                                <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-end-4" placeholder="www.linkedin.com/company/yourcompany" />
+                                <span class="input-group-text rounded-start-4 small">linkedin.com/company/</span>
+                                <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-end-4" placeholder="your-company-slug" />
                             </div>
+                            <div class="form-text">Enter only the slug, e.g. <code>repass-cloud</code></div>
+                            @if (_urlErrors.TryGetValue("LinkedInUrl", out var liErr))
+                            {
+                                <div class="form-text text-danger">@liErr</div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -233,11 +252,16 @@ else
                         </div>
 
                         <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold"><i class="bi bi-facebook me-1 text-primary"></i> Facebook URL</label>
+                            <label class="form-label fw-semibold"><i class="bi bi-facebook me-1 text-primary"></i> Facebook page name</label>
                             <div class="input-group">
-                                <span class="input-group-text rounded-start-4">https://</span>
-                                <InputText @bind-Value="_model.FacebookUrl" class="form-control rounded-end-4" placeholder="www.facebook.com/yourpage" />
+                                <span class="input-group-text rounded-start-4 small">facebook.com/</span>
+                                <InputText @bind-Value="_model.FacebookUrl" class="form-control rounded-end-4" placeholder="YourPageName" />
                             </div>
+                            <div class="form-text">Enter only your page name, e.g. <code>AethonSoftware</code></div>
+                            @if (_urlErrors.TryGetValue("FacebookUrl", out var fbErr))
+                            {
+                                <div class="form-text text-danger">@fbErr</div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -257,11 +281,16 @@ else
                         </div>
 
                         <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold"><i class="bi bi-youtube me-1 text-danger"></i> YouTube URL</label>
+                            <label class="form-label fw-semibold"><i class="bi bi-youtube me-1 text-danger"></i> YouTube channel</label>
                             <div class="input-group">
-                                <span class="input-group-text rounded-start-4">https://</span>
-                                <InputText @bind-Value="_model.YouTubeUrl" class="form-control rounded-end-4" placeholder="www.youtube.com/channel/yourchannelid" />
+                                <span class="input-group-text rounded-start-4 small">youtube.com/channel/</span>
+                                <InputText @bind-Value="_model.YouTubeUrl" class="form-control rounded-end-4" placeholder="UCxxxxxxxxxxxxxxxxxxxxxx" />
                             </div>
+                            <div class="form-text">Enter only the channel ID or handle</div>
+                            @if (_urlErrors.TryGetValue("YouTubeUrl", out var ytErr))
+                            {
+                                <div class="form-text text-danger">@ytErr</div>
+                            }
                         </div>
                     </div>
 
@@ -282,6 +311,10 @@ else
 }
 
 @code {
+    private const string LinkedInBase = "https://www.linkedin.com/company/";
+    private const string FacebookBase = "https://www.facebook.com/";
+    private const string YouTubeBase  = "https://www.youtube.com/channel/";
+
     private bool _loaded;
     private bool _saving;
     private string? _message;
@@ -290,6 +323,7 @@ else
     private bool _checkingSlug;
     private bool? _slugAvailable;
     private string? _slugMessage;
+    private Dictionary<string, string> _urlErrors = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -304,9 +338,9 @@ else
                 {
                     Name = profile.Name,
                     LegalName = profile.LegalName,
-                    WebsiteUrl = profile.WebsiteUrl,
+                    WebsiteUrl = StripHttps(profile.WebsiteUrl),
                     Slug = profile.Slug,
-                    LogoUrl = profile.LogoUrl,
+                    LogoUrl = StripHttps(profile.LogoUrl),
                     Summary = profile.Summary,
                     PublicLocationText = profile.PublicLocationText,
                     LocationCity = profile.LocationCity,
@@ -321,15 +355,15 @@ else
                     IsPublicProfileEnabled = profile.IsPublicProfileEnabled,
                     IsEqualOpportunityEmployer = profile.IsEqualOpportunityEmployer,
                     IsAccessibleWorkplace = profile.IsAccessibleWorkplace,
-                    BannerImageUrl = profile.BannerImageUrl,
+                    BannerImageUrl = StripHttps(profile.BannerImageUrl),
                     Industry = profile.Industry,
                     CompanySize = profile.CompanySize,
-                    LinkedInUrl = profile.LinkedInUrl,
+                    LinkedInUrl = StripSocialPrefix(profile.LinkedInUrl, LinkedInBase),
                     TwitterHandle = profile.TwitterHandle,
-                    FacebookUrl = profile.FacebookUrl,
+                    FacebookUrl = StripSocialPrefix(profile.FacebookUrl, FacebookBase),
                     TikTokHandle = profile.TikTokHandle,
                     InstagramHandle = profile.InstagramHandle,
-                    YouTubeUrl = profile.YouTubeUrl
+                    YouTubeUrl = StripSocialPrefix(profile.YouTubeUrl, YouTubeBase)
                 };
             }
         }
@@ -389,11 +423,82 @@ else
         _saving = true;
         _message = null;
         _error = null;
+        _urlErrors.Clear();
+
+        // Format validation for social handles
+        if (!string.IsNullOrWhiteSpace(_model.LinkedInUrl) &&
+            !Regex.IsMatch(_model.LinkedInUrl.Trim(), @"^[a-zA-Z0-9\-_]+$"))
+            _urlErrors["LinkedInUrl"] = "Enter only your company slug — letters, numbers, and hyphens only. No slashes or https://.";
+
+        if (!string.IsNullOrWhiteSpace(_model.FacebookUrl) &&
+            (_model.FacebookUrl.Contains('/') || _model.FacebookUrl.Contains(' ')))
+            _urlErrors["FacebookUrl"] = "Enter only your page name — no slashes or spaces.";
+
+        if (!string.IsNullOrWhiteSpace(_model.YouTubeUrl) &&
+            (_model.YouTubeUrl.Contains('/') || _model.YouTubeUrl.Contains(' ')))
+            _urlErrors["YouTubeUrl"] = "Enter only the channel ID or handle — no slashes or spaces.";
+
+        if (_urlErrors.Count > 0)
+        {
+            _saving = false;
+            return;
+        }
+
+        // Build submit model with full URLs restored
+        var submit = new UpdateOrganisationProfileRequestDto
+        {
+            Name = _model.Name,
+            LegalName = _model.LegalName,
+            WebsiteUrl    = BuildHttpsUrl(_model.WebsiteUrl),
+            Slug          = _model.Slug,
+            LogoUrl       = BuildHttpsUrl(_model.LogoUrl),
+            BannerImageUrl = BuildHttpsUrl(_model.BannerImageUrl),
+            Summary       = _model.Summary,
+            PublicLocationText    = _model.PublicLocationText,
+            LocationCity          = _model.LocationCity,
+            LocationState         = _model.LocationState,
+            LocationCountry       = _model.LocationCountry,
+            LocationCountryCode   = _model.LocationCountryCode,
+            LocationLatitude      = _model.LocationLatitude,
+            LocationLongitude     = _model.LocationLongitude,
+            LocationPlaceId       = _model.LocationPlaceId,
+            PublicContactEmail    = _model.PublicContactEmail,
+            PublicContactPhone    = _model.PublicContactPhone,
+            IsPublicProfileEnabled       = _model.IsPublicProfileEnabled,
+            IsEqualOpportunityEmployer   = _model.IsEqualOpportunityEmployer,
+            IsAccessibleWorkplace        = _model.IsAccessibleWorkplace,
+            Industry      = _model.Industry,
+            CompanySize   = _model.CompanySize,
+            LinkedInUrl   = BuildSocialUrl(_model.LinkedInUrl, LinkedInBase),
+            TwitterHandle = _model.TwitterHandle,
+            FacebookUrl   = BuildSocialUrl(_model.FacebookUrl, FacebookBase),
+            TikTokHandle  = _model.TikTokHandle,
+            InstagramHandle = _model.InstagramHandle,
+            YouTubeUrl    = BuildSocialUrl(_model.YouTubeUrl, YouTubeBase)
+        };
+
+        // URL reachability checks (website, logo, banner) — run in parallel
+        var checks = new List<Task>();
+        if (!string.IsNullOrWhiteSpace(submit.WebsiteUrl))
+            checks.Add(CheckUrlAsync(submit.WebsiteUrl, "WebsiteUrl"));
+        if (!string.IsNullOrWhiteSpace(submit.LogoUrl))
+            checks.Add(CheckUrlAsync(submit.LogoUrl, "LogoUrl"));
+        if (!string.IsNullOrWhiteSpace(submit.BannerImageUrl))
+            checks.Add(CheckUrlAsync(submit.BannerImageUrl, "BannerImageUrl"));
+
+        if (checks.Count > 0)
+            await Task.WhenAll(checks);
+
+        if (_urlErrors.Count > 0)
+        {
+            _saving = false;
+            return;
+        }
 
         try
         {
             var client = await Api.CreateAsync();
-            var response = await client.PutAsJsonAsync("/api/v1/organisations/me/profile", _model);
+            var response = await client.PutAsJsonAsync("/api/v1/organisations/me/profile", submit);
 
             if (response.IsSuccessStatusCode)
             {
@@ -403,9 +508,7 @@ else
 
             _error = await response.Content.ReadAsStringAsync();
             if (string.IsNullOrWhiteSpace(_error))
-            {
                 _error = "Could not save organisation profile.";
-            }
         }
         catch
         {
@@ -415,6 +518,64 @@ else
         {
             _saving = false;
         }
+    }
+
+    private async Task CheckUrlAsync(string url, string field)
+    {
+        try
+        {
+            using var http = HttpClientFactory.CreateClient();
+            http.Timeout = TimeSpan.FromSeconds(8);
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; AethonBot/1.0)");
+            using var req = new HttpRequestMessage(HttpMethod.Head, url);
+            using var res = await http.SendAsync(req);
+            if (!res.IsSuccessStatusCode)
+                _urlErrors[field] = $"URL returned HTTP {(int)res.StatusCode}. Please check it is publicly accessible.";
+        }
+        catch
+        {
+            _urlErrors[field] = "Could not reach this URL. Please check it is correct and publicly accessible.";
+        }
+    }
+
+    // ── URL helpers ────────────────────────────────────────────────────────────
+
+    private static string StripHttps(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "";
+        if (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return url["https://".Length..];
+        if (url.StartsWith("http://",  StringComparison.OrdinalIgnoreCase)) return url["http://".Length..];
+        return url;
+    }
+
+    private static string StripSocialPrefix(string? url, string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "";
+        url = url.Trim();
+        // Try exact base and base without www
+        foreach (var p in new[] { baseUrl, baseUrl.Replace("www.", "") })
+            if (url.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                return url[p.Length..].Trim('/');
+        // Fall back: just strip https://
+        return StripHttps(url);
+    }
+
+    private static string? BuildHttpsUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        value = value.Trim();
+        if (value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return value;
+        return "https://" + value;
+    }
+
+    private static string? BuildSocialUrl(string? handle, string baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(handle)) return null;
+        handle = handle.Trim().TrimStart('/');
+        if (handle.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return handle;
+        return baseUrl + handle;
     }
 
     private sealed class SlugCheckResult

@@ -131,7 +131,8 @@ else
         try
         {
             var client = await Api.CreateAsync();
-            var url = $"/api/v1/admin/jobs?page={_page}&search={Uri.EscapeDataString(_search)}&status={Uri.EscapeDataString(_statusFilter)}";
+            var url = $"/api/v1/admin/jobs?page={_page}&search={Uri.EscapeDataString(_search)}"
+                + (string.IsNullOrEmpty(_statusFilter) ? "" : $"&status={Uri.EscapeDataString(_statusFilter)}");
             var result = await client.GetFromJsonAsync<PagedResult<JobRow>>(url, AethonApiClient.JsonOptions);
             if (result is not null) { _jobs = result.Items; _total = result.Total; }
         }

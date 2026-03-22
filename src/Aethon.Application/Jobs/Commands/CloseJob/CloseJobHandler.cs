@@ -1,4 +1,6 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
+using Aethon.Application.Common.Caching;
 using Aethon.Application.Common.Results;
 using Aethon.Application.Organisations.Services;
 using Aethon.Data;
@@ -12,15 +14,18 @@ public sealed class CloseJobHandler
     private readonly AethonDbContext _db;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly OrganisationAccessService _orgAccess;
+    private readonly IAppCache _cache;
 
     public CloseJobHandler(
         AethonDbContext db,
         ICurrentUserAccessor currentUser,
-        OrganisationAccessService orgAccess)
+        OrganisationAccessService orgAccess,
+        IAppCache cache)
     {
         _db = db;
         _currentUser = currentUser;
         _orgAccess = orgAccess;
+        _cache = cache;
     }
 
     public async Task<Result> HandleAsync(Guid jobId, CancellationToken ct = default)
@@ -33,7 +38,8 @@ public sealed class CloseJobHandler
         if (job is null)
             return Result.Failure("jobs.not_found", "Job not found.");
 
-        var canEdit = await _orgAccess.CanCreateJobsAsync(_currentUser.UserId, job.OwnedByOrganisationId, ct) ||
+        var canEdit = _currentUser.IsStaff ||
+                      await _orgAccess.CanCreateJobsAsync(_currentUser.UserId, job.OwnedByOrganisationId, ct) ||
                       (job.ManagedByOrganisationId.HasValue &&
                        await _orgAccess.CanCreateJobsAsync(_currentUser.UserId, job.ManagedByOrganisationId.Value, ct));
 
@@ -50,6 +56,7 @@ public sealed class CloseJobHandler
         job.UpdatedByUserId = _currentUser.UserId;
 
         await _db.SaveChangesAsync(ct);
+        await _cache.RemoveAsync(CacheKeys.JobDetail(jobId), ct);
 
         return Result.Success();
     }

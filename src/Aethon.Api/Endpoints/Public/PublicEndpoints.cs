@@ -5,9 +5,11 @@ using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
 using Aethon.Application.Jobs.Queries.GetPublicJobLocations;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
+using Aethon.Data;
 using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Endpoints.Public;
 
@@ -18,6 +20,44 @@ public static class PublicEndpoints
         var group = app.MapGroup("/public")
             .AllowAnonymous()
             .WithTags("Public");
+
+        // GET /api/v1/public/locations?q= — location search from the curated locations table
+        group.MapGet("/locations", async (
+            AethonDbContext db,
+            string? q,
+            CancellationToken ct) =>
+        {
+            var query = db.Locations.AsNoTracking().Where(l => l.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var search = q.Trim().ToLower();
+                query = query.Where(l =>
+                    l.DisplayName.ToLower().Contains(search) ||
+                    (l.City != null && l.City.ToLower().Contains(search)) ||
+                    (l.State != null && l.State.ToLower().Contains(search)) ||
+                    (l.Country != null && l.Country.ToLower().Contains(search)));
+            }
+
+            var results = await query
+                .OrderBy(l => l.SortOrder)
+                .ThenBy(l => l.DisplayName)
+                .Take(10)
+                .Select(l => new
+                {
+                    l.Id,
+                    l.DisplayName,
+                    l.City,
+                    l.State,
+                    l.Country,
+                    l.CountryCode,
+                    l.Latitude,
+                    l.Longitude
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(results);
+        });
 
         // GET /api/v1/public/organisations/{slug}
         group.MapGet("/organisations/{slug}", async (

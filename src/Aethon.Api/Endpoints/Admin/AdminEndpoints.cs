@@ -736,6 +736,169 @@ public static class AdminEndpoints
             return Results.Ok(new { key, updated = true });
         });
 
+        // ─── Locations ────────────────────────────────────────────────────────────
+
+        // GET /api/v1/admin/locations
+        group.MapGet("/locations", async (
+            AethonDbContext db,
+            string? search,
+            int page = 1,
+            CancellationToken ct = default) =>
+        {
+            const int pageSize = 100;
+            var query = db.Locations.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                query = query.Where(l => l.DisplayName.ToLower().Contains(s));
+            }
+
+            var total = await query.CountAsync(ct);
+            var items = await query
+                .OrderBy(l => l.SortOrder)
+                .ThenBy(l => l.DisplayName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(l => new
+                {
+                    l.Id,
+                    l.DisplayName,
+                    l.City,
+                    l.State,
+                    l.Country,
+                    l.CountryCode,
+                    l.Latitude,
+                    l.Longitude,
+                    l.IsActive,
+                    l.SortOrder,
+                    l.CreatedUtc
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { total, page, pageSize, items });
+        });
+
+        // POST /api/v1/admin/locations — add single location
+        group.MapPost("/locations", async (
+            HttpContext http,
+            AethonDbContext db,
+            UpsertLocationRequest request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var nextOrder = await db.Locations.AnyAsync(ct)
+                ? await db.Locations.MaxAsync(l => l.SortOrder, ct) + 1
+                : 1;
+
+            var location = new Location
+            {
+                Id = Guid.NewGuid(),
+                DisplayName = request.DisplayName.Trim(),
+                City = request.City?.Trim(),
+                State = request.State?.Trim(),
+                Country = request.Country?.Trim(),
+                CountryCode = request.CountryCode?.Trim().ToUpper(),
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
+                IsActive = true,
+                SortOrder = nextOrder,
+                CreatedUtc = DateTime.UtcNow
+            };
+
+            db.Locations.Add(location);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { locationId = location.Id, displayName = location.DisplayName });
+        });
+
+        // POST /api/v1/admin/locations/bulk — add multiple locations at once
+        group.MapPost("/locations/bulk", async (
+            HttpContext http,
+            AethonDbContext db,
+            List<UpsertLocationRequest> requests,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var nextOrder = await db.Locations.AnyAsync(ct)
+                ? await db.Locations.MaxAsync(l => l.SortOrder, ct) + 1
+                : 1;
+
+            var locations = requests.Select((r, i) => new Location
+            {
+                Id = Guid.NewGuid(),
+                DisplayName = r.DisplayName.Trim(),
+                City = r.City?.Trim(),
+                State = r.State?.Trim(),
+                Country = r.Country?.Trim(),
+                CountryCode = r.CountryCode?.Trim().ToUpper(),
+                Latitude = r.Latitude,
+                Longitude = r.Longitude,
+                IsActive = true,
+                SortOrder = nextOrder + i,
+                CreatedUtc = DateTime.UtcNow
+            }).ToList();
+
+            db.Locations.AddRange(locations);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { added = locations.Count });
+        });
+
+        // PUT /api/v1/admin/locations/{locationId}
+        group.MapPut("/locations/{locationId:guid}", async (
+            HttpContext http,
+            AethonDbContext db,
+            Guid locationId,
+            UpsertLocationRequest request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var updated = await db.Locations
+                .Where(l => l.Id == locationId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(l => l.DisplayName, request.DisplayName.Trim())
+                    .SetProperty(l => l.City, request.City)
+                    .SetProperty(l => l.State, request.State)
+                    .SetProperty(l => l.Country, request.Country)
+                    .SetProperty(l => l.CountryCode, request.CountryCode != null ? request.CountryCode.ToUpper() : null)
+                    .SetProperty(l => l.Latitude, request.Latitude)
+                    .SetProperty(l => l.Longitude, request.Longitude)
+                    .SetProperty(l => l.IsActive, request.IsActive),
+                    ct);
+
+            if (updated == 0)
+                return Results.NotFound(new { code = "locations.not_found", message = "Location not found." });
+
+            return Results.Ok(new { locationId, updated = true });
+        });
+
+        // DELETE /api/v1/admin/locations/{locationId}
+        group.MapDelete("/locations/{locationId:guid}", async (
+            HttpContext http,
+            AethonDbContext db,
+            Guid locationId,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var deleted = await db.Locations
+                .Where(l => l.Id == locationId)
+                .ExecuteDeleteAsync(ct);
+
+            if (deleted == 0)
+                return Results.NotFound(new { code = "locations.not_found", message = "Location not found." });
+
+            return Results.NoContent();
+        });
+
         // GET /api/v1/admin/syndication-records?page=
         group.MapGet("/syndication-records", async (
             AethonDbContext db,
@@ -820,5 +983,17 @@ public static class AdminEndpoints
     public sealed class UpdateSettingRequest
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    public sealed class UpsertLocationRequest
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? Country { get; set; }
+        public string? CountryCode { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

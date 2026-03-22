@@ -2,19 +2,30 @@
  * locationPicker.js — Google Places Autocomplete integration for LocationPicker.razor
  *
  * Exposes:
- *   window.locationPicker.init(elementId, dotNetRef)
+ *   window.locationPicker.init(elementId, dotNetRef, initialValue)
  *   window.locationPicker.destroy(elementId)
+ *   window.locationPicker.setValue(elementId, value)
  */
 window.locationPicker = (function () {
     const instances = {};
+    const MAX_RETRIES = 10;
 
-    function init(elementId, dotNetRef) {
+    function init(elementId, dotNetRef, initialValue, retryCount) {
+        retryCount = retryCount || 0;
+
         const input = document.getElementById(elementId);
         if (!input) return;
 
-        // Guard: Google Maps must be loaded
+        // Set initial value so the field shows existing data without Blazor binding
+        if (initialValue) input.value = initialValue;
+
+        // Guard: Google Maps must be loaded — retry up to MAX_RETRIES times
         if (!window.google || !window.google.maps || !window.google.maps.places) {
-            console.warn('locationPicker: Google Maps Places library not loaded for', elementId);
+            if (retryCount < MAX_RETRIES) {
+                setTimeout(() => init(elementId, dotNetRef, initialValue, retryCount + 1), 300);
+            } else {
+                console.warn('locationPicker: Google Maps Places library not available for', elementId);
+            }
             return;
         }
 
@@ -22,11 +33,12 @@ window.locationPicker = (function () {
         destroy(elementId);
 
         const autocomplete = new google.maps.places.Autocomplete(input, {
-            types: ['(cities)'],
+            types: ['geocode'],
             fields: ['address_components', 'geometry', 'name', 'place_id', 'formatted_address']
         });
 
-        const listener = autocomplete.addListener('place_changed', () => {
+        // When user selects a place from the dropdown
+        const placeListener = autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             if (!place || !place.geometry) return;
 
@@ -58,15 +70,28 @@ window.locationPicker = (function () {
             );
         });
 
-        instances[elementId] = { autocomplete, listener };
+        // When user manually types and leaves the field without selecting a place
+        const blurHandler = () => {
+            dotNetRef.invokeMethodAsync('OnTextChanged', input.value || '');
+        };
+        input.addEventListener('blur', blurHandler);
+
+        instances[elementId] = { autocomplete, placeListener, blurHandler };
     }
 
     function destroy(elementId) {
         const instance = instances[elementId];
         if (!instance) return;
-        google.maps.event.removeListener(instance.listener);
+        if (instance.placeListener) google.maps.event.removeListener(instance.placeListener);
+        const input = document.getElementById(elementId);
+        if (input && instance.blurHandler) input.removeEventListener('blur', instance.blurHandler);
         delete instances[elementId];
     }
 
-    return { init, destroy };
+    function setValue(elementId, value) {
+        const input = document.getElementById(elementId);
+        if (input) input.value = value || '';
+    }
+
+    return { init, destroy, setValue };
 })();

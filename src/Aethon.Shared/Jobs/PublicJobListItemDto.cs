@@ -28,6 +28,7 @@ public sealed class PublicJobListItemDto
     public DateTime? PublishedUtc { get; set; }
     public JobCategory? Category { get; set; }
     public List<JobRegion> Regions { get; set; } = [];
+    public List<string> Countries { get; set; } = [];
     public List<string> BenefitsTags { get; set; } = [];
     public bool IsHighlighted { get; set; }
     public bool IsImmediateStart { get; set; }

@@ -16,6 +16,18 @@ public sealed class CurrentUserAccessor : ICurrentUserAccessor
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
 
+    public bool IsStaff
+    {
+        get
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            return user is not null && (
+                user.IsInRole("SuperAdmin") ||
+                user.IsInRole("Admin") ||
+                user.IsInRole("Support"));
+        }
+    }
+
     public Guid UserId
     {
         get

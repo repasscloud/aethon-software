@@ -31,6 +31,7 @@ public sealed class PublicJobDetailDto
     public DateTime? PostingExpiresUtc { get; set; }
     public JobCategory? Category { get; set; }
     public List<JobRegion> Regions { get; set; } = [];
+    public List<string> Countries { get; set; } = [];
     public List<string> BenefitsTags { get; set; } = [];
     public string? ApplicationSpecialRequirements { get; set; }
     public string? ExternalApplicationUrl { get; set; }

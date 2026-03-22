@@ -318,41 +318,33 @@
             {
                 <div class="col-12 col-lg-6">
                     <a href="@JobUrl(job)" class="text-decoration-none">
-                        <div class="card border-0 shadow-sm rounded-4 h-100 @(job.IsHighlighted ? "border border-warning" : "")">
+                        <div class="card border-0 shadow-sm rounded-4 h-100" style="@(job.IsHighlighted ? "background:linear-gradient(135deg,#fffbea 0%,#fff8d6 100%); border:1px solid #ffe066 !important;" : "")">
                             <div class="card-body p-4 d-flex flex-column">
 
-                                <!-- Badges row -->
-                                <div class="d-flex flex-wrap gap-1 mb-2">
-                                    @if (job.IsHighlighted)
+                                <!-- Header: content left, logo right -->
+                                <div class="d-flex gap-3 mb-2">
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="d-flex align-items-start gap-2 flex-wrap mb-1">
+                                            <h2 class="h5 fw-bold mb-0 text-dark">@job.Title</h2>
+                                            @if (job.IsImmediateStart)
+                                            {
+                                                <span class="badge bg-success rounded-pill align-self-center" style="font-size:.65rem; white-space:nowrap;"><i class="bi bi-lightning-fill me-1"></i>Immediate Start</span>
+                                            }
+                                        </div>
+                                        <div class="d-flex align-items-center flex-wrap gap-2">
+                                            <span class="text-secondary small">@job.OrganisationName</span>
+                                            @if (job.OrganisationIsVerified)
+                                            {
+                                                <span class="badge bg-primary rounded-pill" style="font-size:.65rem;"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    @if (job.IncludeCompanyLogo && !string.IsNullOrWhiteSpace(job.OrganisationLogoUrl))
                                     {
-                                        <span class="badge bg-warning text-dark rounded-pill" style="font-size:.7rem;">Featured</span>
-                                    }
-                                    @if (job.IsImmediateStart)
-                                    {
-                                        <span class="badge bg-success rounded-pill" style="font-size:.7rem;">Immediate Start</span>
-                                    }
-                                    @if (job.OrganisationIsVerified)
-                                    {
-                                        <span class="badge bg-primary rounded-pill" style="font-size:.7rem;"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
-                                    }
-                                </div>
-
-                                @if (job.IncludeCompanyLogo && !string.IsNullOrWhiteSpace(job.OrganisationLogoUrl))
-                                {
-                                    <img src="@job.OrganisationLogoUrl" alt="@job.OrganisationName"
-                                         style="max-height:36px; max-width:120px; object-fit:contain;" class="mb-2 d-block" />
-                                }
-
-                                <h2 class="h5 fw-bold mb-1 text-dark">@job.Title</h2>
-
-                                <div class="text-secondary mb-2 small">
-                                    @if (!string.IsNullOrWhiteSpace(job.OrganisationSlug))
-                                    {
-                                        <span>@job.OrganisationName</span>
-                                    }
-                                    else
-                                    {
-                                        @job.OrganisationName
+                                        <div class="flex-shrink-0">
+                                            <img src="@job.OrganisationLogoUrl" alt="@job.OrganisationName"
+                                                 style="max-height:48px; max-width:80px; object-fit:contain;" />
+                                        </div>
                                     }
                                 </div>
 
@@ -372,11 +364,56 @@
                                             <i class="bi bi-bullseye me-1"></i>@job.DistanceKm.Value.ToString("F1") km away
                                         </span>
                                     }
-                                    <span class="badge bg-light text-secondary border rounded-pill">@FormatEnum(job.WorkplaceType.ToString())</span>
-                                    <span class="badge bg-light text-secondary border rounded-pill">@FormatEnum(job.EmploymentType.ToString())</span>
+                                    <span class="badge bg-light text-secondary border rounded-pill">
+                                        @switch (job.WorkplaceType)
+                                        {
+                                            case WorkplaceType.OnSite:
+                                                <i class="bi bi-building-fill me-1" style="font-size:.7rem; color:#e67e22;"></i>
+                                                break;
+                                            case WorkplaceType.Hybrid:
+                                                <i class="bi bi-shuffle me-1" style="font-size:.7rem; color:#8e44ad;"></i>
+                                                break;
+                                            case WorkplaceType.Remote:
+                                                <i class="bi bi-house-fill me-1" style="font-size:.7rem; color:#16a085;"></i>
+                                                break;
+                                        }
+                                        @FormatEnum(job.WorkplaceType.ToString())
+                                    </span>
+                                    <span class="badge bg-light text-secondary border rounded-pill">
+                                        @switch (job.EmploymentType)
+                                        {
+                                            case EmploymentType.FullTime:
+                                                <i class="bi bi-clock-fill me-1" style="font-size:.7rem; color:#2980b9;"></i>
+                                                break;
+                                            case EmploymentType.PartTime:
+                                                <i class="bi bi-clock-history me-1" style="font-size:.7rem; color:#7f8c8d;"></i>
+                                                break;
+                                            case EmploymentType.Contract:
+                                                <i class="bi bi-file-earmark-text-fill me-1" style="font-size:.7rem; color:#d35400;"></i>
+                                                break;
+                                            case EmploymentType.Temporary:
+                                                <i class="bi bi-hourglass-split me-1" style="font-size:.7rem; color:#f39c12;"></i>
+                                                break;
+                                            case EmploymentType.Casual:
+                                                <i class="bi bi-sun-fill me-1" style="font-size:.7rem; color:#27ae60;"></i>
+                                                break;
+                                            case EmploymentType.Internship:
+                                                <i class="bi bi-mortarboard-fill me-1" style="font-size:.7rem; color:#8e44ad;"></i>
+                                                break;
+                                        }
+                                        @FormatEnum(job.EmploymentType.ToString())
+                                    </span>
                                     @if (job.Category.HasValue)
                                     {
-                                        <span class="badge bg-light text-secondary border rounded-pill">@FormatEnum(job.Category.Value.ToString())</span>
+                                        <span class="badge bg-light text-secondary border rounded-pill"><i class="bi bi-tag-fill text-success me-1" style="font-size:.7rem;"></i>@FormatEnum(job.Category.Value.ToString())</span>
+                                    }
+                                    @foreach (var region in job.Regions)
+                                    {
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill" style="font-size:.7rem;"><i class="bi bi-globe2 me-1"></i>@FormatRegion(region)</span>
+                                    }
+                                    @foreach (var country in job.Countries)
+                                    {
+                                        <span class="badge bg-light text-secondary border rounded-pill" style="font-size:.75rem;" title="@country">@CountryFlag(country) @country</span>
                                     }
                                 </div>
 
@@ -597,6 +634,49 @@
     private static string FormatEnum(string value)
     {
         return Regex.Replace(value, "([A-Z])", " $1").Trim();
+    }
+
+    private static string FormatRegion(JobRegion r) => r switch
+    {
+        JobRegion.LatinAmerica  => "Latin America",
+        JobRegion.MiddleEast    => "Middle East",
+        JobRegion.NorthAmerica  => "North America",
+        _                       => r.ToString()
+    };
+
+    private static string CountryFlag(string country)
+    {
+        var code = country switch
+        {
+            "Afghanistan"          => "AF", "Albania"            => "AL", "Algeria"          => "DZ",
+            "Argentina"            => "AR", "Australia"          => "AU", "Austria"          => "AT",
+            "Bangladesh"           => "BD", "Belgium"            => "BE", "Bolivia"          => "BO",
+            "Brazil"               => "BR", "Cambodia"           => "KH", "Canada"           => "CA",
+            "Chile"                => "CL", "China"              => "CN", "Colombia"         => "CO",
+            "Croatia"              => "HR", "Czech Republic"     => "CZ", "Denmark"          => "DK",
+            "Ecuador"              => "EC", "Egypt"              => "EG", "Estonia"          => "EE",
+            "Ethiopia"             => "ET", "Finland"            => "FI", "France"           => "FR",
+            "Germany"              => "DE", "Ghana"              => "GH", "Greece"           => "GR",
+            "Guatemala"            => "GT", "Hungary"            => "HU", "India"            => "IN",
+            "Indonesia"            => "ID", "Ireland"            => "IE", "Israel"           => "IL",
+            "Italy"                => "IT", "Japan"              => "JP", "Jordan"           => "JO",
+            "Kenya"                => "KE", "Latvia"             => "LV", "Lithuania"        => "LT",
+            "Malaysia"             => "MY", "Mexico"             => "MX", "Morocco"          => "MA",
+            "Netherlands"          => "NL", "New Zealand"        => "NZ", "Nigeria"          => "NG",
+            "Norway"               => "NO", "Pakistan"           => "PK", "Panama"           => "PA",
+            "Peru"                 => "PE", "Philippines"        => "PH", "Poland"           => "PL",
+            "Portugal"             => "PT", "Romania"            => "RO", "Russia"           => "RU",
+            "Saudi Arabia"         => "SA", "Serbia"             => "RS", "Singapore"        => "SG",
+            "Slovakia"             => "SK", "Slovenia"           => "SI", "South Africa"     => "ZA",
+            "South Korea"          => "KR", "Spain"              => "ES", "Sri Lanka"        => "LK",
+            "Sweden"               => "SE", "Switzerland"        => "CH", "Taiwan"           => "TW",
+            "Thailand"             => "TH", "Turkey"             => "TR", "Ukraine"          => "UA",
+            "United Arab Emirates" => "AE", "United Kingdom"     => "GB", "United States"    => "US",
+            "Uruguay"              => "UY", "Venezuela"          => "VE", "Vietnam"          => "VN",
+            _ => null
+        };
+        if (code is null) return "🌐";
+        return string.Concat(code.Select(c => char.ConvertFromUtf32(c - 'A' + 0x1F1E6)));
     }
 
     private static string JobUrl(PublicJobListItemDto job)

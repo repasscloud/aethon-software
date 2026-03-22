@@ -27,6 +27,7 @@ using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Commands.EmailJobApplication;
 using Aethon.Application.Jobs.Commands.PublishJob;
+using Aethon.Application.Jobs.Commands.PutJobOnHold;
 using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
 using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
@@ -86,6 +87,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<PublishJobHandler>();
         services.AddScoped<CloseJobHandler>();
         services.AddScoped<ReturnJobToDraftHandler>();
+        services.AddScoped<PutJobOnHoldHandler>();
         services.AddScoped<GetJobByIdHandler>();
         services.AddScoped<GetMyOrgJobsHandler>();
         services.AddScoped<GetPublicJobsHandler>();

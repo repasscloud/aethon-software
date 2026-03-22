@@ -46,6 +46,7 @@ public sealed class AethonDbContext
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<JobSyndicationRecord> JobSyndicationRecords => Set<JobSyndicationRecord>();
+    public DbSet<Location> Locations => Set<Location>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

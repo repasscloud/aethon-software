@@ -208,11 +208,12 @@ public sealed class GetJobByIdHandler
                 "The requested job was not found.");
         }
 
-        var canView = await _organisationAccessService.CanViewJobAsync(
-            _currentUserAccessor.UserId,
-            job.OwnedByOrganisationId,
-            job.ManagedByOrganisationId,
-            cancellationToken);
+        var canView = _currentUserAccessor.IsStaff ||
+                      await _organisationAccessService.CanViewJobAsync(
+                          _currentUserAccessor.UserId,
+                          job.OwnedByOrganisationId,
+                          job.ManagedByOrganisationId,
+                          cancellationToken);
 
         if (!canView)
         {

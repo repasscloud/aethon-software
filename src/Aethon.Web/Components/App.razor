@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Aethon.Web.styles.css"]" />
     <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico"/>
     <HeadOutlet />
 </head>
 
@@ -23,14 +23,6 @@
     <script src="/lib/tinymce/tinymce.min.js"></script>
     <script src="/js/tinymce-interop.js"></script>
     <script src="/js/aethon.js"></script>
-    @{
-        var placesKey = Configuration["GooglePlaces:ApiKey"] ?? "";
-        if (!string.IsNullOrWhiteSpace(placesKey))
-        {
-            <script src="https://maps.googleapis.com/maps/api/js?key=@placesKey&libraries=places&loading=async"></script>
-            <script src="/js/locationPicker.js"></script>
-        }
-    }
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 

@@ -52,6 +52,7 @@ public sealed class GetPublicJobDetailHandler
                 j.Category,
                 j.BenefitsTags,
                 j.Regions,
+                j.Countries,
                 j.ApplicationSpecialRequirements,
                 j.ExternalApplicationUrl,
                 j.ApplicationEmail,
@@ -127,6 +128,9 @@ public sealed class GetPublicJobDetailHandler
                 : [],
             Regions = raw.Regions is not null
                 ? JsonSerializer.Deserialize<List<JobRegion>>(raw.Regions, _enumJson) ?? []
+                : [],
+            Countries = raw.Countries is not null
+                ? JsonSerializer.Deserialize<List<string>>(raw.Countries) ?? []
                 : [],
             Organisation = new PublicOrganisationProfileDto
             {

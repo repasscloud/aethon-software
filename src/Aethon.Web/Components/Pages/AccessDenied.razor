@@ -1,0 +1,13 @@
+@page "/access-denied"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Access Denied | Aethon</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh;">
+    <div class="text-center">
+        <h1 class="display-6 fw-bold mb-2">Access Denied</h1>
+        <p class="text-secondary mb-4">You do not have permission to view this page.</p>
+        <a href="/" class="btn btn-dark rounded-4 px-4">Go home</a>
+    </div>
+</div>

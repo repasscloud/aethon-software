@@ -138,6 +138,7 @@ public sealed class GetPublicJobsHandler
                 j.PublishedUtc,
                 j.Category,
                 j.Regions,
+                j.Countries,
                 j.BenefitsTags,
                 j.IsHighlighted,
                 j.IsImmediateStart,
@@ -184,6 +185,9 @@ public sealed class GetPublicJobsHandler
                 Category = j.Category,
                 Regions = j.Regions is not null
                     ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions, enumJson) ?? []
+                    : [],
+                Countries = j.Countries is not null
+                    ? JsonSerializer.Deserialize<List<string>>(j.Countries) ?? []
                     : [],
                 BenefitsTags = j.BenefitsTags is not null
                     ? JsonSerializer.Deserialize<List<string>>(j.BenefitsTags) ?? []

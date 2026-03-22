@@ -5,6 +5,7 @@ using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
 using Aethon.Application.Jobs.Commands.PublishJob;
+using Aethon.Application.Jobs.Commands.PutJobOnHold;
 using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
 using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
@@ -133,6 +134,15 @@ public static class JobEndpoints
 
         group.MapPost("/{jobId:guid}/return-to-draft", async (
             [FromServices] ReturnJobToDraftHandler handler,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        group.MapPost("/{jobId:guid}/put-on-hold", async (
+            [FromServices] PutJobOnHoldHandler handler,
             Guid jobId,
             CancellationToken ct) =>
         {
