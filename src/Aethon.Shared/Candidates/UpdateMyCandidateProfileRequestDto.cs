@@ -59,6 +59,8 @@ public sealed class UpdateMyCandidateProfileRequestDto : IValidatableObject
     [MaxLength(200)]
     public string? Slug { get; set; }
 
+    public ProfileVisibility ProfileVisibility { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (DesiredSalaryFrom.HasValue && DesiredSalaryFrom.Value < 0)

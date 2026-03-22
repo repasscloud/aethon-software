@@ -1,4 +1,5 @@
 using Aethon.Application.Abstractions.Authentication;
+using Aethon.Shared.Enums;
 using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Caching;
@@ -71,8 +72,27 @@ public sealed class UpsertMyCandidateProfileHandler
                 "Desired salary currency is required when salary is provided.");
         }
 
+        if (command.ProfileVisibility == ProfileVisibility.Public && string.IsNullOrWhiteSpace(command.Slug))
+        {
+            return Result<CandidateProfileDto>.Failure(
+                "candidates.profile.slug_required_for_public",
+                "A profile URL slug is required before setting your profile to Public.");
+        }
+
         var currentUserId = _currentUserAccessor.UserId;
         var utcNow = _dateTimeProvider.UtcNow;
+
+        // Slug uniqueness check (exclude current user's own profile)
+        if (!string.IsNullOrWhiteSpace(command.Slug))
+        {
+            var normalised = command.Slug.Trim().ToLowerInvariant();
+            var slugTaken = await _dbContext.JobSeekerProfiles
+                .AnyAsync(p => p.Slug == normalised && p.UserId != currentUserId, cancellationToken);
+            if (slugTaken)
+                return Result<CandidateProfileDto>.Failure(
+                    "candidates.profile.slug_taken",
+                    "This profile URL is already in use. Please choose a different one.");
+        }
 
         var profile = await _dbContext.JobSeekerProfiles
             .Include(x => x.Resumes)
@@ -114,7 +134,8 @@ public sealed class UpsertMyCandidateProfileHandler
         profile.WillRelocate = command.WillRelocate;
         profile.RequiresSponsorship = command.RequiresSponsorship;
         profile.HasWorkRights = command.HasWorkRights;
-        profile.IsPublicProfileEnabled = command.IsPublicProfileEnabled;
+        profile.ProfileVisibility = command.ProfileVisibility;
+        profile.IsPublicProfileEnabled = command.ProfileVisibility == ProfileVisibility.Public;
         profile.IsSearchable = command.IsSearchable;
         profile.Slug = Normalize(command.Slug);
         profile.LastProfileUpdatedUtc = utcNow;
@@ -155,6 +176,7 @@ public sealed class UpsertMyCandidateProfileHandler
             IsPublicProfileEnabled = profile.IsPublicProfileEnabled,
             IsSearchable = profile.IsSearchable,
             Slug = profile.Slug,
+            ProfileVisibility = profile.ProfileVisibility,
             LastProfileUpdatedUtc = profile.LastProfileUpdatedUtc,
             Resumes = profile.Resumes
                 .OrderByDescending(x => x.IsDefault)

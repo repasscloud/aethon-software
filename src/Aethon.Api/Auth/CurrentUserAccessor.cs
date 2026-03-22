@@ -28,6 +28,9 @@ public sealed class CurrentUserAccessor : ICurrentUserAccessor
         }
     }
 
+    public string? AppType =>
+        _httpContextAccessor.HttpContext?.User?.FindFirstValue("aethon:app_type");
+
     public Guid UserId
     {
         get

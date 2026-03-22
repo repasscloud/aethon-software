@@ -35,4 +35,6 @@ public sealed class UpsertMyCandidateProfileCommand
     public bool IsSearchable { get; init; }
 
     public string? Slug { get; init; }
+
+    public ProfileVisibility ProfileVisibility { get; init; }
 }

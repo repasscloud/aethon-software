@@ -1,9 +1,12 @@
 using Aethon.Api.Common;
+using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Candidates.Commands.TriggerResumeAnalysis;
 using Aethon.Application.Candidates.Commands.UpsertMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetMyCandidateProfile;
 using Aethon.Application.Candidates.Queries.GetResumeAnalysis;
+using Aethon.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Endpoints.Candidates;
 
@@ -41,6 +44,23 @@ public static class CandidateEndpoints
         {
             var result = await handler.HandleAsync(resumeId, ct);
             return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/me/profile/check-slug?slug=...
+        group.MapGet("/profile/check-slug", async (
+            AethonDbContext db,
+            ICurrentUserAccessor currentUser,
+            string slug,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(slug))
+                return Results.BadRequest(new { available = false, message = "Slug is required." });
+
+            var normalised = slug.Trim().ToLowerInvariant();
+            var taken = await db.JobSeekerProfiles
+                .AnyAsync(p => p.Slug == normalised && p.UserId != currentUser.UserId, ct);
+
+            return Results.Ok(new { available = !taken, slug = normalised });
         });
 
         group.MapPut("/profile", async (

@@ -4,6 +4,7 @@ using Aethon.Application.Jobs.Commands.EmailJobApplication;
 using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
 using Aethon.Application.Jobs.Queries.GetPublicJobLocations;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
+using Aethon.Application.Candidates.Queries.GetPublicJobSeekerProfile;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
 using Aethon.Data;
 using Aethon.Shared.Enums;
@@ -57,6 +58,17 @@ public static class PublicEndpoints
                 .ToListAsync(ct);
 
             return Results.Ok(results);
+        });
+
+        // GET /api/v1/public/job-seekers/{identifier}
+        // identifier = slug (Public only) or userId GUID (access rules enforced by handler)
+        group.MapGet("/job-seekers/{identifier}", async (
+            [FromServices] GetPublicJobSeekerProfileHandler handler,
+            string identifier,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(identifier, ct);
+            return result.ToMinimalApiResult();
         });
 
         // GET /api/v1/public/organisations/{slug}

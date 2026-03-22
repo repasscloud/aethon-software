@@ -71,6 +71,11 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
         builder.Property(x => x.AboutMe)
             .HasMaxLength(2000);
 
+        builder.Property(x => x.ProfileVisibility)
+            .IsRequired()
+            .HasSentinel(Aethon.Shared.Enums.ProfileVisibility.Private)
+            .HasDefaultValue(Aethon.Shared.Enums.ProfileVisibility.Private);
+
         builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
 

@@ -25,8 +25,18 @@ else
     <div class="d-flex flex-column gap-4">
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
-                <h1 class="h3 fw-bold mb-2">Job seeker profile</h1>
-                <p class="text-secondary mb-0">Manage your profile and resume.</p>
+                <div class="d-flex align-items-center gap-3">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">Job seeker profile</h1>
+                        <p class="text-secondary mb-0">Manage your profile and resume.</p>
+                    </div>
+                    @if (_model.OpenToWork)
+                    {
+                        <span class="badge bg-success rounded-pill ms-auto" style="font-size:.85rem;">
+                            <i class="bi bi-briefcase-fill me-1"></i>Open to work
+                        </span>
+                    }
+                </div>
             </div>
         </div>
 
@@ -40,41 +50,52 @@ else
             <div class="alert alert-danger rounded-4 mb-0">@_error</div>
         }
 
+        <!-- Profile details -->
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Profile details</h2>
                 <EditForm Model="_model" OnValidSubmit="SaveAsync">
                     <DataAnnotationsValidator />
 
                     <div class="row g-3">
                         <div class="col-12">
                             <label class="form-label fw-semibold">Headline</label>
-                            <InputText @bind-Value="_model.Headline" class="form-control rounded-4" />
+                            <InputText @bind-Value="_model.Headline" class="form-control rounded-4" placeholder="e.g. Senior .NET Developer | Azure | Blazor" />
                         </div>
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Summary</label>
-                            <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="5" />
+                            <RichTextEditor Value="@(_model.Summary ?? "")" ValueChanged="v => _model.Summary = string.IsNullOrWhiteSpace(v) ? null : v" />
                         </div>
 
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Current location</label>
-                            <InputText @bind-Value="_model.CurrentLocation" class="form-control rounded-4" />
+                            <LocationPicker
+                                LocationText="@_model.CurrentLocation"
+                                LocationTextChanged="v => _model.CurrentLocation = v"
+                                Placeholder="Start typing a city or location…" />
                         </div>
 
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Preferred location</label>
-                            <InputText @bind-Value="_model.PreferredLocation" class="form-control rounded-4" />
+                            <LocationPicker
+                                LocationText="@_model.PreferredLocation"
+                                LocationTextChanged="v => _model.PreferredLocation = v"
+                                Placeholder="Start typing a preferred location…" />
                         </div>
 
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">LinkedIn URL</label>
-                            <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-4" />
+                            <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-4" placeholder="https://linkedin.com/in/yourprofile" />
                         </div>
 
                         <div class="col-12">
                             <div class="form-check">
-                                <InputCheckbox @bind-Value="_model.OpenToWork" class="form-check-input" />
-                                <label class="form-check-label">Open to work</label>
+                                <InputCheckbox @bind-Value="_model.OpenToWork" class="form-check-input" id="openToWorkCheck" />
+                                <label class="form-check-label" for="openToWorkCheck">
+                                    Open to work
+                                    <span class="text-secondary small ms-2">— displays a badge on your public/unlisted profile</span>
+                                </label>
                             </div>
                         </div>
 
@@ -110,6 +131,89 @@ else
             </div>
         </div>
 
+        <!-- Privacy & public profile -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-1">Privacy &amp; public profile</h2>
+                <p class="text-secondary small mb-3">Control who can see your profile.</p>
+
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Profile visibility</label>
+                        <select class="form-select rounded-4" @bind="_model.ProfileVisibility">
+                            <option value="@ProfileVisibility.Private">Private — only you and Aethon staff</option>
+                            <option value="@ProfileVisibility.Unlisted">Unlisted — employers &amp; recruiters via job applications</option>
+                            @if (_slugConfirmed)
+                            {
+                                <option value="@ProfileVisibility.Public">Public — anyone with the link or URL</option>
+                            }
+                        </select>
+                        @if (_model.ProfileVisibility == ProfileVisibility.Public && !_slugConfirmed)
+                        {
+                            <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>You must confirm a profile URL before setting your profile to Public.</div>
+                        }
+                        <div class="form-text text-secondary mt-2">
+                            @if (_model.ProfileVisibility == ProfileVisibility.Private)
+                            {
+                                <span><i class="bi bi-lock-fill me-1"></i>Your profile is private and cannot be viewed by anyone else.</span>
+                            }
+                            else if (_model.ProfileVisibility == ProfileVisibility.Unlisted)
+                            {
+                                <span><i class="bi bi-eye-slash-fill me-1"></i>Your profile is accessible at <code>/job-seeker/@_profile?.UserId</code> — employers and recruiters can view it from your job applications.</span>
+                            }
+                            else if (_model.ProfileVisibility == ProfileVisibility.Public && _slugConfirmed)
+                            {
+                                <span><i class="bi bi-globe2 me-1"></i>Your public profile URL: <a href="/job-seeker/@_model.Slug" target="_blank">/job-seeker/@_model.Slug</a></span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-5">
+                        <label class="form-label fw-semibold">Profile URL slug <span class="text-secondary fw-normal">(required for Public)</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text rounded-start-4 text-secondary" style="font-size:.85rem;">/job-seeker/</span>
+                            <input type="text" class="form-control"
+                                   placeholder="your-name"
+                                   value="@_model.Slug"
+                                   @oninput="OnSlugInput"
+                                   style="text-transform:lowercase;" />
+                            <button class="btn btn-outline-secondary rounded-end-4"
+                                    type="button"
+                                    @onclick="CheckSlugAsync"
+                                    disabled="@(string.IsNullOrWhiteSpace(_model.Slug) || _checkingSlug)">
+                                @(_checkingSlug ? "Checking…" : "Check availability")
+                            </button>
+                        </div>
+                        @if (_slugMessage is not null)
+                        {
+                            <div class="form-text @(_slugConfirmed ? "text-success" : "text-danger")">
+                                @if (_slugConfirmed)
+                                {
+                                    <i class="bi bi-check-circle-fill me-1"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-x-circle-fill me-1"></i>
+                                }
+                                @_slugMessage
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-text text-secondary">Use lowercase letters, numbers, and hyphens only.</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn btn-dark rounded-4 px-4" @onclick="SavePrivacyAsync" disabled="@_savingPrivacy">
+                        @(_savingPrivacy ? "Saving..." : "Save privacy settings")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resume -->
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
                 <h2 class="h5 fw-bold mb-3">Resume</h2>
@@ -226,10 +330,14 @@ else
 @code {
     private bool _loaded;
     private bool _savingProfile;
+    private bool _savingPrivacy;
     private bool _uploadingResume;
     private bool _triggeringAnalysis;
+    private bool _checkingSlug;
+    private bool _slugConfirmed;
     private string? _message;
     private string? _error;
+    private string? _slugMessage;
     private CandidateProfileDto? _profile;
     private UpdateJobSeekerProfileRequestDto _model = new();
     private StoredFileDto? _resumeFile;
@@ -237,10 +345,7 @@ else
     private Guid? _activeResumeId;
     private ResumeAnalysisDto? _analysis;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -253,16 +358,25 @@ else
             {
                 _model = new UpdateJobSeekerProfileRequestDto
                 {
-                    Headline = _profile.Headline,
-                    Summary = _profile.Summary,
-                    CurrentLocation = _profile.CurrentLocation,
-                    PreferredLocation = _profile.PreferredLocation,
-                    LinkedInUrl = _profile.LinkedInUrl,
-                    OpenToWork = _profile.OpenToWork,
-                    DesiredSalaryFrom = _profile.DesiredSalaryFrom,
-                    DesiredSalaryTo = _profile.DesiredSalaryTo,
-                    DesiredSalaryCurrency = _profile.DesiredSalaryCurrency
+                    Headline             = _profile.Headline,
+                    Summary              = _profile.Summary,
+                    CurrentLocation      = _profile.CurrentLocation,
+                    PreferredLocation    = _profile.PreferredLocation,
+                    LinkedInUrl          = _profile.LinkedInUrl,
+                    OpenToWork           = _profile.OpenToWork,
+                    DesiredSalaryFrom    = _profile.DesiredSalaryFrom,
+                    DesiredSalaryTo      = _profile.DesiredSalaryTo,
+                    DesiredSalaryCurrency = _profile.DesiredSalaryCurrency,
+                    IsPublicProfileEnabled = _profile.IsPublicProfileEnabled,
+                    IsSearchable         = _profile.IsSearchable,
+                    Slug                 = _profile.Slug,
+                    ProfileVisibility    = _profile.ProfileVisibility
                 };
+
+                // A slug loaded from the server is already confirmed
+                _slugConfirmed = !string.IsNullOrWhiteSpace(_profile.Slug);
+                if (_slugConfirmed)
+                    _slugMessage = $"'{_profile.Slug}' is your current profile URL.";
 
                 var resume = _profile.Resumes.FirstOrDefault(r => r.IsDefault && r.IsActive)
                              ?? _profile.Resumes.FirstOrDefault(r => r.IsActive);
@@ -291,9 +405,90 @@ else
         }
     }
 
+    private void OnSlugInput(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? "";
+        // Normalise: lowercase, replace spaces with hyphens, strip other invalid chars
+        _model.Slug = System.Text.RegularExpressions.Regex.Replace(raw.ToLowerInvariant().Replace(' ', '-'), @"[^a-z0-9\-]", "");
+        _slugConfirmed = false;
+        _slugMessage = null;
+    }
+
+    private async Task CheckSlugAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Slug)) return;
+        _checkingSlug = true;
+        _slugMessage = null;
+        _slugConfirmed = false;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<SlugCheckResult>(
+                $"/api/v1/me/profile/check-slug?slug={Uri.EscapeDataString(_model.Slug)}",
+                AethonApiClient.JsonOptions);
+
+            if (result?.Available == true)
+            {
+                _slugConfirmed = true;
+                _model.Slug = result.Slug; // use server-normalised value
+                _slugMessage = $"'{result.Slug}' is available!";
+            }
+            else
+            {
+                _slugMessage = $"'{_model.Slug}' is already taken. Please choose a different URL.";
+            }
+        }
+        catch
+        {
+            _slugMessage = "Could not check slug availability. Please try again.";
+        }
+        finally
+        {
+            _checkingSlug = false;
+        }
+    }
+
     private async Task SaveAsync()
     {
         _savingProfile = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            // Only save profile fields (not privacy settings) — include slug/visibility for round-trip
+            var response = await client.PutAsJsonAsync("/api/v1/me/profile", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Profile saved.";
+                return;
+            }
+
+            _error = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_error)) _error = "Could not save profile.";
+        }
+        catch
+        {
+            _error = "Could not save profile.";
+        }
+        finally
+        {
+            _savingProfile = false;
+        }
+    }
+
+    private async Task SavePrivacyAsync()
+    {
+        if (_model.ProfileVisibility == ProfileVisibility.Public && !_slugConfirmed)
+        {
+            _error = "Please confirm your profile URL before setting your profile to Public.";
+            return;
+        }
+
+        _savingPrivacy = true;
         _message = null;
         _error = null;
 
@@ -304,23 +499,21 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                _message = "Profile saved.";
+                _message = "Privacy settings saved.";
+                await LoadAsync();
                 return;
             }
 
             _error = await response.Content.ReadAsStringAsync();
-            if (string.IsNullOrWhiteSpace(_error))
-            {
-                _error = "Could not save profile.";
-            }
+            if (string.IsNullOrWhiteSpace(_error)) _error = "Could not save privacy settings.";
         }
         catch
         {
-            _error = "Could not save profile.";
+            _error = "Could not save privacy settings.";
         }
         finally
         {
-            _savingProfile = false;
+            _savingPrivacy = false;
         }
     }
 
@@ -364,10 +557,7 @@ else
 
     private async Task UploadResumeAsync()
     {
-        if (_selectedResume is null)
-        {
-            return;
-        }
+        if (_selectedResume is null) return;
 
         _uploadingResume = true;
         _message = null;
@@ -413,7 +603,6 @@ else
                 DownloadUrl = uploaded.DownloadUrl
             };
 
-            // Reload profile to get the new resume ID for analysis
             await LoadAsync();
             _message = "Resume uploaded. Analysis has been queued automatically.";
             _selectedResume = null;
@@ -427,4 +616,6 @@ else
             _uploadingResume = false;
         }
     }
+
+    private sealed record SlugCheckResult(bool Available, string Slug);
 }

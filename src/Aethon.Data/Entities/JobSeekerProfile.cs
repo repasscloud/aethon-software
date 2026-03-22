@@ -145,6 +145,14 @@ public class JobSeekerProfile : EntityBase
     public string? AboutMe { get; set; }
 
     /// <summary>
+    /// Controls who can view the candidate's profile.
+    /// Public = accessible at /job-seeker/{slug} (requires slug).
+    /// Unlisted = accessible at /job-seeker/{userId} by employers/recruiters/admins.
+    /// Private = accessible only by admin/support.
+    /// </summary>
+    public ProfileVisibility ProfileVisibility { get; set; } = ProfileVisibility.Private;
+
+    /// <summary>
     /// When the candidate profile was last meaningfully updated.
     /// Useful for profile freshness and search ranking later.
     /// </summary>

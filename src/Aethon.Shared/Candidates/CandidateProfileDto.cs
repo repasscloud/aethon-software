@@ -36,6 +36,7 @@ public sealed class CandidateProfileDto
     public bool IsPublicProfileEnabled { get; set; }
     public bool IsSearchable { get; set; }
     public string? Slug { get; set; }
+    public ProfileVisibility ProfileVisibility { get; set; }
 
     public DateTime? LastProfileUpdatedUtc { get; set; }
 

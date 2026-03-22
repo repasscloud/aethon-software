@@ -87,6 +87,7 @@ public sealed class GetMyCandidateProfileHandler
                     IsPublicProfileEnabled = profile.IsPublicProfileEnabled,
                     IsSearchable = profile.IsSearchable,
                     Slug = profile.Slug,
+                    ProfileVisibility = profile.ProfileVisibility,
                     LastProfileUpdatedUtc = profile.LastProfileUpdatedUtc,
                     Resumes = profile.Resumes
                         .OrderByDescending(x => x.IsDefault)
