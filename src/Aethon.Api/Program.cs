@@ -41,8 +41,9 @@ services
     {
         options.User.RequireUniqueEmail = true;
     })
-    .AddRoles<IdentityRole<Guid>>()
-    .AddEntityFrameworkStores<AethonDbContext>();
+    .AddRoles<ApplicationRole>()
+    .AddEntityFrameworkStores<AethonDbContext>()
+    .AddDefaultTokenProviders();
 
 services.AddAethonAuth(configuration);
 
@@ -86,6 +87,50 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AethonDbContext>();
     db.Database.Migrate();
+
+    // Seed SuperAdmin role and admin account
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+    const string superAdminRole = "SuperAdmin";
+    const string adminRole = "Admin";
+    const string supportRole = "Support";
+    const string adminEmail = "aethon@localhost.com";
+    const string adminPassword = "Aethon@Admin2026!";
+
+    foreach (var role in new[] { superAdminRole, adminRole, supportRole })
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+            await roleManager.CreateAsync(new ApplicationRole { Name = role });
+    }
+
+    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+    if (adminUser is null)
+    {
+        adminUser = new ApplicationUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = adminEmail,
+            Email = adminEmail,
+            DisplayName = "Aethon Admin",
+            UserType = Aethon.Shared.Enums.UserAccountType.Admin,
+            IsEnabled = true,
+            EmailConfirmed = true
+        };
+        await userManager.CreateAsync(adminUser, adminPassword);
+        await userManager.AddToRoleAsync(adminUser, superAdminRole);
+    }
+    else
+    {
+        // Fix existing seed that may have wrong UserType
+        if (adminUser.UserType != Aethon.Shared.Enums.UserAccountType.Admin)
+        {
+            adminUser.UserType = Aethon.Shared.Enums.UserAccountType.Admin;
+            await userManager.UpdateAsync(adminUser);
+        }
+        if (!await userManager.IsInRoleAsync(adminUser, superAdminRole))
+            await userManager.AddToRoleAsync(adminUser, superAdminRole);
+    }
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();

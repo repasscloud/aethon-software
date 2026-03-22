@@ -40,7 +40,7 @@ public sealed class ReturnJobToDraftHandler
         if (!canEdit)
             return Result.Failure("jobs.forbidden", "Insufficient permissions to modify this job.");
 
-        if (job.Status is JobStatus.Closed or JobStatus.Cancelled)
+        if (job.Status is JobStatus.Cancelled)
             return Result.Failure("jobs.invalid_status", $"Cannot return a '{job.Status}' job to draft.");
 
         job.Status = JobStatus.Draft;

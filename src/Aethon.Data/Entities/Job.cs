@@ -251,6 +251,38 @@ public class Job : EntityBase
     /// <summary>Free-text special requirements for applicants.</summary>
     public string? ApplicationSpecialRequirements { get; set; }
 
+    // ─── Pay & commission ─────────────────────────────────────────────────────
+
+    /// <summary>Whether the role includes a commission component.</summary>
+    public bool HasCommission { get; set; }
+
+    /// <summary>Lower bound of the OTE (On Target Earnings = base + commission).</summary>
+    public decimal? OteFrom { get; set; }
+
+    /// <summary>Upper bound of the OTE.</summary>
+    public decimal? OteTo { get; set; }
+
+    // ─── Job flags ────────────────────────────────────────────────────────────
+
+    /// <summary>Whether the role is available for an immediate start.</summary>
+    public bool IsImmediateStart { get; set; }
+
+    // ─── Media ────────────────────────────────────────────────────────────────
+
+    /// <summary>YouTube video ID for an optional job video embed (mutually exclusive with VimeoVideoId).</summary>
+    public string? VideoYouTubeId { get; set; }
+
+    /// <summary>Vimeo video ID for an optional job video embed (mutually exclusive with VideoYouTubeId).</summary>
+    public string? VideoVimeoId { get; set; }
+
+    // ─── Screening questions ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// JSON-serialised ScreeningConfig — employer-configured screening questions
+    /// and per-question acceptable answers.  Null means no screening questions.
+    /// </summary>
+    public string? ScreeningQuestionsJson { get; set; }
+
     // ─── ATS / search ────────────────────────────────────────────────────────
 
     /// <summary>Comma-separated or space-separated keywords used for ATS matching.</summary>

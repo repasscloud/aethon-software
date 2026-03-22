@@ -1,0 +1,58 @@
+@page "/info/equal-opportunity-employer"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Equal Opportunity Employer | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4" style="max-width:720px; margin:0 auto;">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span style="font-size:2.5rem;"><i class="bi bi-people-fill text-success"></i></span>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Equal Opportunity Employer</h1>
+                    <div class="text-secondary">What this means for you as a candidate</div>
+                </div>
+            </div>
+
+            <p class="lead text-secondary mb-4">
+                Employers who display this badge have certified that they are committed to fair and
+                non-discriminatory hiring practices.
+            </p>
+
+            <h2 class="h5 fw-bold mb-3">What it means</h2>
+            <p>An Equal Opportunity Employer (EOE) is an organisation that does not discriminate
+            against job applicants or employees on the basis of:</p>
+            <ul class="mb-4">
+                <li>Race, colour, ethnicity, or national origin</li>
+                <li>Gender, gender identity, or gender expression</li>
+                <li>Age</li>
+                <li>Religion or belief</li>
+                <li>Disability or health condition</li>
+                <li>Sexual orientation</li>
+                <li>Marital or family status</li>
+                <li>Pregnancy or parental status</li>
+                <li>Political opinion</li>
+                <li>Any other characteristic protected by applicable law</li>
+            </ul>
+
+            <h2 class="h5 fw-bold mb-3">What this means in practice</h2>
+            <ul class="mb-4">
+                <li>Hiring decisions are based on skills, qualifications, and experience</li>
+                <li>All candidates receive fair and consistent consideration</li>
+                <li>The workplace is free from discrimination, bias, and harassment</li>
+                <li>Reasonable adjustments are made where required</li>
+            </ul>
+
+            <div class="alert alert-success rounded-4 mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                This certification is self-declared by the employer. If you have concerns about
+                discriminatory practices, you are encouraged to report them to the relevant
+                equal opportunity authority in your jurisdiction.
+            </div>
+        </div>
+    </div>
+    <div class="text-center">
+        <button onclick="history.back()" class="btn btn-outline-dark rounded-4 px-4"><i class="bi bi-arrow-left me-2"></i>Go back</button>
+    </div>
+</div>

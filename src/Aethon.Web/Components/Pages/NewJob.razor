@@ -38,7 +38,7 @@
                     </div>
 
                     <div class="col-12 col-lg-4">
-                        <label class="form-label fw-semibold">Category</label>
+                        <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
                         <InputSelect @bind-Value="_model.Category" class="form-select rounded-4">
                             <option value="">Select category</option>
                             <option value="@JobCategory.Accounting">Accounting</option>
@@ -92,14 +92,25 @@
                         </InputSelect>
                     </div>
 
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Summary <span class="text-danger">*</span></label>
+                        <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="3"
+                                       placeholder="A brief overview of the role that will appear in search results (50–300 characters)" maxlength="300" />
+                        <div class="d-flex justify-content-between">
+                            <ValidationMessage For="@(() => _model.Summary)" />
+                            <div class="form-text text-end">@(_model.Summary?.Length ?? 0)/300</div>
+                        </div>
+                    </div>
+
                     <div class="col-12 col-lg-4">
                         <label class="form-label fw-semibold">Department</label>
                         <InputText @bind-Value="_model.Department" class="form-control rounded-4" placeholder="e.g. Engineering, Finance, Marketing" />
                     </div>
 
                     <div class="col-12 col-lg-4">
-                        <label class="form-label fw-semibold">Location</label>
+                        <label class="form-label fw-semibold">Location <span class="text-danger">*</span></label>
                         <InputText @bind-Value="_model.LocationText" class="form-control rounded-4" placeholder="e.g. Sydney NSW" />
+                        <ValidationMessage For="@(() => _model.LocationText)" />
                     </div>
 
                     <div class="col-12 col-lg-4">
@@ -125,6 +136,16 @@
                             <option value="@EmploymentType.Internship">Internship</option>
                         </InputSelect>
                         <ValidationMessage For="@(() => _model.EmploymentType)" />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.IsImmediateStart" class="form-check-input" id="immediateStartCheck" />
+                            <label class="form-check-label" for="immediateStartCheck">
+                                <span class="fw-semibold">Immediate Start</span>
+                                <span class="text-secondary ms-1 small">— this role is available to start right away (shown as a green badge on listings)</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -192,15 +213,13 @@
                 <h2 class="h5 fw-bold mb-3">Compensation</h2>
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-lg-3">
-                        <label class="form-label fw-semibold">Salary from <span class="text-danger">*</span></label>
-                        <InputNumber @bind-Value="_model.SalaryFrom" class="form-control rounded-4" />
-                        <ValidationMessage For="@(() => _model.SalaryFrom)" />
+                        <label class="form-label fw-semibold">Salary from</label>
+                        <InputNumber @bind-Value="_model.SalaryFrom" class="form-control rounded-4" placeholder="e.g. 80000" />
                     </div>
 
                     <div class="col-12 col-lg-3">
-                        <label class="form-label fw-semibold">Salary to <span class="text-danger">*</span></label>
-                        <InputNumber @bind-Value="_model.SalaryTo" class="form-control rounded-4" />
-                        <ValidationMessage For="@(() => _model.SalaryTo)" />
+                        <label class="form-label fw-semibold">Salary to</label>
+                        <InputNumber @bind-Value="_model.SalaryTo" class="form-control rounded-4" placeholder="e.g. 100000" />
                     </div>
 
                     <div class="col-12 col-lg-3">
@@ -214,6 +233,7 @@
                             <option value="@CurrencyCode.NZD">NZD</option>
                         </InputSelect>
                     </div>
+
                     <div class="col-12 col-lg-3">
                         <label class="form-label fw-semibold">Status</label>
                         <InputSelect @bind-Value="_model.Status" class="form-select rounded-4">
@@ -221,24 +241,56 @@
                             <option value="@JobStatus.Published">Published</option>
                         </InputSelect>
                     </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.HasCommission" class="form-check-input" id="commissionCheck" />
+                            <label class="form-check-label" for="commissionCheck">
+                                <span class="fw-semibold">This role includes commission / variable pay</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    @if (_model.HasCommission)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">OTE from <span class="text-secondary small">(On-Target Earnings)</span></label>
+                            <InputNumber @bind-Value="_model.OteFrom" class="form-control rounded-4" placeholder="e.g. 120000" />
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">OTE to</label>
+                            <InputNumber @bind-Value="_model.OteTo" class="form-control rounded-4" placeholder="e.g. 160000" />
+                        </div>
+                        <div class="col-12 col-lg-4 d-flex align-items-end">
+                            <div class="form-text mb-2">OTE = base salary + full commission at target. Leave blank to just show "+ Commission".</div>
+                        </div>
+                    }
                 </div>
 
                 <!-- ── Benefits tags ─────────────────────────────────────── -->
                 <h2 class="h5 fw-bold mb-3">Benefit tags</h2>
-                <div class="row g-2 mb-4">
-                    @foreach (var benefit in _allBenefits)
-                    {
-                        <div class="col-6 col-md-4 col-lg-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox"
-                                       id="benefit-@benefit.Replace(" ", "-").ToLower()"
-                                       checked="@_model.BenefitsTags.Contains(benefit)"
-                                       @onchange="e => ToggleBenefit(benefit, (bool)(e.Value ?? false))" />
-                                <label class="form-check-label small" for="benefit-@benefit.Replace(" ", "-").ToLower()">@benefit</label>
-                            </div>
+                @foreach (var group in _benefitGroups)
+                {
+                    <div class="mb-3">
+                        <div class="small fw-semibold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;">@group.Key</div>
+                        <div class="row g-1">
+                            @foreach (var benefit in group.Value)
+                            {
+                                var benefitId = $"benefit-{benefit.Replace(" ", "-").Replace("(", "").Replace(")", "").Replace("/", "").Replace("+", "").ToLower()}";
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="@benefitId"
+                                               checked="@_model.BenefitsTags.Contains(benefit)"
+                                               @onchange="e => ToggleBenefit(benefit, (bool)(e.Value ?? false))" />
+                                        <label class="form-check-label small" for="@benefitId">@benefit</label>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    }
-                </div>
+                    </div>
+                }
+                <div class="mb-4"></div>
 
                 <!-- ── Application options ──────────────────────────────── -->
                 <h2 class="h5 fw-bold mb-3">Application options</h2>
@@ -288,6 +340,96 @@
                         <div class="form-text">Job will be hidden from public after this date.</div>
                     </div>
                 </div>
+
+                <!-- ── Video ────────────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-1">Video</h2>
+                <p class="text-secondary small mb-3">Embed a short video to showcase the role or your workplace. Only one video source can be used.</p>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold"><i class="bi bi-youtube me-1 text-danger"></i>YouTube video ID</label>
+                        <InputText @bind-Value="_model.VideoYouTubeId" class="form-control rounded-4" placeholder="e.g. dQw4w9WgXcQ"
+                                   disabled="@(!string.IsNullOrWhiteSpace(_model.VideoVimeoId))" />
+                        <div class="form-text">The ID from the YouTube URL: youtube.com/watch?v=<strong>ID</strong></div>
+                        <ValidationMessage For="@(() => _model.VideoYouTubeId)" />
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold"><i class="bi bi-camera-video me-1 text-info"></i>Vimeo video ID</label>
+                        <InputText @bind-Value="_model.VideoVimeoId" class="form-control rounded-4" placeholder="e.g. 123456789"
+                                   disabled="@(!string.IsNullOrWhiteSpace(_model.VideoYouTubeId))" />
+                        <div class="form-text">The numeric ID from the Vimeo URL: vimeo.com/<strong>ID</strong></div>
+                        <ValidationMessage For="@(() => _model.VideoVimeoId)" />
+                    </div>
+                </div>
+
+                <!-- ── Screening questions ───────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-1">Screening questions</h2>
+                <p class="text-secondary small mb-3">Configure questions applicants must answer when applying via the internal ATS. These questions do not appear for email or external URL applications.</p>
+
+                <div class="form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="sqAutoTag"
+                           checked="@_screening.AutoTagNotSuitable"
+                           @onchange="e => _screening.AutoTagNotSuitable = (bool)e.Value!" />
+                    <label class="form-check-label" for="sqAutoTag">Automatically tag applications that don't meet must-have requirements as "Not Suitable"</label>
+                </div>
+
+                @{
+                    var _sqCountry = _model.Countries?.Count == 1 ? _model.Countries[0] : "";
+                    var _sqIndustry = _model.Category.HasValue ? FormatCategory(_model.Category.Value) : "";
+                    var _sqWrLabel = string.IsNullOrEmpty(_sqCountry) ? "Right to work" : $"Right to work in {_sqCountry}";
+                    var _sqYeLabel = string.IsNullOrEmpty(_sqIndustry) ? "Years of experience" : $"Years of experience in {_sqIndustry}";
+                    var _sqQualLabel = string.IsNullOrEmpty(_sqIndustry) ? "Relevant qualification" : $"Qualification in {_sqIndustry}";
+                }
+
+                @SqSimpleBlock("sqWr", _sqWrLabel, _screening.WorkRights, _workRightsAnswers)
+                @SqSimpleBlock("sqYe", _sqYeLabel, _screening.YearsExperience, _yearsExpAnswers)
+
+                @* ── Salary (special: AcceptableMaxSalary) ── *@
+                <div class="border rounded-4 p-3 mb-2">
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                        <span class="fw-semibold small">Expected annual base salary</span>
+                        <div class="d-flex gap-3 flex-shrink-0">
+                            <div class="form-check form-switch mb-0">
+                                <input type="checkbox" class="form-check-input" id="sqSalEn"
+                                       checked="@_screening.Salary.Enabled"
+                                       @onchange="e => _screening.Salary.Enabled = (bool)e.Value!" />
+                                <label class="form-check-label small" for="sqSalEn">Include</label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input type="checkbox" class="form-check-input" id="sqSalMh"
+                                       disabled="@(!_screening.Salary.Enabled)"
+                                       checked="@(_screening.Salary.Enabled && _screening.Salary.IsMustHave)"
+                                       @onchange="e => _screening.Salary.IsMustHave = (bool)e.Value!" />
+                                <label class="form-check-label small" for="sqSalMh">Must-have</label>
+                            </div>
+                        </div>
+                    </div>
+                    @if (_screening.Salary.Enabled && _screening.Salary.IsMustHave)
+                    {
+                        <div class="col-12 col-lg-4 mt-2">
+                            <label class="form-label small text-secondary">Maximum acceptable salary</label>
+                            <select class="form-select form-select-sm rounded-4"
+                                    value="@_screening.Salary.AcceptableMaxSalary"
+                                    @onchange="e => _screening.Salary.AcceptableMaxSalary = e.Value?.ToString()">
+                                <option value="">Select max salary</option>
+                                @foreach (var opt in _salaryOptions)
+                                {
+                                    <option value="@opt">@opt</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                @SqSimpleBlock("sqNp", "Notice period", _screening.NoticePeriod, _noticePeriodAnswers)
+                @SqSimpleBlock("sqPc", "Police check", _screening.PoliceCheck, _policeCheckAnswers)
+                @SqSimpleBlock("sqWwc", "Working with Children Check", _screening.WorkingWithChildren, _wwcAnswers)
+                @SqSimpleBlock("sqMed", "Pre-employment medical check", _screening.MedicalCheck, _yesNoAnswers)
+                @SqSimpleBlock("sqDl", "Driver's licence", _screening.DriversLicence, _yesNoAnswers)
+                @SqSimpleBlock("sqCar", "Access to a car", _screening.CarAccess, _yesNoAnswers)
+                @SqSimpleBlock("sqPh", "Available to work on public holidays", _screening.PublicHolidays, _yesNoAnswers)
+
+                @* ── Qualification (multi-select acceptable answers) ── *@
+                @SqSimpleBlock("sqQual", _sqQualLabel, _screening.Qualification, _qualificationAnswers(_sqIndustry))
 
                 <!-- ── Promotion options ─────────────────────────────────── -->
                 <h2 class="h5 fw-bold mb-3">Promotion</h2>
@@ -344,16 +486,135 @@
     private DateTime? _stickyUntilDate;
     private DateOnly? _expiryDate;
 
-    private static readonly string[] _allBenefits =
+    // ── Screening questions ─────────────────────────────────────────────
+    private readonly ScreeningConfig _screening = new();
+
+    private static readonly string[] _workRightsAnswers =
     [
-        "401(K)", "Distributed team", "Async", "Vision insurance", "Dental insurance",
-        "Medical insurance", "Unlimited vacation", "Paid time off", "4-day workweek",
-        "401(K) matching", "Company retreats", "Coworking budget", "Learning budget",
-        "Free gym membership", "Mental wellness budget", "Home office budget",
-        "Pay in crypto", "Pseudonymous", "Profit sharing", "Equity compensation",
-        "No whiteboard interview", "No monitoring system", "No politics at work",
-        "We hire old (and young)"
+        "I have permanent work rights with no restrictions",
+        "I have temporary work rights with no restrictions",
+        "I have temporary work rights limited to designated locations",
+        "I have temporary work rights with limitations on work hours",
+        "I have temporary work rights limited to specific industries",
+        "I require sponsorship to work for a new employer"
     ];
+
+    private static readonly string[] _yearsExpAnswers =
+        ["No experience", "Less than 1 year", "1 year", "2 years", "3 years", "4 years", "5 years", "5+ years"];
+
+    private static readonly string[] _salaryOptions =
+    [
+        "$30,000","$35,000","$40,000","$45,000","$50,000","$55,000","$60,000","$65,000","$70,000",
+        "$80,000","$90,000","$100,000","$110,000","$120,000","$130,000","$140,000","$150,000",
+        "$170,000","$200,000","$250,000","$300,000","$350,000","$350,000+"
+    ];
+
+    private static readonly string[] _noticePeriodAnswers =
+        ["None, I can start immediately", "1 week", "2 weeks", "3 weeks", "4 weeks", "5 weeks", "5 or more weeks"];
+
+    private static readonly string[] _policeCheckAnswers =
+        ["Yes, I have a current police check", "I am willing to undertake a police check", "No"];
+
+    private static readonly string[] _wwcAnswers =
+        ["Yes, I have a current Working with Children Check", "I am willing to undertake a Working with Children Check", "No"];
+
+    private static readonly string[] _yesNoAnswers = ["Yes", "No"];
+
+    private static string[] _qualificationAnswers(string industry) =>
+    [
+        "Yes, Bachelor degree",
+        "Yes, Bachelor degree with honours",
+        "Yes, Graduate certificate",
+        "Yes, Graduate diploma",
+        "Yes, Master's degree",
+        "Yes, Doctoral degree",
+        string.IsNullOrEmpty(industry) ? "I have a relevant qualification that is not listed" : $"I have a qualification in {industry} that is not listed",
+        string.IsNullOrEmpty(industry) ? "I do not have a relevant qualification" : $"I do not have a qualification in {industry}"
+    ];
+
+    private static void ToggleAcceptable(ScreeningQuestion q, string answer, bool selected)
+    {
+        if (selected && !q.AcceptableAnswers.Contains(answer))
+            q.AcceptableAnswers.Add(answer);
+        else if (!selected)
+            q.AcceptableAnswers.Remove(answer);
+    }
+
+    private static string FormatCategory(JobCategory c) => c switch
+    {
+        JobCategory.AdminSecretarial => "Admin & Secretarial",
+        JobCategory.AdvertisingPR => "Advertising & PR",
+        JobCategory.AgricultureFishingForestry => "Agriculture, Fishing & Forestry",
+        JobCategory.BuildingConstruction => "Building & Construction",
+        JobCategory.CustomerService => "Customer Service",
+        JobCategory.ExecutiveManagement => "Executive & Management",
+        JobCategory.FinanceInsurance => "Finance & Insurance",
+        JobCategory.FoodBeverage => "Food & Beverage",
+        JobCategory.GraduateRoles => "Graduate Roles",
+        JobCategory.HumanResources => "Human Resources",
+        JobCategory.ITSoftware => "IT & Software",
+        JobCategory.LegalServices => "Legal Services",
+        JobCategory.MediaJournalism => "Media & Journalism",
+        JobCategory.MiningResources => "Mining & Resources",
+        JobCategory.PartTimeTemp => "Part-time & Temp",
+        JobCategory.PropertyRealEstate => "Property & Real Estate",
+        JobCategory.PublicRelations => "Public Relations",
+        JobCategory.SecurityIntelligence => "Security & Intelligence",
+        JobCategory.SocialWork => "Social Work",
+        JobCategory.SportRecreation => "Sport & Recreation",
+        JobCategory.TelecommunicationsISP => "Telecommunications & ISP",
+        JobCategory.TransportDistribution => "Transport & Distribution",
+        JobCategory.UtilitiesEnergy => "Utilities & Energy",
+        _ => c.ToString()
+    };
+
+    private RenderFragment SqSimpleBlock(string idPrefix, string label, ScreeningQuestion q, string[] answers) => __builder =>
+    {
+        <div class="border rounded-4 p-3 mb-2">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                <span class="fw-semibold small">@label</span>
+                <div class="d-flex gap-3 flex-shrink-0">
+                    <div class="form-check form-switch mb-0">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}En")"
+                               checked="@q.Enabled"
+                               @onchange="e => { q.Enabled = (bool)e.Value!; StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}En")">Include</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}Mh")"
+                               disabled="@(!q.Enabled)"
+                               checked="@(q.Enabled && q.IsMustHave)"
+                               @onchange="e => { q.IsMustHave = (bool)e.Value!; StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}Mh")">Must-have</label>
+                    </div>
+                </div>
+            </div>
+            @if (q.Enabled && q.IsMustHave)
+            {
+                <div class="text-secondary small mb-1">Acceptable answers:</div>
+                @foreach (var ans in answers)
+                {
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}{ans.GetHashCode()}")"
+                               checked="@q.AcceptableAnswers.Contains(ans)"
+                               @onchange="e => { ToggleAcceptable(q, ans, (bool)e.Value!); StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}{ans.GetHashCode()}")">@ans</label>
+                    </div>
+                }
+            }
+        </div>;
+    };
+
+    private static readonly Dictionary<string, string[]> _benefitGroups = new()
+    {
+        ["Compensation & Financial"] = ["401(k)", "401(k) matching", "Profit sharing", "Equity compensation", "Performance bonus", "Annual bonus", "Signing bonus", "Referral bonus", "Employee stock purchase plan", "Salary packaging", "Commissions", "Overtime pay", "Cryptocurrency payment option"],
+        ["Health & Wellness"] = ["Medical insurance", "Dental insurance", "Vision insurance", "Mental wellness budget", "Free gym membership", "Wellness allowance", "Employee assistance program", "Life insurance", "Income protection insurance", "Disability insurance", "Paid parental leave", "Fertility support", "Health reimbursement arrangement"],
+        ["Time Off & Flexibility"] = ["Paid time off", "Unlimited vacation", "4-day workweek", "Flexible schedule", "Flexible hours", "Compressed workweek", "Public holiday flexibility", "Birthday leave", "Volunteer leave", "Study leave", "Carer's leave", "Paid sick leave", "Sabbatical leave"],
+        ["Remote Work & Equipment"] = ["Remote-first team", "Hybrid work options", "Home office budget", "Coworking budget", "Company retreats", "Work-from-anywhere policy", "Distributed team", "Office equipment provided", "Laptop provided", "Internet allowance", "Phone allowance", "Relocation support", "Travel stipend"],
+        ["Learning & Growth"] = ["Learning budget", "Training budget", "Conference budget", "Certification support", "Paid training", "Mentorship program", "Career progression pathways", "Internal promotion opportunities", "Professional development leave", "Leadership development program"],
+        ["Hiring Process"] = ["No whiteboard interview", "Take-home assessment", "Fast interview process", "Transparent hiring process", "Skills-based assessment", "Portfolio-friendly applications", "Practical interview process", "Interview feedback provided", "No unpaid trial work", "Paid trial project"],
+        ["Culture & Workplace"] = ["No employee monitoring", "Privacy-friendly workplace", "Age-inclusive hiring", "Equal opportunity employer", "Inclusive workplace", "Diverse team", "Accessible workplace", "Respectful workplace", "Low-meeting culture", "Asynchronous work culture", "Documentation-first culture", "Results-focused workplace", "Family-friendly workplace", "Pet-friendly office", "Social impact mission", "Values-driven company", "LGBTQ+ inclusive workplace", "Neurodiversity-inclusive workplace", "Disability-inclusive workplace"],
+    };
 
     private static readonly Dictionary<JobRegion, string[]> _regionCountries = new()
     {
@@ -424,6 +685,8 @@
         _model.PostingExpiresUtc = _expiryDate.HasValue
             ? DateTime.SpecifyKind(_expiryDate.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
             : null;
+
+        _model.ScreeningQuestionsJson = System.Text.Json.JsonSerializer.Serialize(_screening);
 
         try
         {

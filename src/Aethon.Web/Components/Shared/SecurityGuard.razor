@@ -1,0 +1,32 @@
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+            return;
+
+        var currentPath = new Uri(NavigationManager.Uri).AbsolutePath;
+
+        var mustChangePassword = user.FindFirstValue(AppClaimTypes.MustChangePassword) == "true";
+        var mustEnableMfa = user.FindFirstValue(AppClaimTypes.MustEnableMfa) == "true";
+
+        if (mustChangePassword && !currentPath.StartsWith("/account/change-password", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/account/change-password", forceLoad: true);
+            return;
+        }
+
+        if (mustEnableMfa && !currentPath.StartsWith("/account/setup-mfa", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/account/setup-mfa", forceLoad: true);
+        }
+    }
+}

@@ -92,6 +92,38 @@
                 <span>Integrations</span>
             </NavLink>
         }
+        else if (_isStaff)
+        {
+            <NavLink class="nav-link aethon-nav-link" href="/admin" Match="NavLinkMatch.All">
+                <span class="aethon-nav-icon"><i class="bi bi-speedometer2"></i></span>
+                <span>Dashboard</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/organisations" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-building"></i></span>
+                <span>Organisations</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/jobs" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-briefcase"></i></span>
+                <span>Jobs</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/users" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-people"></i></span>
+                <span>Users</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/files" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-folder2"></i></span>
+                <span>Files</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/stripe-events" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-credit-card"></i></span>
+                <span>Stripe Events</span>
+            </NavLink>
+        }
         else if (_isJobSeeker)
         {
             <NavLink class="nav-link aethon-nav-link" href="/app/jobseeker" Match="NavLinkMatch.Prefix">
@@ -115,30 +147,22 @@
             </NavLink>
         }
 
-        <NavLink class="nav-link aethon-nav-link" href="/" Match="NavLinkMatch.All">
-            <span class="aethon-nav-icon">→</span>
-            <span>Role landing</span>
+        <div class="aethon-nav-section-label mt-3">Account</div>
+
+        <NavLink class="nav-link aethon-nav-link" href="/account/change-password" Match="NavLinkMatch.All">
+            <span class="aethon-nav-icon"><i class="bi bi-key"></i></span>
+            <span>Change password</span>
         </NavLink>
 
-        <div class="mt-3 px-2">
-            <div class="small text-secondary mb-1">Signed in as</div>
-            <div class="fw-semibold text-dark">@_displayName</div>
-
-            @if (!string.IsNullOrWhiteSpace(_organisationName))
-            {
-                <div class="small text-secondary mt-1">@_organisationName</div>
-            }
-
-            @if (!_isEmployer && !_isRecruiter && !_isJobSeeker)
-            {
-                <div class="small text-danger mt-1">No app type resolved</div>
-            }
-        </div>
+        <NavLink class="nav-link aethon-nav-link" href="/account/setup-mfa" Match="NavLinkMatch.All">
+            <span class="aethon-nav-icon"><i class="bi bi-shield-lock"></i></span>
+            <span>Two-factor auth</span>
+        </NavLink>
 
         <form method="post" action="/account/logout" class="mt-3">
             <input type="hidden" name="returnPath" value="/login" />
             <button type="submit" class="nav-link aethon-nav-link w-100 border-0 bg-transparent text-start">
-                <span class="aethon-nav-icon">×</span>
+                <span class="aethon-nav-icon"><i class="bi bi-box-arrow-right"></i></span>
                 <span>Logout</span>
             </button>
         </form>
@@ -155,6 +179,10 @@
     private bool _isEmployer;
     private bool _isRecruiter;
     private bool _isJobSeeker;
+    private bool _isSuperAdmin;
+    private bool _isAdmin;
+    private bool _isSupport;
+    private bool _isStaff;
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,6 +200,10 @@
             _isEmployer = _appType == "employer";
             _isRecruiter = _appType == "recruiter";
             _isJobSeeker = _appType == "jobseeker";
+            _isSuperAdmin = _appType == "superadmin";
+            _isAdmin = _appType == "admin";
+            _isSupport = _appType == "support";
+            _isStaff = _isSuperAdmin || _isAdmin || _isSupport;
         }
 
         _ready = true;

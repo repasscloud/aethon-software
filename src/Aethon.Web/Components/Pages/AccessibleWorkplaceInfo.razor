@@ -1,0 +1,56 @@
+@page "/info/accessible-workplace"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Accessible Workplace | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4" style="max-width:720px; margin:0 auto;">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span style="font-size:2.5rem;"><i class="bi bi-universal-access text-primary"></i></span>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Accessible Workplace</h1>
+                    <div class="text-secondary">What this means for you as a candidate</div>
+                </div>
+            </div>
+
+            <p class="lead text-secondary mb-4">
+                Employers who display this badge have certified that their workplace is designed
+                to be inclusive and accessible to people with disabilities or diverse needs.
+            </p>
+
+            <h2 class="h5 fw-bold mb-3">What it means</h2>
+            <p>An Accessible Workplace is one that actively removes barriers so that employees
+            with disabilities or diverse needs can participate fully. This can include:</p>
+            <ul class="mb-4">
+                <li>Physical accessibility — ramps, accessible bathrooms, elevators, parking</li>
+                <li>Digital accessibility — screen reader compatible tools, captions, alt text</li>
+                <li>Flexible working arrangements — remote work, adjusted hours, job-sharing</li>
+                <li>Assistive technology — software and hardware to support different needs</li>
+                <li>Reasonable workplace adjustments made upon request</li>
+                <li>Accessible interview and onboarding processes</li>
+            </ul>
+
+            <h2 class="h5 fw-bold mb-3">Who benefits</h2>
+            <ul class="mb-4">
+                <li>People with physical disabilities or mobility challenges</li>
+                <li>People with sensory impairments (vision, hearing)</li>
+                <li>People with chronic health conditions</li>
+                <li>Neurodivergent people (autism, ADHD, dyslexia, and others)</li>
+                <li>People with mental health conditions</li>
+                <li>Carers or people with family responsibilities requiring flexibility</li>
+            </ul>
+
+            <div class="alert alert-primary rounded-4 mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                This certification is self-declared by the employer. If you require specific
+                accommodations, we encourage you to discuss your needs with the employer during
+                the hiring process.
+            </div>
+        </div>
+    </div>
+    <div class="text-center">
+        <button onclick="history.back()" class="btn btn-outline-dark rounded-4 px-4"><i class="bi bi-arrow-left me-2"></i>Go back</button>
+    </div>
+</div>

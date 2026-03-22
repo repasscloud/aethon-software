@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.Net.Http.Json
+@using Aethon.Shared.Enums
 @using Aethon.Shared.Organisations
 @using Microsoft.AspNetCore.Authorization
 @inject AethonApiClient Api
@@ -57,7 +58,10 @@ else
 
                         <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Website</label>
-                            <InputText @bind-Value="_model.WebsiteUrl" class="form-control rounded-4" />
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.WebsiteUrl" class="form-control rounded-end-4" placeholder="www.yourcompany.com" />
+                            </div>
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -81,9 +85,67 @@ else
                             }
                         </div>
 
-                        <div class="col-12">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Logo URL</label>
-                            <InputText @bind-Value="_model.LogoUrl" class="form-control rounded-4" />
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.LogoUrl" class="form-control rounded-end-4" placeholder="example.com/logo.png" />
+                            </div>
+                            <div class="form-text">Square image, min 200×200px recommended.</div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Banner image URL</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.BannerImageUrl" class="form-control rounded-end-4" placeholder="example.com/banner.jpg" />
+                            </div>
+                            <div class="form-text">Wide header image shown at the top of your public page (e.g. 1200×300px).</div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Industry</label>
+                            <InputSelect @bind-Value="_model.Industry" class="form-select rounded-4">
+                                <option value="">— Select industry —</option>
+                                <option value="@JobCategory.AdminSecretarial">Admin &amp; Secretarial</option>
+                                <option value="@JobCategory.AdvertisingPR">Advertising &amp; PR</option>
+                                <option value="@JobCategory.AgricultureFishingForestry">Agriculture, Fishing &amp; Forestry</option>
+                                <option value="@JobCategory.BuildingConstruction">Building &amp; Construction</option>
+                                <option value="@JobCategory.CustomerService">Customer Service</option>
+                                <option value="@JobCategory.ExecutiveManagement">Executive &amp; Management</option>
+                                <option value="@JobCategory.FinanceInsurance">Finance &amp; Insurance</option>
+                                <option value="@JobCategory.FoodBeverage">Food &amp; Beverage</option>
+                                <option value="@JobCategory.GraduateRoles">Graduate Roles</option>
+                                <option value="@JobCategory.HumanResources">Human Resources</option>
+                                <option value="@JobCategory.ITSoftware">IT &amp; Software</option>
+                                <option value="@JobCategory.LegalServices">Legal Services</option>
+                                <option value="@JobCategory.MediaJournalism">Media &amp; Journalism</option>
+                                <option value="@JobCategory.MiningResources">Mining &amp; Resources</option>
+                                <option value="@JobCategory.PartTimeTemp">Part-time &amp; Temp</option>
+                                <option value="@JobCategory.PropertyRealEstate">Property &amp; Real Estate</option>
+                                <option value="@JobCategory.PublicRelations">Public Relations</option>
+                                <option value="@JobCategory.SecurityIntelligence">Security &amp; Intelligence</option>
+                                <option value="@JobCategory.SocialWork">Social Work</option>
+                                <option value="@JobCategory.SportRecreation">Sport &amp; Recreation</option>
+                                <option value="@JobCategory.TelecommunicationsISP">Telecommunications &amp; ISP</option>
+                                <option value="@JobCategory.TransportDistribution">Transport &amp; Distribution</option>
+                                <option value="@JobCategory.UtilitiesEnergy">Utilities &amp; Energy</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Company size</label>
+                            <InputSelect @bind-Value="_model.CompanySize" class="form-select rounded-4">
+                                <option value="">— Select size —</option>
+                                <option value="@CompanySize.UpTo10">1–10 employees</option>
+                                <option value="@CompanySize.UpTo50">11–50 employees</option>
+                                <option value="@CompanySize.UpTo200">51–200 employees</option>
+                                <option value="@CompanySize.UpTo500">201–500 employees</option>
+                                <option value="@CompanySize.UpTo1000">501–1,000 employees</option>
+                                <option value="@CompanySize.UpTo5000">1,001–5,000 employees</option>
+                                <option value="@CompanySize.UpTo10000">5,001–10,000 employees</option>
+                                <option value="@CompanySize.MoreThan10000">More than 10,000 employees</option>
+                            </InputSelect>
                         </div>
 
                         <div class="col-12">
@@ -110,6 +172,78 @@ else
                             <div class="form-check">
                                 <InputCheckbox @bind-Value="_model.IsPublicProfileEnabled" class="form-check-input" />
                                 <label class="form-check-label">Enable public organisation page and public job branding</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_model.IsEqualOpportunityEmployer" class="form-check-input" id="eoeCheck" />
+                                <label class="form-check-label" for="eoeCheck">
+                                    <i class="bi bi-people-fill text-success me-1"></i>
+                                    We certify as an <strong>Equal Opportunity Employer</strong>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_model.IsAccessibleWorkplace" class="form-check-input" id="accessibleCheck" />
+                                <label class="form-check-label" for="accessibleCheck">
+                                    <i class="bi bi-universal-access text-primary me-1"></i>
+                                    We certify as an <strong>Accessible Workplace</strong>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4" />
+                    <h2 class="h5 fw-bold mb-3">Social media</h2>
+                    <div class="row g-3 mb-2">
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-linkedin me-1 text-primary"></i> LinkedIn URL</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-end-4" placeholder="www.linkedin.com/company/yourcompany" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-twitter-x me-1"></i> X / Twitter handle</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">@@</span>
+                                <InputText @bind-Value="_model.TwitterHandle" class="form-control rounded-end-4" placeholder="yourhandle" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-facebook me-1 text-primary"></i> Facebook URL</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.FacebookUrl" class="form-control rounded-end-4" placeholder="www.facebook.com/yourpage" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-tiktok me-1"></i> TikTok handle</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">@@</span>
+                                <InputText @bind-Value="_model.TikTokHandle" class="form-control rounded-end-4" placeholder="yourhandle" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-instagram me-1 text-danger"></i> Instagram handle</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">@@</span>
+                                <InputText @bind-Value="_model.InstagramHandle" class="form-control rounded-end-4" placeholder="yourhandle" />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold"><i class="bi bi-youtube me-1 text-danger"></i> YouTube URL</label>
+                            <div class="input-group">
+                                <span class="input-group-text rounded-start-4">https://</span>
+                                <InputText @bind-Value="_model.YouTubeUrl" class="form-control rounded-end-4" placeholder="www.youtube.com/channel/yourchannelid" />
                             </div>
                         </div>
                     </div>
@@ -160,7 +294,18 @@ else
                     PublicLocationText = profile.PublicLocationText,
                     PublicContactEmail = profile.PublicContactEmail,
                     PublicContactPhone = profile.PublicContactPhone,
-                    IsPublicProfileEnabled = profile.IsPublicProfileEnabled
+                    IsPublicProfileEnabled = profile.IsPublicProfileEnabled,
+                    IsEqualOpportunityEmployer = profile.IsEqualOpportunityEmployer,
+                    IsAccessibleWorkplace = profile.IsAccessibleWorkplace,
+                    BannerImageUrl = profile.BannerImageUrl,
+                    Industry = profile.Industry,
+                    CompanySize = profile.CompanySize,
+                    LinkedInUrl = profile.LinkedInUrl,
+                    TwitterHandle = profile.TwitterHandle,
+                    FacebookUrl = profile.FacebookUrl,
+                    TikTokHandle = profile.TikTokHandle,
+                    InstagramHandle = profile.InstagramHandle,
+                    YouTubeUrl = profile.YouTubeUrl
                 };
             }
         }

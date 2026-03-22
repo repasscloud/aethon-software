@@ -321,6 +321,43 @@ namespace Aethon.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ResumeAnalyses",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobSeekerResumeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    StoredFileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    HeadlineSuggestion = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: true),
+                    SummaryExtract = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    SkillsJson = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    ExperienceLevel = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    YearsExperience = table.Column<int>(type: "integer", nullable: true),
+                    AnalysedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    AnalysisError = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ResumeAnalyses", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ResumeAnalyses_JobSeekerResumes_JobSeekerResumeId",
+                        column: x => x.JobSeekerResumeId,
+                        principalTable: "JobSeekerResumes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ResumeAnalyses_StoredFiles_StoredFileId",
+                        column: x => x.StoredFileId,
+                        principalTable: "StoredFiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ActivityLogs",
                 columns: table => new
                 {
@@ -556,6 +593,9 @@ namespace Aethon.Data.Migrations
                     IsArchived = table.Column<bool>(type: "boolean", nullable: false),
                     ArchivedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ExternalReference = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    ScreeningAnswersJson = table.Column<string>(type: "text", nullable: true),
+                    IsNotSuitable = table.Column<bool>(type: "boolean", nullable: false),
+                    NotSuitableReasons = table.Column<string>(type: "text", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -679,6 +719,26 @@ namespace Aethon.Data.Migrations
                     ExternalApplicationUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     ApplicationEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
                     CreatedForUnclaimedCompany = table.Column<bool>(type: "boolean", nullable: false),
+                    Category = table.Column<int>(type: "integer", nullable: true),
+                    Regions = table.Column<string>(type: "text", nullable: true),
+                    Countries = table.Column<string>(type: "text", nullable: true),
+                    PostingExpiresUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IncludeCompanyLogo = table.Column<bool>(type: "boolean", nullable: false),
+                    IsHighlighted = table.Column<bool>(type: "boolean", nullable: false),
+                    StickyUntilUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    BenefitsTags = table.Column<string>(type: "text", nullable: true),
+                    ApplicationSpecialRequirements = table.Column<string>(type: "text", nullable: true),
+                    HasCommission = table.Column<bool>(type: "boolean", nullable: false),
+                    OteFrom = table.Column<decimal>(type: "numeric", nullable: true),
+                    OteTo = table.Column<decimal>(type: "numeric", nullable: true),
+                    IsImmediateStart = table.Column<bool>(type: "boolean", nullable: false),
+                    VideoYouTubeId = table.Column<string>(type: "text", nullable: true),
+                    VideoVimeoId = table.Column<string>(type: "text", nullable: true),
+                    ScreeningQuestionsJson = table.Column<string>(type: "text", nullable: true),
+                    Keywords = table.Column<string>(type: "text", nullable: true),
+                    PoNumber = table.Column<string>(type: "text", nullable: true),
+                    AllowAutoMatch = table.Column<bool>(type: "boolean", nullable: false),
+                    ShortUrlCode = table.Column<string>(type: "text", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -781,6 +841,17 @@ namespace Aethon.Data.Migrations
                     PublicContactEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
                     PublicContactPhone = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     IsPublicProfileEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    IsEqualOpportunityEmployer = table.Column<bool>(type: "boolean", nullable: false),
+                    IsAccessibleWorkplace = table.Column<bool>(type: "boolean", nullable: false),
+                    CompanySize = table.Column<int>(type: "integer", nullable: true),
+                    Industry = table.Column<int>(type: "integer", nullable: true),
+                    BannerImageUrl = table.Column<string>(type: "text", nullable: true),
+                    LinkedInUrl = table.Column<string>(type: "text", nullable: true),
+                    TwitterHandle = table.Column<string>(type: "text", nullable: true),
+                    FacebookUrl = table.Column<string>(type: "text", nullable: true),
+                    TikTokHandle = table.Column<string>(type: "text", nullable: true),
+                    InstagramHandle = table.Column<string>(type: "text", nullable: true),
+                    YouTubeUrl = table.Column<string>(type: "text", nullable: true),
                     PrimaryDomainId = table.Column<Guid>(type: "uuid", nullable: true),
                     IsProvisionedByRecruiter = table.Column<bool>(type: "boolean", nullable: false),
                     ClaimedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1513,6 +1584,22 @@ namespace Aethon.Data.Migrations
                 columns: new[] { "Type", "Status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ResumeAnalyses_JobSeekerResumeId",
+                table: "ResumeAnalyses",
+                column: "JobSeekerResumeId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ResumeAnalyses_Status",
+                table: "ResumeAnalyses",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ResumeAnalyses_StoredFileId",
+                table: "ResumeAnalyses",
+                column: "StoredFileId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StoredFiles_StoragePath",
                 table: "StoredFiles",
                 column: "StoragePath",
@@ -1682,9 +1769,6 @@ namespace Aethon.Data.Migrations
                 name: "JobSeekerNationalities");
 
             migrationBuilder.DropTable(
-                name: "JobSeekerResumes");
-
-            migrationBuilder.DropTable(
                 name: "OrganisationClaimRequests");
 
             migrationBuilder.DropTable(
@@ -1692,6 +1776,9 @@ namespace Aethon.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "OrganisationMemberships");
+
+            migrationBuilder.DropTable(
+                name: "ResumeAnalyses");
 
             migrationBuilder.DropTable(
                 name: "WebhookDeliveries");
@@ -1703,13 +1790,16 @@ namespace Aethon.Data.Migrations
                 name: "JobApplicationInterviews");
 
             migrationBuilder.DropTable(
-                name: "JobSeekerProfiles");
+                name: "JobSeekerResumes");
 
             migrationBuilder.DropTable(
                 name: "WebhookSubscriptions");
 
             migrationBuilder.DropTable(
                 name: "JobApplications");
+
+            migrationBuilder.DropTable(
+                name: "JobSeekerProfiles");
 
             migrationBuilder.DropTable(
                 name: "Jobs");

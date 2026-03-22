@@ -6,4 +6,5 @@ public sealed class SubmitJobApplicationCommand
     public Guid? ResumeFileId { get; init; }
     public string? CoverLetter { get; init; }
     public string? Source { get; init; }
+    public string? ScreeningAnswersJson { get; init; }
 }

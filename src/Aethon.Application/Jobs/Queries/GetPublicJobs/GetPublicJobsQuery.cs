@@ -11,6 +11,11 @@ public sealed class GetPublicJobsQuery
     public string? Country { get; init; }
     public string? Keywords { get; init; }
     public string? OrganisationSlug { get; init; }
+    public decimal? SalaryMin { get; init; }
+    public decimal? SalaryMax { get; init; }
+    public bool VerifiedOnly { get; init; }
+    public WorkplaceType? WorkplaceType { get; init; }
+    public bool ImmediateStart { get; init; }
 }
 
 public enum DateRangeFilter

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Common.Results;
 using Aethon.Application.Organisations.Services;
@@ -42,6 +43,7 @@ public sealed class UpdateJobHandler
             return Result.Failure("jobs.forbidden", "Insufficient permissions to edit this job.");
 
         job.Title = request.Title.Trim();
+        job.Summary = string.IsNullOrWhiteSpace(request.Summary) ? null : request.Summary.Trim();
         job.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
         job.LocationText = string.IsNullOrWhiteSpace(request.LocationText) ? null : request.LocationText.Trim();
         job.WorkplaceType = request.WorkplaceType!.Value;
@@ -56,7 +58,7 @@ public sealed class UpdateJobHandler
         job.ApplicationEmail = string.IsNullOrWhiteSpace(request.ApplicationEmail) ? null : request.ApplicationEmail.Trim();
         job.Visibility = request.Visibility;
         job.Category = request.Category;
-        job.Regions = request.Regions.Count > 0 ? JsonSerializer.Serialize(request.Regions) : null;
+        job.Regions = request.Regions.Count > 0 ? JsonSerializer.Serialize(request.Regions, _enumJson) : null;
         job.Countries = request.Countries.Count > 0 ? JsonSerializer.Serialize(request.Countries) : null;
         job.PostingExpiresUtc = request.PostingExpiresUtc;
         job.IncludeCompanyLogo = request.IncludeCompanyLogo;
@@ -69,8 +71,15 @@ public sealed class UpdateJobHandler
         job.ApplicationSpecialRequirements = string.IsNullOrWhiteSpace(request.ApplicationSpecialRequirements)
             ? null
             : request.ApplicationSpecialRequirements.Trim();
+        job.HasCommission = request.HasCommission;
+        job.OteFrom = request.OteFrom;
+        job.OteTo = request.OteTo;
+        job.IsImmediateStart = request.IsImmediateStart;
+        job.VideoYouTubeId = string.IsNullOrWhiteSpace(request.VideoYouTubeId) ? null : request.VideoYouTubeId.Trim();
+        job.VideoVimeoId = string.IsNullOrWhiteSpace(request.VideoVimeoId) ? null : request.VideoVimeoId.Trim();
         job.Keywords = string.IsNullOrWhiteSpace(request.Keywords) ? null : request.Keywords.Trim();
         job.PoNumber = string.IsNullOrWhiteSpace(request.PoNumber) ? null : request.PoNumber.Trim();
+        job.ScreeningQuestionsJson = request.ScreeningQuestionsJson;
         job.UpdatedUtc = DateTime.UtcNow;
         job.UpdatedByUserId = _currentUser.UserId;
 
@@ -78,4 +87,9 @@ public sealed class UpdateJobHandler
 
         return Result.Success();
     }
+
+    private static readonly JsonSerializerOptions _enumJson = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 }

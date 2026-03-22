@@ -25,12 +25,14 @@ using Aethon.Application.Integrations.Queries.GetWebhookSubscriptions;
 using Aethon.Application.Integrations.Services;
 using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
+using Aethon.Application.Jobs.Commands.EmailJobApplication;
 using Aethon.Application.Jobs.Commands.PublishJob;
 using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
 using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Jobs.Queries.GetMyOrgJobs;
 using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
+using Aethon.Application.Jobs.Queries.GetPublicJobLocations;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Commands.AcceptOrganisationInvite;
 using Aethon.Application.Organisations.Commands.AddOrganisationDomain;
@@ -88,6 +90,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetMyOrgJobsHandler>();
         services.AddScoped<GetPublicJobsHandler>();
         services.AddScoped<GetPublicJobDetailHandler>();
+        services.AddScoped<GetPublicJobLocationsHandler>();
+        services.AddScoped<EmailJobApplicationHandler>();
 
         services.AddScoped<GetMyOrganisationProfileHandler>();
         services.AddScoped<UpdateMyOrganisationProfileHandler>();

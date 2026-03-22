@@ -67,6 +67,14 @@ public sealed class JobDetailDto
     public string? PoNumber { get; set; }
     public string? ShortUrlCode { get; set; }
 
+    public bool HasCommission { get; set; }
+    public decimal? OteFrom { get; set; }
+    public decimal? OteTo { get; set; }
+    public bool IsImmediateStart { get; set; }
+    public string? VideoYouTubeId { get; set; }
+    public string? VideoVimeoId { get; set; }
+    public string? ScreeningQuestionsJson { get; set; }
+
     public DateTime CreatedUtc { get; set; }
     public Guid CreatedByIdentityUserId { get; set; }
 

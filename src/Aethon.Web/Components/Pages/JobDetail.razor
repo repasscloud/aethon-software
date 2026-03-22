@@ -74,7 +74,16 @@ else
         </div>
 
         <div class="row g-3">
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="small text-secondary mb-2">Category</div>
+                        <div class="fw-semibold">@(_job.Category.HasValue ? _job.Category.Value.ToString() : "-")</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
                     <div class="card-body p-4">
                         <div class="small text-secondary mb-2">Department</div>
@@ -83,7 +92,7 @@ else
                 </div>
             </div>
 
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
                     <div class="card-body p-4">
                         <div class="small text-secondary mb-2">Location</div>
@@ -93,10 +102,10 @@ else
                 </div>
             </div>
 
-            <div class="col-12 col-lg-4">
+            <div class="col-12 col-md-6 col-lg-3">
                 <div class="card border-0 shadow-sm rounded-4 h-100">
                     <div class="card-body p-4">
-                        <div class="small text-secondary mb-2">Employment</div>
+                        <div class="small text-secondary mb-2">Employment type</div>
                         <div class="fw-semibold">@_job.EmploymentType</div>
                         <div class="text-secondary mt-2">
                             @if (_job.SalaryFrom.HasValue || _job.SalaryTo.HasValue)

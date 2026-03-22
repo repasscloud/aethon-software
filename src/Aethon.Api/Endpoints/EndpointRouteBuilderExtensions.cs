@@ -1,3 +1,4 @@
+using Aethon.Api.Endpoints.Admin;
 using Aethon.Api.Endpoints.Applications;
 using Aethon.Api.Endpoints.Auth;
 using Aethon.Api.Endpoints.Candidates;
@@ -10,6 +11,7 @@ using Aethon.Api.Endpoints.Organisations;
 using Aethon.Api.Endpoints.Public;
 using Aethon.Api.Endpoints.RecruiterCompanies;
 using Aethon.Api.Endpoints.RecruiterJobs;
+using Aethon.Api.Endpoints.Webhooks;
 
 namespace Aethon.Api.Endpoints;
 
@@ -20,6 +22,7 @@ public static class EndpointRouteBuilderExtensions
         var api = app.MapGroup("/api/v1");
 
         api.MapAuthEndpoints();
+        api.MapAdminEndpoints();
         api.MapPublicEndpoints();
         api.MapJobEndpoints();
         api.MapApplicationEndpointsGroup();
@@ -31,5 +34,6 @@ public static class EndpointRouteBuilderExtensions
         api.MapCompanyRecruiterEndpoints();
         api.MapRecruiterJobEndpoints();
         api.MapCompanyJobEndpoints();
+        api.MapStripeWebhookEndpoints();
     }
 }

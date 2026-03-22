@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Aethon.Shared.Enums;
 
 namespace Aethon.Data.Entities;
@@ -21,6 +22,20 @@ public class Organisation : EntityBase
     public string? PublicContactPhone { get; set; }
     public bool IsPublicProfileEnabled { get; set; }
 
+    public bool IsEqualOpportunityEmployer { get; set; }
+    public bool IsAccessibleWorkplace { get; set; }
+
+    public CompanySize? CompanySize { get; set; }
+    public JobCategory? Industry { get; set; }
+    public string? BannerImageUrl { get; set; }
+
+    public string? LinkedInUrl { get; set; }
+    public string? TwitterHandle { get; set; }
+    public string? FacebookUrl { get; set; }
+    public string? TikTokHandle { get; set; }
+    public string? InstagramHandle { get; set; }
+    public string? YouTubeUrl { get; set; }
+
     public Guid? PrimaryDomainId { get; set; }
     public OrganisationDomain? PrimaryDomain { get; set; }
 
@@ -32,9 +47,12 @@ public class Organisation : EntityBase
     public string? PrimaryContactEmail { get; set; }
     public string? PrimaryContactPhone { get; set; }
 
-    public bool IsVerified { get; set; } = false;
+    public VerificationTier VerificationTier { get; set; } = VerificationTier.None;
     public DateTime? VerifiedUtc { get; set; }
     public Guid? VerifiedByUserId { get; set; }
+
+    [NotMapped]
+    public bool IsVerified => VerificationTier != VerificationTier.None;
 
     public ICollection<OrganisationDomain> Domains { get; set; } = [];
     public ICollection<OrganisationMembership> Memberships { get; set; } = [];

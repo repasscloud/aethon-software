@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Email;
@@ -7,6 +8,7 @@ using Aethon.Application.Common.Results;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
+using Aethon.Shared.Jobs;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Application.Applications.Commands.SubmitJobApplication;
@@ -106,6 +108,67 @@ public sealed class SubmitJobApplicationHandler
         var utcNow = _dateTimeProvider.UtcNow;
         var applicationId = Guid.NewGuid();
 
+        // ── Evaluate screening questions ──────────────────────────────────────
+        var isNotSuitable = false;
+        var notSuitableReasons = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(job.ScreeningQuestionsJson) &&
+            !string.IsNullOrWhiteSpace(command.ScreeningAnswersJson))
+        {
+            try
+            {
+                var config = JsonSerializer.Deserialize<ScreeningConfig>(
+                    job.ScreeningQuestionsJson, _jsonOptions);
+                var answers = JsonSerializer.Deserialize<ScreeningAnswers>(
+                    command.ScreeningAnswersJson, _jsonOptions);
+
+                if (config is not null && answers is not null && config.AutoTagNotSuitable)
+                {
+                    EvaluateQuestion(config.WorkRights, answers.WorkRights,
+                        "Did not meet required work rights", notSuitableReasons);
+                    EvaluateQuestion(config.YearsExperience, answers.YearsExperience,
+                        "Did not meet required years of experience", notSuitableReasons);
+                    EvaluateQuestion(config.NoticePeriod, answers.NoticePeriod,
+                        "Notice period outside acceptable range", notSuitableReasons);
+                    EvaluateQuestion(config.PoliceCheck, answers.PoliceCheck,
+                        "Does not hold required police check", notSuitableReasons);
+                    EvaluateQuestion(config.WorkingWithChildren, answers.WorkingWithChildren,
+                        "Does not hold required Working with Children Check", notSuitableReasons);
+                    EvaluateQuestion(config.MedicalCheck, answers.MedicalCheck,
+                        "Not willing to undertake pre-employment medical check", notSuitableReasons);
+                    EvaluateQuestion(config.DriversLicence, answers.DriversLicence,
+                        "Does not hold required driver's licence", notSuitableReasons);
+                    EvaluateQuestion(config.CarAccess, answers.CarAccess,
+                        "Does not have required access to a vehicle", notSuitableReasons);
+                    EvaluateQuestion(config.PublicHolidays, answers.PublicHolidays,
+                        "Not available to work on public holidays", notSuitableReasons);
+
+                    // Qualification (multi-select: at least one answer must be acceptable)
+                    if (config.Qualification.Enabled && config.Qualification.IsMustHave &&
+                        config.Qualification.AcceptableAnswers.Count > 0 &&
+                        answers.Qualification.Count > 0 &&
+                        !answers.Qualification.Any(a => config.Qualification.AcceptableAnswers.Contains(a)))
+                    {
+                        notSuitableReasons.Add("Does not hold required qualification");
+                    }
+
+                    // Salary (compare applicant's min expectation vs employer's acceptable max)
+                    if (config.Salary.Enabled && config.Salary.IsMustHave &&
+                        !string.IsNullOrWhiteSpace(config.Salary.AcceptableMaxSalary) &&
+                        !string.IsNullOrWhiteSpace(answers.SalaryMin))
+                    {
+                        var empMax = ParseSalary(config.Salary.AcceptableMaxSalary);
+                        var appMin = ParseSalary(answers.SalaryMin);
+                        if (empMax > 0 && appMin > empMax)
+                            notSuitableReasons.Add("Salary expectation outside allowed range");
+                    }
+
+                    isNotSuitable = notSuitableReasons.Count > 0;
+                }
+            }
+            catch { /* Screening evaluation is best-effort */ }
+        }
+
         var application = new JobApplication
         {
             Id = applicationId,
@@ -119,7 +182,12 @@ public sealed class SubmitJobApplicationHandler
             LastStatusChangedUtc = utcNow,
             LastActivityUtc = utcNow,
             CreatedUtc = utcNow,
-            CreatedByUserId = currentUserId
+            CreatedByUserId = currentUserId,
+            ScreeningAnswersJson = command.ScreeningAnswersJson,
+            IsNotSuitable = isNotSuitable,
+            NotSuitableReasons = notSuitableReasons.Count > 0
+                ? string.Join("\n", notSuitableReasons)
+                : null
         };
 
         var historyEntry = new JobApplicationStatusHistory
@@ -176,4 +244,41 @@ public sealed class SubmitJobApplicationHandler
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    /// <summary>
+    /// Evaluates a single-answer screening question. Adds <paramref name="failReason"/>
+    /// to <paramref name="reasons"/> when the question is enabled, marked as must-have,
+    /// has acceptable answers configured, and the applicant's answer is not in the list.
+    /// </summary>
+    private static void EvaluateQuestion(
+        ScreeningQuestion config,
+        string? answer,
+        string failReason,
+        List<string> reasons)
+    {
+        if (!config.Enabled || !config.IsMustHave || config.AcceptableAnswers.Count == 0)
+            return;
+
+        if (string.IsNullOrWhiteSpace(answer) ||
+            !config.AcceptableAnswers.Contains(answer, StringComparer.OrdinalIgnoreCase))
+        {
+            reasons.Add(failReason);
+        }
+    }
+
+    /// <summary>
+    /// Parses a salary string like "$80,000" or "80000" into a decimal.
+    /// Returns 0 on failure.
+    /// </summary>
+    private static decimal ParseSalary(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0;
+        var cleaned = value.Replace("$", "").Replace(",", "").Replace("+", "").Trim();
+        return decimal.TryParse(cleaned, out var result) ? result : 0;
+    }
 }

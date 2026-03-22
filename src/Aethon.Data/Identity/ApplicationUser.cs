@@ -56,4 +56,16 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     /// When the user's phone number was verified.
     /// </summary>
     public DateTime? PhoneNumberVerifiedUtc { get; set; }
+
+    /// <summary>
+    /// Forces the user to set a new password on next login.
+    /// Set when a staff account is first created or when an admin resets the password.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
+    /// <summary>
+    /// Forces the user to enable TOTP-based MFA on next login.
+    /// Only meaningful if TwoFactorEnabled is false.
+    /// </summary>
+    public bool MustEnableMfa { get; set; }
 }

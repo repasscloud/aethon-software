@@ -298,6 +298,24 @@ public class JobApplication : EntityBase
     public string? ExternalReference { get; set; }
 
     /// <summary>
+    /// JSON-serialised ScreeningAnswers — the applicant's responses to the
+    /// enabled screening questions on the job.
+    /// </summary>
+    public string? ScreeningAnswersJson { get; set; }
+
+    /// <summary>
+    /// Whether this application was automatically tagged as Not Suitable due
+    /// to one or more Must-have screening question mismatches.
+    /// </summary>
+    public bool IsNotSuitable { get; set; }
+
+    /// <summary>
+    /// Newline-separated list of reasons why the application was tagged Not Suitable.
+    /// e.g. "Did not meet required work rights\nSalary expectation outside allowed range"
+    /// </summary>
+    public string? NotSuitableReasons { get; set; }
+
+    /// <summary>
     /// Historical status changes for this application.
     /// </summary>
     public ICollection<JobApplicationStatusHistory> StatusHistory { get; set; } = new List<JobApplicationStatusHistory>();

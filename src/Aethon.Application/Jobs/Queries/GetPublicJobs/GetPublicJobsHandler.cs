@@ -1,6 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Aethon.Application.Common.Results;
-using Aethon.Shared.Enums;
 using Aethon.Data;
 using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
@@ -59,10 +59,10 @@ public sealed class GetPublicJobsHandler
         if (q.Category.HasValue)
             dbQuery = dbQuery.Where(j => j.Category == q.Category.Value);
 
-        // Region filter (text search in JSON array)
+        // Region filter (text search in JSON array — stored as string names e.g. ["Oceania"])
         if (q.Region.HasValue)
         {
-            var regionStr = q.Region.Value.ToString();
+            var regionStr = $"\"{q.Region.Value.ToString()}\"";
             dbQuery = dbQuery.Where(j => j.Regions != null && j.Regions.Contains(regionStr));
         }
 
@@ -90,6 +90,25 @@ public sealed class GetPublicJobsHandler
                 j.Description.ToLower().Contains(kw));
         }
 
+        // Salary range filter
+        if (q.SalaryMin.HasValue)
+            dbQuery = dbQuery.Where(j => j.SalaryTo >= q.SalaryMin.Value || j.OteTo >= q.SalaryMin.Value);
+
+        if (q.SalaryMax.HasValue)
+            dbQuery = dbQuery.Where(j => j.SalaryFrom <= q.SalaryMax.Value);
+
+        // Verified employers only
+        if (q.VerifiedOnly)
+            dbQuery = dbQuery.Where(j => j.OwnedByOrganisation.VerificationTier != VerificationTier.None);
+
+        // Workplace type filter
+        if (q.WorkplaceType.HasValue)
+            dbQuery = dbQuery.Where(j => j.WorkplaceType == q.WorkplaceType.Value);
+
+        // Immediate start filter
+        if (q.ImmediateStart)
+            dbQuery = dbQuery.Where(j => j.IsImmediateStart);
+
         var raw = await dbQuery
             .OrderByDescending(j => j.StickyUntilUtc > DateTime.UtcNow)
             .ThenByDescending(j => j.IsHighlighted)
@@ -99,9 +118,11 @@ public sealed class GetPublicJobsHandler
             {
                 j.Id,
                 j.Title,
+                j.Summary,
                 OrganisationName = j.OwnedByOrganisation.Name,
                 OrganisationSlug = j.OwnedByOrganisation.Slug,
                 OrganisationLogoUrl = j.OwnedByOrganisation.LogoUrl,
+                OrganisationIsVerified = j.OwnedByOrganisation.VerificationTier != VerificationTier.None,
                 j.Department,
                 j.LocationText,
                 j.WorkplaceType,
@@ -109,22 +130,30 @@ public sealed class GetPublicJobsHandler
                 j.SalaryFrom,
                 j.SalaryTo,
                 j.SalaryCurrency,
+                j.HasCommission,
+                j.OteFrom,
+                j.OteTo,
                 j.PublishedUtc,
                 j.Category,
                 j.Regions,
                 j.BenefitsTags,
                 j.IsHighlighted,
+                j.IsImmediateStart,
                 j.IncludeCompanyLogo
             })
             .ToListAsync(ct);
+
+        var enumJson = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } };
 
         var jobs = raw.Select(j => new PublicJobListItemDto
         {
             Id = j.Id,
             Title = j.Title,
+            Summary = j.Summary,
             OrganisationName = j.OrganisationName,
             OrganisationSlug = j.OrganisationSlug,
             OrganisationLogoUrl = j.IncludeCompanyLogo ? j.OrganisationLogoUrl : null,
+            OrganisationIsVerified = j.OrganisationIsVerified,
             Department = j.Department,
             LocationText = j.LocationText,
             WorkplaceType = j.WorkplaceType,
@@ -132,15 +161,19 @@ public sealed class GetPublicJobsHandler
             SalaryFrom = j.SalaryFrom,
             SalaryTo = j.SalaryTo,
             SalaryCurrency = j.SalaryCurrency,
+            HasCommission = j.HasCommission,
+            OteFrom = j.OteFrom,
+            OteTo = j.OteTo,
             PublishedUtc = j.PublishedUtc,
             Category = j.Category,
             Regions = j.Regions is not null
-                ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions) ?? []
+                ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions, enumJson) ?? []
                 : [],
             BenefitsTags = j.BenefitsTags is not null
                 ? JsonSerializer.Deserialize<List<string>>(j.BenefitsTags) ?? []
                 : [],
             IsHighlighted = j.IsHighlighted,
+            IsImmediateStart = j.IsImmediateStart,
             IncludeCompanyLogo = j.IncludeCompanyLogo
         }).ToList();
 

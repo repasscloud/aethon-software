@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Shared.Enums;
 using Aethon.Application.Abstractions.Caching;
@@ -101,6 +102,13 @@ public sealed class GetJobByIdHandler
                         x.Keywords,
                         x.PoNumber,
                         x.ShortUrlCode,
+                        x.HasCommission,
+                        x.OteFrom,
+                        x.OteTo,
+                        x.IsImmediateStart,
+                        x.VideoYouTubeId,
+                        x.VideoVimeoId,
+                        x.ScreeningQuestionsJson,
                         x.CreatedUtc,
                         x.CreatedByIdentityUserId,
                         ApplicationCount = x.Applications.Count
@@ -147,7 +155,7 @@ public sealed class GetJobByIdHandler
                     CreatedForUnclaimedCompany = raw.CreatedForUnclaimedCompany,
                     Category = raw.Category,
                     Regions = raw.Regions is not null
-                        ? JsonSerializer.Deserialize<List<JobRegion>>(raw.Regions) ?? []
+                        ? JsonSerializer.Deserialize<List<JobRegion>>(raw.Regions, _enumJson) ?? []
                         : [],
                     Countries = raw.Countries is not null
                         ? JsonSerializer.Deserialize<List<string>>(raw.Countries) ?? []
@@ -164,6 +172,13 @@ public sealed class GetJobByIdHandler
                     Keywords = raw.Keywords,
                     PoNumber = raw.PoNumber,
                     ShortUrlCode = raw.ShortUrlCode,
+                    HasCommission = raw.HasCommission,
+                    OteFrom = raw.OteFrom,
+                    OteTo = raw.OteTo,
+                    IsImmediateStart = raw.IsImmediateStart,
+                    VideoYouTubeId = raw.VideoYouTubeId,
+                    VideoVimeoId = raw.VideoVimeoId,
+                    ScreeningQuestionsJson = raw.ScreeningQuestionsJson,
                     CreatedUtc = raw.CreatedUtc,
                     CreatedByIdentityUserId = raw.CreatedByIdentityUserId,
                     ApplicationCount = raw.ApplicationCount
@@ -194,4 +209,9 @@ public sealed class GetJobByIdHandler
 
         return Result<JobDetailDto>.Success(job);
     }
+
+    private static readonly JsonSerializerOptions _enumJson = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 }

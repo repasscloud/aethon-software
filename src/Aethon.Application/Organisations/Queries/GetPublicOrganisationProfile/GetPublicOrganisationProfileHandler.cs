@@ -43,7 +43,20 @@ public sealed class GetPublicOrganisationProfileHandler
             Summary = org.Summary,
             PublicLocationText = org.PublicLocationText,
             PublicContactEmail = org.PublicContactEmail,
-            PublicContactPhone = org.PublicContactPhone
+            PublicContactPhone = org.PublicContactPhone,
+            IsEqualOpportunityEmployer = org.IsEqualOpportunityEmployer,
+            IsAccessibleWorkplace = org.IsAccessibleWorkplace,
+            IsVerified = org.IsVerified,
+            VerificationTier = org.VerificationTier,
+            BannerImageUrl = org.BannerImageUrl,
+            CompanySize = org.CompanySize,
+            Industry = org.Industry,
+            LinkedInUrl = org.LinkedInUrl,
+            TwitterHandle = org.TwitterHandle,
+            FacebookUrl = org.FacebookUrl,
+            TikTokHandle = org.TikTokHandle,
+            InstagramHandle = org.InstagramHandle,
+            YouTubeUrl = org.YouTubeUrl
         });
     }
 }

@@ -10,4 +10,7 @@ public sealed class CreateJobApplicationRequestDto
 
     [MaxLength(250)]
     public string? Source { get; set; }
+
+    /// <summary>JSON-serialised ScreeningAnswers submitted by the applicant.</summary>
+    public string? ScreeningAnswersJson { get; set; }
 }

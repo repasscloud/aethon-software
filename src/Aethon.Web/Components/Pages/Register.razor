@@ -18,7 +18,7 @@
         <div class="col-12 col-xl-10">
             <div class="row g-0 shadow-lg rounded-4 overflow-hidden border bg-white">
                 <div class="col-lg-5 d-none d-lg-flex flex-column justify-content-between p-5 text-white"
-                     style="background: linear-gradient(160deg, #111827 0%, #212529 100%); min-height: 760px;">
+                     style="background: linear-gradient(160deg, #111827 0%, #212529 100%); min-height: 600px;">
                     <div>
                         <div class="d-inline-flex align-items-center justify-content-center rounded-circle border border-light border-opacity-25 mb-4"
                              style="width: 72px; height: 72px; background: rgba(255,255,255,0.08); font-size: 1.6rem; font-weight: 700;">
@@ -81,143 +81,111 @@
                         <EditForm EditContext="_editContext" OnValidSubmit="HandleValidSubmitAsync">
                             <DataAnnotationsValidator />
 
-                            <div class="mb-4">
-                                <label class="form-label fw-semibold d-block mb-3">Register as</label>
-
-                                <div class="row g-3">
-                                    <div class="col-12 col-md-4">
-                                        <label class="card h-100 rounded-4 p-3 border @(Model.RegistrationType == "company" ? "border-dark shadow-sm" : "border-light-subtle")"
-                                               style="cursor: pointer; transition: all 0.15s ease-in-out;">
-                                            <input type="radio"
-                                                   class="form-check-input me-2"
-                                                   name="registrationTypeSelector"
-                                                   value="company"
-                                                   checked="@(Model.RegistrationType == "company")"
-                                                   @onchange="@(() => SetRegistrationType("company"))" />
-                                            <span class="fw-bold d-block mt-3 mb-1">Company</span>
-                                            <small class="text-secondary">
-                                                Create and manage your company account, users, and jobs.
-                                            </small>
-                                        </label>
-                                    </div>
-
-                                    <div class="col-12 col-md-4">
-                                        <label class="card h-100 rounded-4 p-3 border @(Model.RegistrationType == "recruiter" ? "border-dark shadow-sm" : "border-light-subtle")"
-                                               style="cursor: pointer; transition: all 0.15s ease-in-out;">
-                                            <input type="radio"
-                                                   class="form-check-input me-2"
-                                                   name="registrationTypeSelector"
-                                                   value="recruiter"
-                                                   checked="@(Model.RegistrationType == "recruiter")"
-                                                   @onchange="@(() => SetRegistrationType("recruiter"))" />
-                                            <span class="fw-bold d-block mt-3 mb-1">Recruiter</span>
-                                            <small class="text-secondary">
-                                                Create and manage your recruitment organisation and client jobs.
-                                            </small>
-                                        </label>
-                                    </div>
-
-                                    <div class="col-12 col-md-4">
-                                        <label class="card h-100 rounded-4 p-3 border @(Model.RegistrationType == "jobseeker" ? "border-dark shadow-sm" : "border-light-subtle")"
-                                               style="cursor: pointer; transition: all 0.15s ease-in-out;">
-                                            <input type="radio"
-                                                   class="form-check-input me-2"
-                                                   name="registrationTypeSelector"
-                                                   value="jobseeker"
-                                                   checked="@(Model.RegistrationType == "jobseeker")"
-                                                   @onchange="@(() => SetRegistrationType("jobseeker"))" />
-                                            <span class="fw-bold d-block mt-3 mb-1">Job seeker</span>
-                                            <small class="text-secondary">
-                                                Create a personal account to search and apply for jobs.
-                                            </small>
-                                        </label>
-                                    </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold mb-2">Register as</label>
+                                <div class="btn-group w-100 rounded-3 overflow-hidden border" role="group">
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "company" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2"
+                                            @onclick='@(() => SetRegistrationType("company"))'>
+                                        Company
+                                    </button>
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "recruiter" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2 border-start border-end"
+                                            style="border-color: #dee2e6 !important;"
+                                            @onclick='@(() => SetRegistrationType("recruiter"))'>
+                                        Recruiter
+                                    </button>
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "jobseeker" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2"
+                                            @onclick='@(() => SetRegistrationType("jobseeker"))'>
+                                        Job seeker
+                                    </button>
+                                </div>
+                                <div class="form-text mt-1">
+                                    @(Model.RegistrationType switch {
+                                        "company"   => "Create and manage your company account, users, and job listings.",
+                                        "recruiter" => "Create your recruitment agency and manage client jobs.",
+                                        _           => "Create a personal profile to search and apply for jobs."
+                                    })
                                 </div>
                                 <ValidationMessage For="@(() => Model.RegistrationType)" />
                             </div>
 
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label for="firstName" class="form-label fw-semibold">First name</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label for="firstName" class="form-label fw-semibold mb-1">First name</label>
                                     <InputText id="firstName"
                                                @bind-Value="Model.FirstName"
                                                autocomplete="given-name"
-                                               class="form-control form-control-lg rounded-4"
-                                               placeholder="First name"
-                                               style="min-height: 58px;" />
+                                               class="form-control rounded-3"
+                                               placeholder="First name" />
                                     <ValidationMessage For="@(() => Model.FirstName)" />
                                 </div>
 
-                                <div class="col-12 col-md-6">
-                                    <label for="lastName" class="form-label fw-semibold">Last name</label>
+                                <div class="col-6">
+                                    <label for="lastName" class="form-label fw-semibold mb-1">Last name</label>
                                     <InputText id="lastName"
                                                @bind-Value="Model.LastName"
                                                autocomplete="family-name"
-                                               class="form-control form-control-lg rounded-4"
-                                               placeholder="Last name"
-                                               style="min-height: 58px;" />
+                                               class="form-control rounded-3"
+                                               placeholder="Last name" />
                                     <ValidationMessage For="@(() => Model.LastName)" />
                                 </div>
 
                                 @if (RequiresOrganisationName)
                                 {
                                     <div class="col-12">
-                                        <label for="organisationName" class="form-label fw-semibold">
-                                            @(Model.RegistrationType == "company" ? "Company name" : "Recruiter organisation name")
+                                        <label for="organisationName" class="form-label fw-semibold mb-1">
+                                            @(Model.RegistrationType == "company" ? "Company name" : "Organisation name")
                                         </label>
                                         <InputText id="organisationName"
                                                    @bind-Value="Model.OrganisationName"
                                                    autocomplete="organization"
-                                                   class="form-control form-control-lg rounded-4"
-                                                   placeholder="@(Model.RegistrationType == "company" ? "Enter your company name" : "Enter your recruiter organisation name")"
-                                                   style="min-height: 58px;" />
+                                                   class="form-control rounded-3"
+                                                   placeholder="@(Model.RegistrationType == "company" ? "Your company name" : "Your agency name")" />
                                         <ValidationMessage For="@(() => Model.OrganisationName)" />
                                     </div>
                                 }
 
                                 <div class="col-12">
-                                    <label for="email" class="form-label fw-semibold">Email</label>
+                                    <label for="email" class="form-label fw-semibold mb-1">Email</label>
                                     <InputText id="email"
                                                @bind-Value="Model.Email"
                                                autocomplete="username"
-                                               class="form-control form-control-lg rounded-4"
-                                               placeholder="@(RequiresOrganisationName ? "name@company.com" : "name@example.com")"
-                                               style="min-height: 58px;" />
-                                    <div class="form-text mt-2">
-                                        @(RequiresOrganisationName
-                                            ? "Use your business email address. The domain will be used to identify your organisation."
-                                            : "Use your personal or professional email address.")
-                                    </div>
+                                               class="form-control rounded-3"
+                                               placeholder="@(RequiresOrganisationName ? "name@company.com" : "name@example.com")" />
+                                    @if (RequiresOrganisationName)
+                                    {
+                                        <div class="form-text">Use your business email — the domain identifies your organisation.</div>
+                                    }
                                     <ValidationMessage For="@(() => Model.Email)" />
                                 </div>
 
-                                <div class="col-12 col-md-6">
-                                    <label for="password" class="form-label fw-semibold">Password</label>
+                                <div class="col-6">
+                                    <label for="password" class="form-label fw-semibold mb-1">Password</label>
                                     <InputText id="password"
                                                @bind-Value="Model.Password"
                                                type="password"
                                                autocomplete="new-password"
-                                               class="form-control form-control-lg rounded-4"
-                                               placeholder="Create a password"
-                                               style="min-height: 58px;" />
+                                               class="form-control rounded-3"
+                                               placeholder="Create a password" />
                                     <ValidationMessage For="@(() => Model.Password)" />
                                 </div>
 
-                                <div class="col-12 col-md-6">
-                                    <label for="confirmPassword" class="form-label fw-semibold">Confirm password</label>
+                                <div class="col-6">
+                                    <label for="confirmPassword" class="form-label fw-semibold mb-1">Confirm</label>
                                     <InputText id="confirmPassword"
                                                @bind-Value="Model.ConfirmPassword"
                                                type="password"
                                                autocomplete="new-password"
-                                               class="form-control form-control-lg rounded-4"
-                                               placeholder="Confirm your password"
-                                               style="min-height: 58px;" />
+                                               class="form-control rounded-3"
+                                               placeholder="Confirm password" />
                                     <ValidationMessage For="@(() => Model.ConfirmPassword)" />
                                 </div>
                             </div>
 
-                            <div class="d-grid mt-4">
-                                <button type="submit" class="btn btn-dark btn-lg rounded-4" style="min-height: 58px;" disabled="@IsSubmitting">
+                            <div class="d-grid mt-3">
+                                <button type="submit" class="btn btn-dark btn-lg rounded-3" disabled="@IsSubmitting">
                                     @(IsSubmitting ? "Creating account..." : "Create account")
                                 </button>
                             </div>

@@ -54,6 +54,17 @@ public sealed class UpdateMyOrganisationProfileHandler
         org.PublicContactEmail = request.PublicContactEmail?.Trim();
         org.PublicContactPhone = request.PublicContactPhone?.Trim();
         org.IsPublicProfileEnabled = request.IsPublicProfileEnabled;
+        org.IsEqualOpportunityEmployer = request.IsEqualOpportunityEmployer;
+        org.IsAccessibleWorkplace = request.IsAccessibleWorkplace;
+        org.BannerImageUrl = request.BannerImageUrl?.Trim();
+        org.CompanySize = request.CompanySize;
+        org.Industry = request.Industry;
+        org.LinkedInUrl = request.LinkedInUrl?.Trim();
+        org.TwitterHandle = request.TwitterHandle?.Trim();
+        org.FacebookUrl = request.FacebookUrl?.Trim();
+        org.TikTokHandle = request.TikTokHandle?.Trim();
+        org.InstagramHandle = request.InstagramHandle?.Trim();
+        org.YouTubeUrl = request.YouTubeUrl?.Trim();
 
         await _db.SaveChangesAsync(ct);
 
@@ -70,7 +81,19 @@ public sealed class UpdateMyOrganisationProfileHandler
             PublicLocationText = org.PublicLocationText,
             PublicContactEmail = org.PublicContactEmail,
             PublicContactPhone = org.PublicContactPhone,
-            IsPublicProfileEnabled = org.IsPublicProfileEnabled
+            IsPublicProfileEnabled = org.IsPublicProfileEnabled,
+            IsEqualOpportunityEmployer = org.IsEqualOpportunityEmployer,
+            IsAccessibleWorkplace = org.IsAccessibleWorkplace,
+            IsVerified = org.IsVerified,
+            BannerImageUrl = org.BannerImageUrl,
+            CompanySize = org.CompanySize,
+            Industry = org.Industry,
+            LinkedInUrl = org.LinkedInUrl,
+            TwitterHandle = org.TwitterHandle,
+            FacebookUrl = org.FacebookUrl,
+            TikTokHandle = org.TikTokHandle,
+            InstagramHandle = org.InstagramHandle,
+            YouTubeUrl = org.YouTubeUrl
         });
     }
 }

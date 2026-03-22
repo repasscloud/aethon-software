@@ -36,13 +36,28 @@ public sealed class MailerSendEmailService : IEmailService
             return;
         }
 
+        object? replyTo = message.ReplyToEmail is not null
+            ? new { email = message.ReplyToEmail, name = message.ReplyToName }
+            : null;
+
+        var attachments = message.Attachments.Count > 0
+            ? message.Attachments.Select(a => new
+            {
+                content = a.ContentBase64,
+                filename = a.FileName,
+                disposition = "attachment"
+            }).ToArray()
+            : null;
+
         var payload = new
         {
             from = new { email = _options.FromEmail, name = _options.FromName },
             to = new[] { new { email = message.ToEmail, name = message.ToName } },
+            reply_to = replyTo,
             subject = message.Subject,
             text = message.TextBody,
-            html = message.HtmlBody
+            html = message.HtmlBody,
+            attachments
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOptions);

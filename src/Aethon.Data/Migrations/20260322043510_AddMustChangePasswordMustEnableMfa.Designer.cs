@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260321074520_AddRegionsCountriesExpiry")]
-    partial class AddRegionsCountriesExpiry
+    [Migration("20260322043510_AddMustChangePasswordMustEnableMfa")]
+    partial class AddMustChangePasswordMustEnableMfa
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -162,10 +162,16 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("HasCommission")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IncludeCompanyLogo")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsHighlighted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsImmediateStart")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Keywords")
@@ -183,6 +189,12 @@ namespace Aethon.Data.Migrations
 
                     b.Property<Guid?>("OrganisationRecruitmentPartnershipId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("OteFrom")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("OteTo")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("OwnedByOrganisationId")
                         .HasColumnType("uuid");
@@ -218,6 +230,9 @@ namespace Aethon.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<string>("ScreeningQuestionsJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("ShortUrlCode")
                         .HasColumnType("text");
 
@@ -248,6 +263,12 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VideoVimeoId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("VideoYouTubeId")
+                        .HasColumnType("text");
 
                     b.Property<int>("Visibility")
                         .HasColumnType("integer");
@@ -350,6 +371,9 @@ namespace Aethon.Data.Migrations
                     b.Property<bool>("IsHired")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsNotSuitable")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsRejected")
                         .HasColumnType("boolean");
 
@@ -364,6 +388,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("LastStatusChangedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NotSuitableReasons")
+                        .HasColumnType("text");
 
                     b.Property<decimal?>("Rating")
                         .HasPrecision(5, 2)
@@ -395,6 +422,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<int?>("SalaryExpectationCurrency")
                         .HasColumnType("integer");
+
+                    b.Property<string>("ScreeningAnswersJson")
+                        .HasColumnType("text");
 
                     b.Property<string>("ScreeningSummary")
                         .HasMaxLength(4000)
@@ -1075,6 +1105,9 @@ namespace Aethon.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BannerImageUrl")
+                        .HasColumnType("text");
+
                     b.Property<int>("ClaimStatus")
                         .HasColumnType("integer");
 
@@ -1084,11 +1117,29 @@ namespace Aethon.Data.Migrations
                     b.Property<DateTime?>("ClaimedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("CompanySize")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FacebookUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("Industry")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InstagramHandle")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsAccessibleWorkplace")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEqualOpportunityEmployer")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsProvisionedByRecruiter")
                         .HasColumnType("boolean");
@@ -1096,12 +1147,12 @@ namespace Aethon.Data.Migrations
                     b.Property<bool>("IsPublicProfileEnabled")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsVerified")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("LegalName")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
+
+                    b.Property<string>("LinkedInUrl")
+                        .HasColumnType("text");
 
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(1000)
@@ -1155,6 +1206,12 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("TikTokHandle")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TwitterHandle")
+                        .HasColumnType("text");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -1163,6 +1220,11 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("VerificationTier")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<Guid?>("VerifiedByUserId")
                         .HasColumnType("uuid");
@@ -1174,9 +1236,10 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.HasKey("Id");
+                    b.Property<string>("YouTubeUrl")
+                        .HasColumnType("text");
 
-                    b.HasIndex("IsVerified");
+                    b.HasKey("Id");
 
                     b.HasIndex("NormalizedName");
 
@@ -1185,6 +1248,8 @@ namespace Aethon.Data.Migrations
                     b.HasIndex("Slug")
                         .IsUnique()
                         .HasFilter("\"Slug\" IS NOT NULL");
+
+                    b.HasIndex("VerificationTier");
 
                     b.HasIndex("Type", "Status");
 
@@ -1678,6 +1743,69 @@ namespace Aethon.Data.Migrations
                     b.ToTable("StoredFiles", (string)null);
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.StripePaymentEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("AmountTotal")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("CompletedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CustomerEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("InternalNotes")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StripeEventId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StripeEventId")
+                        .IsUnique();
+
+                    b.ToTable("StripePaymentEvents", (string)null);
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.WebhookDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1839,6 +1967,12 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("MustEnableMfa")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)

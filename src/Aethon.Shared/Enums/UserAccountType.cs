@@ -8,5 +8,6 @@ public enum UserAccountType
     Admin = 1,
     Company = 2,
     RecruiterAgency = 3,
-    JobSeeker = 4
+    JobSeeker = 4,
+    Support = 5
 }

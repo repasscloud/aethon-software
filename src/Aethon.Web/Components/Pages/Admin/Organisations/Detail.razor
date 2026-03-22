@@ -1,0 +1,535 @@
+@page "/admin/organisations/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using System.Text.Json
+@using Aethon.Shared.Auth
+@using Aethon.Shared.Enums
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_org?.Name ?? "Organisation") | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else if (!_ready)
+{
+    <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+}
+else if (_org is null)
+{
+    <div class="alert alert-danger rounded-4">Organisation not found.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-start gap-3 flex-wrap">
+                    <div class="flex-grow-1">
+                        <a href="/admin/organisations" class="text-secondary small text-decoration-none">← All organisations</a>
+                        <h1 class="h3 fw-bold mb-1 mt-1">@_org.Name</h1>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <span class="badge bg-secondary rounded-pill">@_org.Type</span>
+                            <span class="badge @(_org.Status == "Active" ? "bg-success" : "bg-danger") rounded-pill">@_org.Status</span>
+                            @if (_org.VerificationTier == "EnhancedTrusted")
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted Employer</span>
+                            }
+                            else if (_org.VerificationTier == "StandardEmployer")
+                            {
+                                <span class="badge bg-success rounded-pill"><i class="bi bi-patch-check me-1"></i>Standard Employer Verification</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_isSuperAdmin || _isAdmin)
+        {
+            <!-- Verification control — SuperAdmin + Admin only -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Verification</h2>
+                    @if (!string.IsNullOrEmpty(_verifyMessage))
+                    {
+                        <div class="alert @(_verifySuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3">@_verifyMessage</div>
+                    }
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <span class="text-secondary small me-2">Current tier:</span>
+                        <button class="btn btn-sm @(_selectedTier == VerificationTier.None ? "btn-dark" : "btn-outline-secondary") rounded-pill"
+                                @onclick='() => _selectedTier = VerificationTier.None'>None</button>
+                        <button class="btn btn-sm @(_selectedTier == VerificationTier.StandardEmployer ? "btn-success" : "btn-outline-success") rounded-pill"
+                                @onclick='() => _selectedTier = VerificationTier.StandardEmployer'>
+                            <i class="bi bi-patch-check me-1"></i>Standard Employer
+                        </button>
+                        <button class="btn btn-sm @(_selectedTier == VerificationTier.EnhancedTrusted ? "btn-warning" : "btn-outline-warning") rounded-pill"
+                                @onclick='() => _selectedTier = VerificationTier.EnhancedTrusted'>
+                            <i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted
+                        </button>
+                        <button class="btn btn-sm btn-primary rounded-pill ms-2" @onclick="SaveVerification" disabled="@_saving">
+                            @(_saving ? "Saving…" : "Save")
+                        </button>
+                    </div>
+                    @if (_org.VerifiedUtc.HasValue)
+                    {
+                        <div class="text-secondary small mt-2">Verified: @_org.VerifiedUtc.Value.ToString("dd MMM yyyy HH:mm") UTC</div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Details -->
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Details</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">Slug</dt>
+                            <dd class="col-7">@(_org.Slug ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Legal name</dt>
+                            <dd class="col-7">@(_org.LegalName ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Website</dt>
+                            <dd class="col-7">@(_org.WebsiteUrl ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Location</dt>
+                            <dd class="col-7">@(_org.PublicLocationText ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Public email</dt>
+                            <dd class="col-7">@(_org.PublicContactEmail ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Public phone</dt>
+                            <dd class="col-7">@(_org.PublicContactPhone ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Public profile</dt>
+                            <dd class="col-7">@(_org.IsPublicProfileEnabled ? "Enabled" : "Disabled")</dd>
+                            <dt class="col-5 text-secondary">Jobs</dt>
+                            <dd class="col-7">@_org.JobCount</dd>
+                            <dt class="col-5 text-secondary">Members</dt>
+                            <dd class="col-7">@_org.MemberCount</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Primary contact</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">Name</dt>
+                            <dd class="col-7">@(_org.PrimaryContactName ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Email</dt>
+                            <dd class="col-7">@(_org.PrimaryContactEmail ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Phone</dt>
+                            <dd class="col-7">@(_org.PrimaryContactPhone ?? "—")</dd>
+                            <dt class="col-5 text-secondary">EOE</dt>
+                            <dd class="col-7">@(_org.IsEqualOpportunityEmployer ? "Yes" : "No")</dd>
+                            <dt class="col-5 text-secondary">Accessible</dt>
+                            <dd class="col-7">@(_org.IsAccessibleWorkplace ? "Yes" : "No")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Partnerships panel -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <h2 class="h5 fw-bold mb-0 flex-grow-1">Recruiter partnerships</h2>
+                    @if (_isSuperAdmin || _isAdmin)
+                    {
+                        <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="ToggleCreateForm">
+                            @(_showCreateForm ? "Cancel" : "+ Link recruiter")
+                        </button>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(_partnershipMessage))
+                {
+                    <div class="alert @(_partnershipSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3">@_partnershipMessage</div>
+                }
+
+                @if (_showCreateForm && (_isSuperAdmin || _isAdmin))
+                {
+                    <div class="border rounded-3 p-3 mb-3 bg-light">
+                        <h3 class="h6 fw-semibold mb-3">Link a recruiter organisation</h3>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold mb-1">Search recruiter org</label>
+                                <input class="form-control form-control-sm" placeholder="Type to search…"
+                                       @bind="_createSearch" @bind:event="oninput" @bind:after="SearchRecruiter" />
+                                @if (_createSearchResults.Count > 0)
+                                {
+                                    <div class="list-group mt-1" style="position:absolute;z-index:100;width:300px;">
+                                        @foreach (var r in _createSearchResults)
+                                        {
+                                            <button type="button" class="list-group-item list-group-item-action small py-2"
+                                                    @onclick="@(() => SelectRecruiter(r))">@r.Name</button>
+                                        }
+                                    </div>
+                                }
+                                @if (_selectedRecruiter is not null)
+                                {
+                                    <div class="mt-1 small text-success"><i class="bi bi-check-circle me-1"></i>Selected: <strong>@_selectedRecruiter.Name</strong></div>
+                                }
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Initial status</label>
+                                <select class="form-select form-select-sm" @bind="_createStatus">
+                                    <option value="Active">Active (approved)</option>
+                                    <option value="Pending">Pending</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1">Permissions</label>
+                            <div class="d-flex flex-wrap gap-3">
+                                <div class="form-check"><input class="form-check-input" type="checkbox" @bind="_createCanPublish" /><label class="form-check-label small">Can publish jobs</label></div>
+                                <div class="form-check"><input class="form-check-input" type="checkbox" @bind="_createCanCreate" /><label class="form-check-label small">Can create draft jobs</label></div>
+                                <div class="form-check"><input class="form-check-input" type="checkbox" @bind="_createCanManageCandidates" /><label class="form-check-label small">Can manage candidates</label></div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold mb-1">Notes (optional)</label>
+                            <input class="form-control form-control-sm" @bind="_createNotes" />
+                        </div>
+                        <button class="btn btn-sm btn-primary rounded-pill" @onclick="CreatePartnership" disabled="@(_createSaving || _selectedRecruiter is null)">
+                            @(_createSaving ? "Linking…" : "Create partnership")
+                        </button>
+                    </div>
+                }
+
+                @if (_partnershipsLoading)
+                {
+                    <div class="text-secondary small">Loading…</div>
+                }
+                else if (_partnerships.Count == 0)
+                {
+                    <div class="text-secondary small">No partnerships found.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Recruiter</th>
+                                    <th>Status</th>
+                                    <th>Approved</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in _partnerships)
+                                {
+                                    <tr>
+                                        <td>@p.CompanyName</td>
+                                        <td>@p.RecruiterName</td>
+                                        <td><span class="badge @PartnershipStatusBadge(p.Status) rounded-pill">@p.Status</span></td>
+                                        <td>@(p.ApprovedUtc?.ToString("dd MMM yyyy") ?? "—")</td>
+                                        <td>
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                @if (p.Status != "Active")
+                                                {
+                                                    <button class="btn btn-outline-success rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                            @onclick="@(() => SetPartnershipStatus(p.Id, "Active"))">Approve</button>
+                                                }
+                                                @if (p.Status != "Suspended")
+                                                {
+                                                    <button class="btn btn-outline-warning rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                            @onclick="@(() => SetPartnershipStatus(p.Id, "Suspended"))">Suspend</button>
+                                                }
+                                                <button class="btn btn-outline-danger rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                        @onclick="@(() => DeletePartnership(p.Id))">Remove</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isSuperAdmin;
+    private bool _isAdmin;
+    private bool _isStaff;
+    private bool _ready;
+    private bool _saving;
+    private string? _verifyMessage;
+    private bool _verifySuccess;
+    private OrgDetail? _org;
+    private VerificationTier _selectedTier;
+
+    private bool _partnershipsLoading = true;
+    private List<PartnershipRow> _partnerships = [];
+    private string? _partnershipMessage;
+    private bool _partnershipSuccess;
+
+    // Create partnership form
+    private bool _showCreateForm;
+    private string _createSearch = "";
+    private List<OrgSearchRow> _createSearchResults = [];
+    private OrgSearchRow? _selectedRecruiter;
+    private string _createStatus = "Active";
+    private bool _createCanPublish;
+    private bool _createCanCreate;
+    private bool _createCanManageCandidates;
+    private string? _createNotes;
+    private bool _createSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        _isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = _isSuperAdmin || _isAdmin || isSupport;
+
+        if (_isStaff)
+        {
+            try
+            {
+                var client = await Api.CreateAsync();
+                _org = await client.GetFromJsonAsync<OrgDetail>($"/api/v1/admin/organisations/{Id}", AethonApiClient.JsonOptions);
+                if (_org is not null)
+                    _selectedTier = Enum.TryParse<VerificationTier>(_org.VerificationTier, out var t) ? t : VerificationTier.None;
+            }
+            catch { }
+
+            await LoadPartnershipsAsync();
+        }
+
+        _ready = true;
+    }
+
+    private async Task LoadPartnershipsAsync()
+    {
+        _partnershipsLoading = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<List<PartnershipRow>>(
+                $"/api/v1/admin/organisations/{Id}/partnerships", AethonApiClient.JsonOptions);
+            _partnerships = result ?? [];
+        }
+        catch { _partnerships = []; }
+        _partnershipsLoading = false;
+    }
+
+    private async Task SaveVerification()
+    {
+        _saving = true;
+        _verifyMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                $"/api/v1/admin/organisations/{Id}/verification",
+                new { tier = _selectedTier.ToString() },
+                AethonApiClient.JsonOptions);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _verifySuccess = true;
+                _verifyMessage = $"Verification tier updated to: {_selectedTier}";
+                if (_org is not null)
+                    _org = _org with { VerificationTier = _selectedTier.ToString() };
+            }
+            else
+            {
+                _verifySuccess = false;
+                _verifyMessage = "Failed to update verification tier.";
+            }
+        }
+        catch
+        {
+            _verifySuccess = false;
+            _verifyMessage = "An error occurred.";
+        }
+        _saving = false;
+    }
+
+    private async Task SetPartnershipStatus(Guid pid, string status)
+    {
+        _partnershipMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                $"/api/v1/admin/organisations/{Id}/partnerships/{pid}/status",
+                new { status },
+                AethonApiClient.JsonOptions);
+            if (resp.IsSuccessStatusCode)
+            {
+                _partnershipSuccess = true;
+                _partnershipMessage = $"Partnership status updated to {status}.";
+                await LoadPartnershipsAsync();
+            }
+            else
+            {
+                _partnershipSuccess = false;
+                _partnershipMessage = "Failed to update partnership status.";
+            }
+        }
+        catch
+        {
+            _partnershipSuccess = false;
+            _partnershipMessage = "An error occurred.";
+        }
+    }
+
+    private async Task DeletePartnership(Guid pid)
+    {
+        _partnershipMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.DeleteAsync($"/api/v1/admin/organisations/{Id}/partnerships/{pid}");
+            if (resp.IsSuccessStatusCode)
+            {
+                _partnershipSuccess = true;
+                _partnershipMessage = "Partnership deleted.";
+                _partnerships.RemoveAll(p => p.Id == pid);
+            }
+            else
+            {
+                _partnershipSuccess = false;
+                _partnershipMessage = "Failed to delete partnership.";
+            }
+        }
+        catch
+        {
+            _partnershipSuccess = false;
+            _partnershipMessage = "An error occurred.";
+        }
+    }
+
+    private void ToggleCreateForm()
+    {
+        _showCreateForm = !_showCreateForm;
+        _createSearch = "";
+        _createSearchResults = [];
+        _selectedRecruiter = null;
+        _createStatus = "Active";
+        _createCanPublish = false;
+        _createCanCreate = false;
+        _createCanManageCandidates = false;
+        _createNotes = null;
+    }
+
+    private async Task SearchRecruiter()
+    {
+        _selectedRecruiter = null;
+
+        if (_createSearch.Length < 2) { _createSearchResults = []; return; }
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<PagedOrgs>(
+                $"/api/v1/admin/organisations?search={Uri.EscapeDataString(_createSearch)}", AethonApiClient.JsonOptions);
+            _createSearchResults = result?.Items
+                .Where(o => o.Type == "RecruiterAgency")
+                .Take(8)
+                .ToList() ?? [];
+        }
+        catch { _createSearchResults = []; }
+    }
+
+    private void SelectRecruiter(OrgSearchRow org)
+    {
+        _selectedRecruiter = org;
+        _createSearch = org.Name;
+        _createSearchResults = [];
+    }
+
+    private async Task CreatePartnership()
+    {
+        if (_selectedRecruiter is null) return;
+        _createSaving = true;
+        _partnershipMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync(
+                $"/api/v1/admin/organisations/{Id}/partnerships",
+                new
+                {
+                    recruiterOrganisationId = _selectedRecruiter.Id,
+                    status = _createStatus,
+                    recruiterCanPublishJobs = _createCanPublish,
+                    recruiterCanCreateUnclaimedCompanyJobs = _createCanCreate,
+                    recruiterCanManageCandidates = _createCanManageCandidates,
+                    notes = string.IsNullOrWhiteSpace(_createNotes) ? (string?)null : _createNotes
+                },
+                AethonApiClient.JsonOptions);
+            if (resp.IsSuccessStatusCode)
+            {
+                _partnershipSuccess = true;
+                _partnershipMessage = $"Partnership created with {_selectedRecruiter.Name}.";
+                _showCreateForm = false;
+                await LoadPartnershipsAsync();
+            }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                _partnershipSuccess = false;
+                _partnershipMessage = "A partnership with this recruiter already exists.";
+            }
+            else
+            {
+                _partnershipSuccess = false;
+                _partnershipMessage = "Failed to create partnership.";
+            }
+        }
+        catch
+        {
+            _partnershipSuccess = false;
+            _partnershipMessage = "An error occurred.";
+        }
+        _createSaving = false;
+    }
+
+    private static string PartnershipStatusBadge(string? s) => s switch
+    {
+        "Active" => "bg-success",
+        "Suspended" => "bg-danger",
+        "Pending" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private sealed record OrgDetail(
+        Guid Id, string Name, string? LegalName, string? Slug, string? Type, string? Status,
+        string? ClaimStatus, string? VerificationTier, DateTime? VerifiedUtc,
+        bool IsPublicProfileEnabled, bool IsEqualOpportunityEmployer, bool IsAccessibleWorkplace,
+        string? WebsiteUrl, string? PublicLocationText, string? PublicContactEmail, string? PublicContactPhone,
+        string? PrimaryContactName, string? PrimaryContactEmail, string? PrimaryContactPhone,
+        string? LogoUrl, int JobCount, int MemberCount);
+
+    private sealed record PartnershipRow(Guid Id, Guid CompanyOrganisationId, string CompanyName,
+        Guid RecruiterOrganisationId, string RecruiterName, string? Status, string? Scope,
+        DateTime? ApprovedUtc, string? Notes);
+
+    private sealed record OrgSearchRow(Guid Id, string Name, string? Type);
+
+    private sealed class PagedOrgs
+    {
+        public int Total { get; set; }
+        public List<OrgSearchRow> Items { get; set; } = [];
+    }
+}

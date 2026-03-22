@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Aethon.Application.Abstractions.Authentication;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Results;
@@ -155,7 +156,7 @@ public sealed class CreateJobHandler
             Visibility = command.Visibility,
             Title = command.Title.Trim(),
             Description = command.Description.Trim(),
-            Summary = Normalize(command.Summary),
+            Summary = string.IsNullOrWhiteSpace(command.Summary) ? null : command.Summary.Trim(),
             Department = Normalize(command.Department),
             LocationText = Normalize(command.LocationText),
             WorkplaceType = command.WorkplaceType,
@@ -172,7 +173,7 @@ public sealed class CreateJobHandler
             ApplicationEmail = Normalize(command.ApplicationEmail),
             CreatedForUnclaimedCompany = command.CreatedForUnclaimedCompany,
             Category = command.Category,
-            Regions = command.Regions.Count > 0 ? JsonSerializer.Serialize(command.Regions) : null,
+            Regions = command.Regions.Count > 0 ? JsonSerializer.Serialize(command.Regions, _enumJson) : null,
             Countries = command.Countries.Count > 0 ? JsonSerializer.Serialize(command.Countries) : null,
             PostingExpiresUtc = command.PostingExpiresUtc,
             IncludeCompanyLogo = command.IncludeCompanyLogo,
@@ -183,8 +184,15 @@ public sealed class CreateJobHandler
                 ? JsonSerializer.Serialize(command.BenefitsTags)
                 : null,
             ApplicationSpecialRequirements = Normalize(command.ApplicationSpecialRequirements),
+            HasCommission = command.HasCommission,
+            OteFrom = command.OteFrom,
+            OteTo = command.OteTo,
+            IsImmediateStart = command.IsImmediateStart,
+            VideoYouTubeId = Normalize(command.VideoYouTubeId),
+            VideoVimeoId = Normalize(command.VideoVimeoId),
             Keywords = Normalize(command.Keywords),
             PoNumber = Normalize(command.PoNumber),
+            ScreeningQuestionsJson = command.ScreeningQuestionsJson,
             CreatedUtc = utcNow,
             CreatedByUserId = currentUserId
         };
@@ -195,6 +203,11 @@ public sealed class CreateJobHandler
 
         return Result<Guid>.Success(job.Id);
     }
+
+    private static readonly JsonSerializerOptions _enumJson = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

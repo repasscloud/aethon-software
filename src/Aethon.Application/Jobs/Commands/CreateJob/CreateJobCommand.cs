@@ -41,4 +41,13 @@ public sealed class CreateJobCommand
     public string? ApplicationSpecialRequirements { get; init; }
     public string? Keywords { get; init; }
     public string? PoNumber { get; init; }
+
+    public bool HasCommission { get; init; }
+    public decimal? OteFrom { get; init; }
+    public decimal? OteTo { get; init; }
+    public bool IsImmediateStart { get; init; }
+    public string? VideoYouTubeId { get; init; }
+    public string? VideoVimeoId { get; init; }
+    public JobStatus Status { get; init; } = JobStatus.Draft;
+    public string? ScreeningQuestionsJson { get; init; }
 }

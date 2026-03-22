@@ -65,8 +65,11 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
         builder.Property(x => x.PrimaryContactPhone)
             .HasMaxLength(50);
 
-        builder.Property(x => x.IsVerified)
-            .IsRequired();
+        builder.Ignore(x => x.IsVerified);
+
+        builder.Property(x => x.VerificationTier)
+            .IsRequired()
+            .HasDefaultValue(Aethon.Shared.Enums.VerificationTier.None);
 
         builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
@@ -77,7 +80,7 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
             .HasFilter("\"Slug\" IS NOT NULL");
         builder.HasIndex(x => x.PrimaryDomainId);
         builder.HasIndex(x => new { x.Type, x.Status });
-        builder.HasIndex(x => x.IsVerified);
+        builder.HasIndex(x => x.VerificationTier);
 
         builder.HasOne(x => x.PrimaryDomain)
             .WithMany()

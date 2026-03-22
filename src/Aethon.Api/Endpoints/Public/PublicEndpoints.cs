@@ -1,6 +1,8 @@
 using Aethon.Api.Common;
 using Aethon.Application.Applications.Commands.SubmitJobApplication;
+using Aethon.Application.Jobs.Commands.EmailJobApplication;
 using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
+using Aethon.Application.Jobs.Queries.GetPublicJobLocations;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
 using Aethon.Shared.Enums;
@@ -27,6 +29,16 @@ public static class PublicEndpoints
             return result.ToMinimalApiResult();
         });
 
+        // GET /api/v1/public/jobs/locations?q= — typeahead suggestions from active jobs
+        group.MapGet("/jobs/locations", async (
+            [FromServices] GetPublicJobLocationsHandler handler,
+            string? q,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(q, ct);
+            return result.ToMinimalApiResult();
+        });
+
         // GET /api/v1/public/jobs
         group.MapGet("/jobs", async (
             [FromServices] GetPublicJobsHandler handler,
@@ -37,6 +49,11 @@ public static class PublicEndpoints
             string? country,
             string? keywords,
             string? organisationSlug,
+            decimal? salaryMin,
+            decimal? salaryMax,
+            bool? verifiedOnly,
+            WorkplaceType? workplaceType,
+            bool? immediateStart,
             CancellationToken ct) =>
         {
             var query = new GetPublicJobsQuery
@@ -47,7 +64,12 @@ public static class PublicEndpoints
                 Region = region,
                 Country = country,
                 Keywords = keywords,
-                OrganisationSlug = organisationSlug
+                OrganisationSlug = organisationSlug,
+                SalaryMin = salaryMin,
+                SalaryMax = salaryMax,
+                VerifiedOnly = verifiedOnly ?? false,
+                WorkplaceType = workplaceType,
+                ImmediateStart = immediateStart ?? false
             };
             var result = await handler.HandleAsync(query, ct);
             return result.ToMinimalApiResult();
@@ -63,6 +85,17 @@ public static class PublicEndpoints
             return result.ToMinimalApiResult();
         });
 
+        // POST /api/v1/public/jobs/{id}/apply-email  (anonymous — sends CV by email to employer)
+        group.MapPost("/jobs/{jobId:guid}/apply-email", async (
+            [FromServices] EmailJobApplicationHandler handler,
+            Guid jobId,
+            EmailJobApplicationRequestDto request,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(jobId, request, ct);
+            return result.ToMinimalApiResult();
+        });
+
         // POST /api/v1/public/jobs/{id}/apply  (requires auth)
         group.MapPost("/jobs/{jobId:guid}/apply", async (
             [FromServices] SubmitJobApplicationHandler handler,
@@ -75,7 +108,8 @@ public static class PublicEndpoints
             {
                 JobId = jobId,
                 CoverLetter = request.CoverLetter,
-                Source = request.Source ?? "AethonPublicBoard"
+                Source = request.Source ?? "AethonPublicBoard",
+                ScreeningAnswersJson = request.ScreeningAnswersJson
             };
 
             var result = await handler.HandleAsync(command, ct);
