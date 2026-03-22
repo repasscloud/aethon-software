@@ -16,6 +16,15 @@ public sealed class GetPublicJobsQuery
     public bool VerifiedOnly { get; init; }
     public WorkplaceType? WorkplaceType { get; init; }
     public bool ImmediateStart { get; init; }
+
+    /// <summary>Centre latitude for radius-based search.</summary>
+    public double? Latitude { get; init; }
+
+    /// <summary>Centre longitude for radius-based search.</summary>
+    public double? Longitude { get; init; }
+
+    /// <summary>Search radius in kilometres. Default 25 KM when Latitude/Longitude are provided.</summary>
+    public double RadiusKm { get; init; } = 25;
 }
 
 public enum DateRangeFilter

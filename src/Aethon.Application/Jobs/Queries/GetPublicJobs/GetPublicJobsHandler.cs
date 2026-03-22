@@ -77,7 +77,7 @@ public sealed class GetPublicJobsHandler
         if (!string.IsNullOrWhiteSpace(q.OrganisationSlug))
         {
             var slug = q.OrganisationSlug.ToLower();
-            dbQuery = dbQuery.Where(j => j.OwnedByOrganisation.Slug.ToLower() == slug);
+            dbQuery = dbQuery.Where(j => j.OwnedByOrganisation.Slug != null && j.OwnedByOrganisation.Slug.ToLower() == slug);
         }
 
         // Keywords filter
@@ -113,7 +113,7 @@ public sealed class GetPublicJobsHandler
             .OrderByDescending(j => j.StickyUntilUtc > DateTime.UtcNow)
             .ThenByDescending(j => j.IsHighlighted)
             .ThenByDescending(j => j.PublishedUtc)
-            .Take(200)
+            .Take(500)
             .Select(j => new
             {
                 j.Id,
@@ -125,6 +125,8 @@ public sealed class GetPublicJobsHandler
                 OrganisationIsVerified = j.OwnedByOrganisation.VerificationTier != VerificationTier.None,
                 j.Department,
                 j.LocationText,
+                j.LocationLatitude,
+                j.LocationLongitude,
                 j.WorkplaceType,
                 j.EmploymentType,
                 j.SalaryFrom,
@@ -145,38 +147,70 @@ public sealed class GetPublicJobsHandler
 
         var enumJson = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } };
 
-        var jobs = raw.Select(j => new PublicJobListItemDto
+        // Apply Haversine radius filter in memory (avoids EF translation issues)
+        var filtered = q.Latitude.HasValue && q.Longitude.HasValue
+            ? raw.Where(j =>
+                j.LocationLatitude.HasValue && j.LocationLongitude.HasValue &&
+                Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude.Value, j.LocationLongitude.Value) <= q.RadiusKm)
+              .OrderBy(j => Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude!.Value, j.LocationLongitude!.Value))
+              .Take(200)
+              .ToList()
+            : raw.Take(200).ToList();
+
+        var jobs = filtered.Select(j =>
         {
-            Id = j.Id,
-            Title = j.Title,
-            Summary = j.Summary,
-            OrganisationName = j.OrganisationName,
-            OrganisationSlug = j.OrganisationSlug,
-            OrganisationLogoUrl = j.IncludeCompanyLogo ? j.OrganisationLogoUrl : null,
-            OrganisationIsVerified = j.OrganisationIsVerified,
-            Department = j.Department,
-            LocationText = j.LocationText,
-            WorkplaceType = j.WorkplaceType,
-            EmploymentType = j.EmploymentType,
-            SalaryFrom = j.SalaryFrom,
-            SalaryTo = j.SalaryTo,
-            SalaryCurrency = j.SalaryCurrency,
-            HasCommission = j.HasCommission,
-            OteFrom = j.OteFrom,
-            OteTo = j.OteTo,
-            PublishedUtc = j.PublishedUtc,
-            Category = j.Category,
-            Regions = j.Regions is not null
-                ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions, enumJson) ?? []
-                : [],
-            BenefitsTags = j.BenefitsTags is not null
-                ? JsonSerializer.Deserialize<List<string>>(j.BenefitsTags) ?? []
-                : [],
-            IsHighlighted = j.IsHighlighted,
-            IsImmediateStart = j.IsImmediateStart,
-            IncludeCompanyLogo = j.IncludeCompanyLogo
+            var dto = new PublicJobListItemDto
+            {
+                Id = j.Id,
+                Title = j.Title,
+                Summary = j.Summary,
+                OrganisationName = j.OrganisationName,
+                OrganisationSlug = j.OrganisationSlug,
+                OrganisationLogoUrl = j.IncludeCompanyLogo ? j.OrganisationLogoUrl : null,
+                OrganisationIsVerified = j.OrganisationIsVerified,
+                Department = j.Department,
+                LocationText = j.LocationText,
+                LocationLatitude = j.LocationLatitude,
+                LocationLongitude = j.LocationLongitude,
+                WorkplaceType = j.WorkplaceType,
+                EmploymentType = j.EmploymentType,
+                SalaryFrom = j.SalaryFrom,
+                SalaryTo = j.SalaryTo,
+                SalaryCurrency = j.SalaryCurrency,
+                HasCommission = j.HasCommission,
+                OteFrom = j.OteFrom,
+                OteTo = j.OteTo,
+                PublishedUtc = j.PublishedUtc,
+                Category = j.Category,
+                Regions = j.Regions is not null
+                    ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions, enumJson) ?? []
+                    : [],
+                BenefitsTags = j.BenefitsTags is not null
+                    ? JsonSerializer.Deserialize<List<string>>(j.BenefitsTags) ?? []
+                    : [],
+                IsHighlighted = j.IsHighlighted,
+                IsImmediateStart = j.IsImmediateStart,
+                IncludeCompanyLogo = j.IncludeCompanyLogo
+            };
+
+            if (q.Latitude.HasValue && q.Longitude.HasValue && j.LocationLatitude.HasValue && j.LocationLongitude.HasValue)
+                dto.DistanceKm = Math.Round(Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude.Value, j.LocationLongitude.Value), 1);
+
+            return dto;
         }).ToList();
 
         return Result<List<PublicJobListItemDto>>.Success(jobs);
+    }
+
+    /// <summary>Haversine great-circle distance in kilometres.</summary>
+    private static double Haversine(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371.0;
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLon = (lon2 - lon1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return R * 2 * Math.Asin(Math.Sqrt(a));
     }
 }

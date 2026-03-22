@@ -9,6 +9,7 @@
 @using Aethon.Web.Components.Layout
 @using Microsoft.AspNetCore.Authorization
 @inject AethonApiClient Api
+@inject IJSRuntime JS
 
 <PageTitle>Jobs | Aethon</PageTitle>
 
@@ -43,7 +44,35 @@
 
                 <div class="col-12 col-md-2 d-flex gap-2">
                     <button class="btn btn-dark rounded-4 px-3 flex-grow-1" @onclick="LoadAsync">Search</button>
+                    <button class="btn btn-outline-secondary rounded-4 px-3" title="Search near my location"
+                            @onclick="UseMyLocationAsync" disabled="@_locating">
+                        @if (_locating)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-geo-alt-fill"></i>
+                        }
+                    </button>
                 </div>
+                @if (_nearMeLat.HasValue)
+                {
+                    <div class="col-12">
+                        <div class="alert alert-info rounded-3 py-2 small mb-0 d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-geo-alt-fill me-1"></i>Showing jobs within 25 km of your location</span>
+                            <button class="btn btn-sm btn-link text-secondary p-0 ms-2" @onclick="ClearNearMe">Clear</button>
+                        </div>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_locatingError))
+                {
+                    <div class="col-12">
+                        <div class="alert alert-warning rounded-3 py-2 small mb-0">
+                            <i class="bi bi-exclamation-triangle me-1"></i>@_locatingError
+                        </div>
+                    </div>
+                }
             </div>
 
             <div class="row g-3 mb-3">
@@ -337,6 +366,12 @@
                                     {
                                         <span class="badge bg-light text-secondary border rounded-pill"><i class="bi bi-geo-alt-fill text-danger me-1" style="font-size:.7rem;"></i>@job.LocationText</span>
                                     }
+                                    @if (job.DistanceKm.HasValue)
+                                    {
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill" style="font-size:.7rem;">
+                                            <i class="bi bi-bullseye me-1"></i>@job.DistanceKm.Value.ToString("F1") km away
+                                        </span>
+                                    }
                                     <span class="badge bg-light text-secondary border rounded-pill">@FormatEnum(job.WorkplaceType.ToString())</span>
                                     <span class="badge bg-light text-secondary border rounded-pill">@FormatEnum(job.EmploymentType.ToString())</span>
                                     @if (job.Category.HasValue)
@@ -418,6 +453,11 @@
     private bool _verifiedOnly;
     private bool _immediateStart;
 
+    private double? _nearMeLat;
+    private double? _nearMeLng;
+    private bool _locating;
+    private string? _locatingError;
+
     private System.Timers.Timer? _debounce;
     private System.Timers.Timer? _locationDebounce;
 
@@ -494,6 +534,12 @@
             if (_salaryMax.HasValue)                      qs.Add($"salaryMax={_salaryMax.Value}");
             if (_verifiedOnly)                            qs.Add("verifiedOnly=true");
             if (_immediateStart)                          qs.Add("immediateStart=true");
+            if (_nearMeLat.HasValue && _nearMeLng.HasValue)
+            {
+                qs.Add($"latitude={_nearMeLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                qs.Add($"longitude={_nearMeLng.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+                qs.Add("radiusKm=25");
+            }
 
             var url = "/api/v1/public/jobs";
             if (qs.Count > 0) url += "?" + string.Join("&", qs);
@@ -510,6 +556,42 @@
             _loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task UseMyLocationAsync()
+    {
+        _locating = true;
+        _locatingError = null;
+        StateHasChanged();
+
+        try
+        {
+            var coords = await JS.InvokeAsync<double[]>("aethon.getLocation");
+            _nearMeLat = coords[0];
+            _nearMeLng = coords[1];
+            await LoadAsync();
+        }
+        catch (JSException)
+        {
+            _locatingError = "Location access was denied or is unavailable. Please allow location access in your browser.";
+        }
+        catch
+        {
+            _locatingError = "Could not determine your location.";
+        }
+        finally
+        {
+            _locating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearNearMe()
+    {
+        _nearMeLat = null;
+        _nearMeLng = null;
+        _locatingError = null;
+        await LoadAsync();
     }
 
     private static string FormatEnum(string value)

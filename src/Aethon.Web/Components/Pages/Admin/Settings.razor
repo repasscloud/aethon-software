@@ -1,0 +1,262 @@
+@page "/admin/settings"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SuperAdmin,Admin,Support")]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using System.Net.Http.Json
+@inject AuthenticationStateProvider AuthProvider
+@inject AethonApiClient Api
+
+<PageTitle>Settings | Admin | Aethon</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-4">
+                <h2 class="h4 fw-bold mb-0 me-3">System Settings</h2>
+                <span class="badge bg-secondary">Admin</span>
+            </div>
+
+            @if (_loading)
+            {
+                <p class="text-secondary">Loading settings...</p>
+            }
+            else
+            {
+                <!-- Google Job Indexing -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Job Syndication</h5>
+                        <p class="text-secondary small mb-4">Control how jobs are syndicated to external platforms.</p>
+
+                        <div class="mb-4 pb-4 border-bottom">
+                            <div class="d-flex align-items-start justify-content-between">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">
+                                        <i class="bi bi-google me-2"></i>Google Job Indexing
+                                    </div>
+                                    <div class="text-secondary small">
+                                        Automatically submit new, updated, and closed jobs to the Google Indexing API.
+                                        Requires a Service Account JSON key and site verification in Google Search Console.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="googleIndexingToggle"
+                                           checked="@_googleIndexingEnabled"
+                                           @onchange="ToggleGoogleIndexing"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_googleIndexingMessage))
+                            {
+                                <div class="alert @(_googleIndexingSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_googleIndexingMessage
+                                </div>
+                            }
+                        </div>
+
+                        @if (_isSuperAdmin)
+                        {
+                            <div>
+                                <label class="form-label fw-semibold">Google Service Account JSON</label>
+                                <div class="text-secondary small mb-2">
+                                    Paste the full JSON key file downloaded from Google Cloud Console.
+                                    This is required for the Indexing API.
+                                    <strong>Never share this key.</strong>
+                                </div>
+                                <textarea class="form-control rounded-3 font-monospace small"
+                                          rows="6"
+                                          @bind="_serviceAccountJson"
+                                          placeholder='{"type":"service_account","project_id":"..."}' />
+                                <div class="alert alert-warning rounded-3 mt-2 py-2 small">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    The Service Account email must be added as an <strong>Owner</strong> in Google Search Console
+                                    before any indexing requests will be accepted.
+                                </div>
+                                <button class="btn btn-dark rounded-3 mt-2" @onclick="SaveServiceAccountJson" disabled="@_saving">
+                                    @(_saving ? "Saving..." : "Save Service Account JSON")
+                                </button>
+                                @if (!string.IsNullOrEmpty(_saJsonMessage))
+                                {
+                                    <div class="alert @(_saJsonSuccess ? "alert-success" : "alert-danger") rounded-3 mt-2 py-2 mb-0">
+                                        @_saJsonMessage
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Coming Soon platforms -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Additional Platforms</h5>
+                        <p class="text-secondary small mb-3">More syndication providers coming soon.</p>
+                        @foreach (var platform in _comingSoon)
+                        {
+                            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                                <div class="fw-semibold text-secondary">@platform</div>
+                                <span class="badge bg-light text-secondary border">Coming soon</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Syndication History -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Recent Syndication History</h5>
+                        @if (_syndicationRecords.Count == 0)
+                        {
+                            <p class="text-secondary">No syndication records yet.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Job</th>
+                                            <th>Provider</th>
+                                            <th>Status</th>
+                                            <th>Submitted</th>
+                                            <th>Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var rec in _syndicationRecords)
+                                        {
+                                            <tr>
+                                                <td class="text-truncate" style="max-width:200px;">@rec.JobTitle</td>
+                                                <td>@rec.Provider</td>
+                                                <td>
+                                                    <span class="badge @(rec.Status == "Success" ? "bg-success" : "bg-danger")">
+                                                        @rec.Status
+                                                    </span>
+                                                </td>
+                                                <td class="small text-secondary">@rec.SubmittedUtc.ToString("dd MMM yyyy HH:mm")</td>
+                                                <td class="small text-danger text-truncate" style="max-width:250px;">@rec.LastErrorMessage</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private bool _isSuperAdmin;
+
+    private bool _googleIndexingEnabled;
+    private string? _googleIndexingMessage;
+    private bool _googleIndexingSuccess;
+
+    private string _serviceAccountJson = "";
+    private string? _saJsonMessage;
+    private bool _saJsonSuccess;
+
+    private List<SyndicationRecordDto> _syndicationRecords = [];
+
+    private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        _isSuperAdmin = authState.User.IsInRole("SuperAdmin");
+
+        var client = await Api.CreateAsync();
+        try
+        {
+            var settings = await client.GetFromJsonAsync<List<SettingDto>>("/api/v1/admin/settings");
+            if (settings is not null)
+            {
+                var enabled = settings.FirstOrDefault(s => s.Key == "GoogleIndexing.Enabled");
+                _googleIndexingEnabled = enabled?.Value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+
+                if (_isSuperAdmin)
+                {
+                    var saJson = settings.FirstOrDefault(s => s.Key == "GoogleIndexing.ServiceAccountJson");
+                    _serviceAccountJson = saJson?.Value ?? "";
+                }
+            }
+
+            var records = await client.GetFromJsonAsync<List<SyndicationRecordDto>>("/api/v1/admin/syndication-records");
+            _syndicationRecords = records ?? [];
+        }
+        catch { /* degrade gracefully */ }
+
+        _loading = false;
+    }
+
+    private async Task ToggleGoogleIndexing(ChangeEventArgs e)
+    {
+        _googleIndexingEnabled = (bool)(e.Value ?? false);
+        _googleIndexingMessage = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/GoogleIndexing.Enabled",
+                new { Value = _googleIndexingEnabled ? "true" : "false" });
+
+            _googleIndexingSuccess = response.IsSuccessStatusCode;
+            _googleIndexingMessage = response.IsSuccessStatusCode
+                ? $"Google Indexing {(_googleIndexingEnabled ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _googleIndexingSuccess = false;
+            _googleIndexingMessage = "Unable to reach settings service.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveServiceAccountJson()
+    {
+        _saJsonMessage = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/GoogleIndexing.ServiceAccountJson",
+                new { Value = _serviceAccountJson });
+
+            _saJsonSuccess = response.IsSuccessStatusCode;
+            _saJsonMessage = response.IsSuccessStatusCode
+                ? "Service Account JSON saved."
+                : "Failed to save Service Account JSON.";
+        }
+        catch
+        {
+            _saJsonSuccess = false;
+            _saJsonMessage = "Unable to reach settings service.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private record SettingDto(string Key, string Value, string? Description);
+    private record SyndicationRecordDto(
+        Guid Id, Guid JobId, string JobTitle, string Provider,
+        string Status, string? ExternalRef, DateTime SubmittedUtc,
+        DateTime? LastAttemptUtc, string? LastErrorMessage);
+}

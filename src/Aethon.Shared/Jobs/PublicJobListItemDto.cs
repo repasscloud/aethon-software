@@ -13,6 +13,10 @@ public sealed class PublicJobListItemDto
     public bool OrganisationIsVerified { get; set; }
     public string? Department { get; set; }
     public string? LocationText { get; set; }
+    public double? LocationLatitude { get; set; }
+    public double? LocationLongitude { get; set; }
+    /// <summary>Populated when a radius search was performed.</summary>
+    public double? DistanceKm { get; set; }
     public WorkplaceType WorkplaceType { get; set; }
     public EmploymentType EmploymentType { get; set; }
     public decimal? SalaryFrom { get; set; }

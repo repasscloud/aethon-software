@@ -30,6 +30,19 @@ public sealed class UpdateOrganisationProfileRequestDto
     [MaxLength(250)]
     public string? PublicLocationText { get; set; }
 
+    [MaxLength(150)]
+    public string? LocationCity { get; set; }
+    [MaxLength(150)]
+    public string? LocationState { get; set; }
+    [MaxLength(100)]
+    public string? LocationCountry { get; set; }
+    [MaxLength(10)]
+    public string? LocationCountryCode { get; set; }
+    public double? LocationLatitude { get; set; }
+    public double? LocationLongitude { get; set; }
+    [MaxLength(500)]
+    public string? LocationPlaceId { get; set; }
+
     [MaxLength(320)]
     [EmailAddress]
     public string? PublicContactEmail { get; set; }

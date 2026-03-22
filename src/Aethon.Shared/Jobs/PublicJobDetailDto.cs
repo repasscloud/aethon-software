@@ -10,6 +10,12 @@ public sealed class PublicJobDetailDto
     public string? Summary { get; set; }
     public string? Department { get; set; }
     public string? LocationText { get; set; }
+    public string? LocationCity { get; set; }
+    public string? LocationState { get; set; }
+    public string? LocationCountry { get; set; }
+    public string? LocationCountryCode { get; set; }
+    public double? LocationLatitude { get; set; }
+    public double? LocationLongitude { get; set; }
     public WorkplaceType WorkplaceType { get; set; }
     public EmploymentType EmploymentType { get; set; }
     public string Description { get; set; } = "";
@@ -22,6 +28,7 @@ public sealed class PublicJobDetailDto
     public decimal? OteFrom { get; set; }
     public decimal? OteTo { get; set; }
     public DateTime? PublishedUtc { get; set; }
+    public DateTime? PostingExpiresUtc { get; set; }
     public JobCategory? Category { get; set; }
     public List<JobRegion> Regions { get; set; } = [];
     public List<string> BenefitsTags { get; set; } = [];

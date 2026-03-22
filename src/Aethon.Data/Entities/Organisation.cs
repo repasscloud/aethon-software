@@ -18,6 +18,13 @@ public class Organisation : EntityBase
     public string? LogoUrl { get; set; }
     public string? Summary { get; set; }
     public string? PublicLocationText { get; set; }
+    public string? LocationCity { get; set; }
+    public string? LocationState { get; set; }
+    public string? LocationCountry { get; set; }
+    public string? LocationCountryCode { get; set; }
+    public double? LocationLatitude { get; set; }
+    public double? LocationLongitude { get; set; }
+    public string? LocationPlaceId { get; set; }
     public string? PublicContactEmail { get; set; }
     public string? PublicContactPhone { get; set; }
     public bool IsPublicProfileEnabled { get; set; }

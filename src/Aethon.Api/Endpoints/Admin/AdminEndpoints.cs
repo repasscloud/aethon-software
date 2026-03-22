@@ -1,4 +1,5 @@
 using Aethon.Application.Abstractions.Email;
+using Aethon.Application.Abstractions.Settings;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Data.Identity;
@@ -684,6 +685,86 @@ public static class AdminEndpoints
 
             return Results.Ok(new { eventId, status = request.Status.ToString() });
         });
+
+        // ─── System Settings ──────────────────────────────────────────────────────
+
+        // GET /api/v1/admin/settings
+        group.MapGet("/settings", async (
+            ISystemSettingsService settings,
+            AethonDbContext db,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var isSuperAdmin = http.User.IsInRole("SuperAdmin");
+
+            var allSettings = await db.SystemSettings
+                .AsNoTracking()
+                .OrderBy(s => s.Key)
+                .Select(s => new
+                {
+                    s.Key,
+                    // Mask the SA JSON for non-SuperAdmins
+                    Value = s.Key == SystemSettingKeys.GoogleIndexingServiceAccount && !isSuperAdmin
+                        ? (string.IsNullOrEmpty(s.Value) ? "" : "••••••••")
+                        : s.Value,
+                    s.Description,
+                    s.UpdatedUtc,
+                    s.UpdatedByUserId
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(allSettings);
+        });
+
+        // PUT /api/v1/admin/settings/{key}
+        group.MapPut("/settings/{key}", async (
+            string key,
+            UpdateSettingRequest request,
+            ISystemSettingsService settings,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            // Only SuperAdmin can update the Service Account JSON
+            if (key == SystemSettingKeys.GoogleIndexingServiceAccount && !http.User.IsInRole("SuperAdmin"))
+                return Results.Forbid();
+
+            var userId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid = userId != null && Guid.TryParse(userId, out var g) ? (Guid?)g : null;
+
+            await settings.SetAsync(key, request.Value, updatedByUserId: userGuid, ct: ct);
+
+            return Results.Ok(new { key, updated = true });
+        });
+
+        // GET /api/v1/admin/syndication-records?page=
+        group.MapGet("/syndication-records", async (
+            AethonDbContext db,
+            int page = 1,
+            CancellationToken ct = default) =>
+        {
+            const int pageSize = 100;
+
+            var records = await db.JobSyndicationRecords
+                .AsNoTracking()
+                .OrderByDescending(r => r.SubmittedUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.JobId,
+                    JobTitle = r.Job.Title,
+                    r.Provider,
+                    r.Status,
+                    r.ExternalRef,
+                    r.SubmittedUtc,
+                    r.LastAttemptUtc,
+                    r.LastErrorMessage
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(records);
+        });
     }
 
     public sealed class SetVerificationTierRequest
@@ -734,5 +815,10 @@ public static class AdminEndpoints
     {
         public StripeEventStatus Status { get; set; }
         public string? InternalNotes { get; set; }
+    }
+
+    public sealed class UpdateSettingRequest
+    {
+        public string Value { get; set; } = string.Empty;
     }
 }

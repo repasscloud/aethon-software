@@ -52,6 +52,25 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(x => x.LocationText)
             .HasMaxLength(250);
 
+        builder.Property(x => x.LocationCity)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.LocationState)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.LocationCountry)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.LocationCountryCode)
+            .HasMaxLength(10);
+
+        builder.Property(x => x.LocationLatitude);
+
+        builder.Property(x => x.LocationLongitude);
+
+        builder.Property(x => x.LocationPlaceId)
+            .HasMaxLength(500);
+
         builder.Property(x => x.WorkplaceType)
             .IsRequired();
 

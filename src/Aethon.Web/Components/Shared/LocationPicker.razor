@@ -1,0 +1,118 @@
+@inject IJSRuntime JS
+@inject IConfiguration Configuration
+@implements IAsyncDisposable
+
+<div class="location-picker-wrapper">
+    <input id="@_elementId"
+           type="text"
+           class="form-control rounded-3"
+           placeholder="@Placeholder"
+           value="@LocationText"
+           @oninput="OnInput"
+           autocomplete="off" />
+    @if (!string.IsNullOrWhiteSpace(LocationCity) || !string.IsNullOrWhiteSpace(LocationCountry))
+    {
+        <div class="form-text text-success mt-1">
+            <i class="bi bi-geo-alt-fill me-1"></i>
+            @LocationCity@(!string.IsNullOrWhiteSpace(LocationCity) && !string.IsNullOrWhiteSpace(LocationState) ? ", " : "")@LocationState@(!string.IsNullOrWhiteSpace(LocationCountry) ? " · " + LocationCountry : "")
+            @if (LocationLatitude.HasValue)
+            {
+                <span class="text-secondary ms-2 small">(@LocationLatitude.Value.ToString("F4"), @LocationLongitude!.Value.ToString("F4"))</span>
+            }
+        </div>
+    }
+    @if (_placesDisabled)
+    {
+        <div class="form-text text-secondary mt-1">
+            <i class="bi bi-info-circle me-1"></i>Location autocomplete not configured.
+        </div>
+    }
+</div>
+
+@code {
+    private readonly string _elementId = $"location-picker-{Guid.NewGuid():N}";
+    private DotNetObjectReference<LocationPicker>? _dotNetRef;
+    private bool _placesDisabled;
+
+    [Parameter] public string? LocationText { get; set; }
+    [Parameter] public EventCallback<string?> LocationTextChanged { get; set; }
+
+    [Parameter] public string? LocationCity { get; set; }
+    [Parameter] public EventCallback<string?> LocationCityChanged { get; set; }
+
+    [Parameter] public string? LocationState { get; set; }
+    [Parameter] public EventCallback<string?> LocationStateChanged { get; set; }
+
+    [Parameter] public string? LocationCountry { get; set; }
+    [Parameter] public EventCallback<string?> LocationCountryChanged { get; set; }
+
+    [Parameter] public string? LocationCountryCode { get; set; }
+    [Parameter] public EventCallback<string?> LocationCountryCodeChanged { get; set; }
+
+    [Parameter] public double? LocationLatitude { get; set; }
+    [Parameter] public EventCallback<double?> LocationLatitudeChanged { get; set; }
+
+    [Parameter] public double? LocationLongitude { get; set; }
+    [Parameter] public EventCallback<double?> LocationLongitudeChanged { get; set; }
+
+    [Parameter] public string? LocationPlaceId { get; set; }
+    [Parameter] public EventCallback<string?> LocationPlaceIdChanged { get; set; }
+
+    [Parameter] public string Placeholder { get; set; } = "Start typing a city...";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var apiKey = Configuration["GooglePlaces:ApiKey"] ?? "";
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            _placesDisabled = true;
+            StateHasChanged();
+            return;
+        }
+
+        _dotNetRef = DotNetObjectReference.Create(this);
+
+        try
+        {
+            await JS.InvokeVoidAsync("locationPicker.init", _elementId, _dotNetRef);
+        }
+        catch
+        {
+            // JS not available (e.g. prerender) — will re-init on next render cycle
+        }
+    }
+
+    private Task OnInput(ChangeEventArgs e)
+    {
+        // Allow the user to type freely — clear structured fields so they aren't stale
+        return LocationTextChanged.InvokeAsync(e.Value?.ToString());
+    }
+
+    [JSInvokable]
+    public async Task OnPlaceSelected(
+        string city, string state, string country, string countryCode,
+        double lat, double lng, string placeId, string displayText)
+    {
+        await LocationTextChanged.InvokeAsync(displayText);
+        await LocationCityChanged.InvokeAsync(city);
+        await LocationStateChanged.InvokeAsync(state);
+        await LocationCountryChanged.InvokeAsync(country);
+        await LocationCountryCodeChanged.InvokeAsync(countryCode);
+        await LocationLatitudeChanged.InvokeAsync(lat);
+        await LocationLongitudeChanged.InvokeAsync(lng);
+        await LocationPlaceIdChanged.InvokeAsync(placeId);
+
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotNetRef is not null)
+        {
+            try { await JS.InvokeVoidAsync("locationPicker.destroy", _elementId); } catch { }
+            _dotNetRef.Dispose();
+        }
+    }
+}

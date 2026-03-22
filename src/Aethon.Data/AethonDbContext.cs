@@ -44,6 +44,9 @@ public sealed class AethonDbContext
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<JobSyndicationRecord> JobSyndicationRecords => Set<JobSyndicationRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

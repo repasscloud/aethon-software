@@ -55,6 +55,7 @@ services:
       DataProtection__CertBase64: "${DataProtection__CertBase64:-}"
       DataProtection__KeysPath: /keys
       DataProtection__ApplicationName: Aethon
+      GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
     volumes:
       - dp_keys:/keys
     ports:

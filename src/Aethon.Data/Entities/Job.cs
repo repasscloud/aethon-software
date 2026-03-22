@@ -117,6 +117,27 @@ public class Job : EntityBase
     /// </summary>
     public string? LocationText { get; set; }
 
+    /// <summary>Structured city name from Google Places.</summary>
+    public string? LocationCity { get; set; }
+
+    /// <summary>Structured state/region from Google Places.</summary>
+    public string? LocationState { get; set; }
+
+    /// <summary>Structured country name from Google Places.</summary>
+    public string? LocationCountry { get; set; }
+
+    /// <summary>ISO 3166-1 alpha-2 country code from Google Places.</summary>
+    public string? LocationCountryCode { get; set; }
+
+    /// <summary>GPS latitude for radius-based job search.</summary>
+    public double? LocationLatitude { get; set; }
+
+    /// <summary>GPS longitude for radius-based job search.</summary>
+    public double? LocationLongitude { get; set; }
+
+    /// <summary>Google Places place_id for the job location.</summary>
+    public string? LocationPlaceId { get; set; }
+
     /// <summary>
     /// Indicates whether the role is onsite, remote, hybrid, etc.
     /// </summary>

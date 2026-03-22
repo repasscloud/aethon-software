@@ -6,16 +6,21 @@ using Aethon.Api.Infrastructure.Caching;
 using Aethon.Api.Infrastructure.Email;
 using Aethon.Api.Infrastructure.Files;
 using Aethon.Api.Infrastructure.ResumeAnalysis;
+using Aethon.Api.Infrastructure.Settings;
+using Aethon.Api.Infrastructure.Syndication;
 using Aethon.Api.Infrastructure.Workers;
 using Aethon.Api.Middleware;
 using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Files;
 using Aethon.Application.Abstractions.ResumeAnalysis;
+using Aethon.Application.Abstractions.Settings;
+using Aethon.Application.Abstractions.Syndication;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Validation;
 using Aethon.Application.DependencyInjection;
 using Aethon.Data;
+using Aethon.Data.Entities;
 using Aethon.Data.Identity;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
@@ -65,6 +70,10 @@ services.AddHostedService<ResumeAnalysisWorker>();
 services.AddHttpClient();
 services.AddHostedService<WebhookDeliveryWorker>();
 services.AddHostedService<DomainVerificationWorker>();
+services.AddHostedService<JobExpiryWorker>();
+
+services.AddScoped<ISystemSettingsService, SystemSettingsService>();
+services.AddScoped<IGoogleIndexingService, GoogleIndexingService>();
 
 services.AddApplicationServices();
 services.AddValidatorsFromAssembly(typeof(ApplicationAssemblyMarker).Assembly);
@@ -131,6 +140,32 @@ using (var scope = app.Services.CreateScope())
         if (!await userManager.IsInRoleAsync(adminUser, superAdminRole))
             await userManager.AddToRoleAsync(adminUser, superAdminRole);
     }
+
+    // Seed SystemSettings defaults
+    var settingsToSeed = new[]
+    {
+        new SystemSetting
+        {
+            Key = SystemSettingKeys.GoogleIndexingEnabled,
+            Value = "false",
+            Description = "Enable Google Indexing API syndication for published jobs.",
+            UpdatedUtc = DateTime.UtcNow
+        },
+        new SystemSetting
+        {
+            Key = SystemSettingKeys.GoogleIndexingServiceAccount,
+            Value = "",
+            Description = "Google Service Account JSON key for the Indexing API (SuperAdmin only).",
+            UpdatedUtc = DateTime.UtcNow
+        }
+    };
+
+    foreach (var setting in settingsToSeed)
+    {
+        if (!await db.SystemSettings.AnyAsync(s => s.Key == setting.Key))
+            db.SystemSettings.Add(setting);
+    }
+    await db.SaveChangesAsync();
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();

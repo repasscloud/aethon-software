@@ -25,6 +25,13 @@ public sealed class JobDetailDto
     public string? ExternalReference { get; set; }
     public string? Department { get; set; }
     public string? LocationText { get; set; }
+    public string? LocationCity { get; set; }
+    public string? LocationState { get; set; }
+    public string? LocationCountry { get; set; }
+    public string? LocationCountryCode { get; set; }
+    public double? LocationLatitude { get; set; }
+    public double? LocationLongitude { get; set; }
+    public string? LocationPlaceId { get; set; }
 
     public WorkplaceType WorkplaceType { get; set; }
     public EmploymentType EmploymentType { get; set; }

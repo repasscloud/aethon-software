@@ -125,8 +125,32 @@ else
 
                         <div class="col-12 col-lg-4">
                             <label class="form-label fw-semibold">Location <span class="text-danger">*</span></label>
-                            <InputText @bind-Value="_model.LocationText" class="form-control rounded-4" />
+                            <LocationPicker
+                                LocationText="@_model.LocationText"
+                                LocationTextChanged="v => _model.LocationText = v"
+                                LocationCity="@_model.LocationCity"
+                                LocationCityChanged="v => _model.LocationCity = v"
+                                LocationState="@_model.LocationState"
+                                LocationStateChanged="v => _model.LocationState = v"
+                                LocationCountry="@_model.LocationCountry"
+                                LocationCountryChanged="v => _model.LocationCountry = v"
+                                LocationCountryCode="@_model.LocationCountryCode"
+                                LocationCountryCodeChanged="v => _model.LocationCountryCode = v"
+                                LocationLatitude="@_model.LocationLatitude"
+                                LocationLatitudeChanged="v => _model.LocationLatitude = v"
+                                LocationLongitude="@_model.LocationLongitude"
+                                LocationLongitudeChanged="v => _model.LocationLongitude = v"
+                                LocationPlaceId="@_model.LocationPlaceId"
+                                LocationPlaceIdChanged="v => _model.LocationPlaceId = v" />
                             <ValidationMessage For="@(() => _model.LocationText)" />
+                            @if (_loaded && !_model.LocationLatitude.HasValue && !string.IsNullOrWhiteSpace(_model.LocationText))
+                            {
+                                <div class="alert alert-warning rounded-3 mt-2 py-2 small mb-0">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    This job has no GPS coordinates and will be excluded from radius-based searches.
+                                    Re-enter the location using the picker above to add coordinates.
+                                </div>
+                            }
                         </div>
 
                         <div class="col-12 col-lg-4">
@@ -710,6 +734,13 @@ else
             _model.Title = job.Title;
             _model.Department = job.Department;
             _model.LocationText = job.LocationText;
+            _model.LocationCity = job.LocationCity;
+            _model.LocationState = job.LocationState;
+            _model.LocationCountry = job.LocationCountry;
+            _model.LocationCountryCode = job.LocationCountryCode;
+            _model.LocationLatitude = job.LocationLatitude;
+            _model.LocationLongitude = job.LocationLongitude;
+            _model.LocationPlaceId = job.LocationPlaceId;
             _model.WorkplaceType = job.WorkplaceType;
             _model.EmploymentType = job.EmploymentType;
             _model.Description = job.Description;

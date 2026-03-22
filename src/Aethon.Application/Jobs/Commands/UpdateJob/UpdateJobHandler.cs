@@ -46,6 +46,13 @@ public sealed class UpdateJobHandler
         job.Summary = string.IsNullOrWhiteSpace(request.Summary) ? null : request.Summary.Trim();
         job.Department = string.IsNullOrWhiteSpace(request.Department) ? null : request.Department.Trim();
         job.LocationText = string.IsNullOrWhiteSpace(request.LocationText) ? null : request.LocationText.Trim();
+        job.LocationCity = string.IsNullOrWhiteSpace(request.LocationCity) ? null : request.LocationCity.Trim();
+        job.LocationState = string.IsNullOrWhiteSpace(request.LocationState) ? null : request.LocationState.Trim();
+        job.LocationCountry = string.IsNullOrWhiteSpace(request.LocationCountry) ? null : request.LocationCountry.Trim();
+        job.LocationCountryCode = string.IsNullOrWhiteSpace(request.LocationCountryCode) ? null : request.LocationCountryCode.Trim();
+        job.LocationLatitude = request.LocationLatitude;
+        job.LocationLongitude = request.LocationLongitude;
+        job.LocationPlaceId = string.IsNullOrWhiteSpace(request.LocationPlaceId) ? null : request.LocationPlaceId.Trim();
         job.WorkplaceType = request.WorkplaceType!.Value;
         job.EmploymentType = request.EmploymentType!.Value;
         job.Description = request.Description.Trim();

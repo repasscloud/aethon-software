@@ -51,6 +51,13 @@ public sealed class UpdateMyOrganisationProfileHandler
         org.LogoUrl = request.LogoUrl?.Trim();
         org.Summary = request.Summary?.Trim();
         org.PublicLocationText = request.PublicLocationText?.Trim();
+        org.LocationCity = request.LocationCity?.Trim();
+        org.LocationState = request.LocationState?.Trim();
+        org.LocationCountry = request.LocationCountry?.Trim();
+        org.LocationCountryCode = request.LocationCountryCode?.Trim();
+        org.LocationLatitude = request.LocationLatitude;
+        org.LocationLongitude = request.LocationLongitude;
+        org.LocationPlaceId = request.LocationPlaceId?.Trim();
         org.PublicContactEmail = request.PublicContactEmail?.Trim();
         org.PublicContactPhone = request.PublicContactPhone?.Trim();
         org.IsPublicProfileEnabled = request.IsPublicProfileEnabled;
@@ -79,6 +86,13 @@ public sealed class UpdateMyOrganisationProfileHandler
             LogoUrl = org.LogoUrl,
             Summary = org.Summary,
             PublicLocationText = org.PublicLocationText,
+            LocationCity = org.LocationCity,
+            LocationState = org.LocationState,
+            LocationCountry = org.LocationCountry,
+            LocationCountryCode = org.LocationCountryCode,
+            LocationLatitude = org.LocationLatitude,
+            LocationLongitude = org.LocationLongitude,
+            LocationPlaceId = org.LocationPlaceId,
             PublicContactEmail = org.PublicContactEmail,
             PublicContactPhone = org.PublicContactPhone,
             IsPublicProfileEnabled = org.IsPublicProfileEnabled,

@@ -1,4 +1,6 @@
 using Aethon.Api.Common;
+using Aethon.Application.Abstractions.Syndication;
+using Aethon.Shared.Utilities;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Jobs.Commands.CloseJob;
 using Aethon.Application.Jobs.Commands.CreateJob;
@@ -7,9 +9,11 @@ using Aethon.Application.Jobs.Commands.ReturnJobToDraft;
 using Aethon.Application.Jobs.Commands.UpdateJob;
 using Aethon.Application.Jobs.Queries.GetJobById;
 using Aethon.Application.Jobs.Queries.GetMyOrgJobs;
+using Aethon.Data;
 using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Endpoints.Jobs;
 
@@ -63,6 +67,9 @@ public static class JobEndpoints
 
         group.MapPut("/{jobId:guid}", async (
             [FromServices] UpdateJobHandler handler,
+            [FromServices] IGoogleIndexingService indexing,
+            [FromServices] IConfiguration config,
+            [FromServices] AethonDbContext db,
             HttpContext ctx,
             Guid jobId,
             UpdateJobRequestDto request,
@@ -72,24 +79,55 @@ public static class JobEndpoints
             if (validation is not null) return validation;
 
             var result = await handler.HandleAsync(jobId, request, ct);
+
+            // Fire Google Indexing UPDATE if job is published
+            if (result.Succeeded)
+            {
+                var isPublished = await db.Jobs.AsNoTracking()
+                    .AnyAsync(j => j.Id == jobId && j.Status == Aethon.Shared.Enums.JobStatus.Published, ct);
+                if (isPublished)
+                {
+                    var baseUrl = config["Email:WebBaseUrl"] ?? config["ApiBaseUrl"] ?? "";
+                    await indexing.NotifyUpdatedAsync(jobId, JobUrlHelper.BuildPublicUrl(baseUrl, jobId), ct);
+                }
+            }
+
             return result.ToMinimalApiResult();
         });
 
         group.MapPost("/{jobId:guid}/publish", async (
             [FromServices] PublishJobHandler handler,
+            [FromServices] IGoogleIndexingService indexing,
+            [FromServices] IConfiguration config,
             Guid jobId,
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(jobId, ct);
+
+            if (result.Succeeded)
+            {
+                var baseUrl = config["Email:WebBaseUrl"] ?? config["ApiBaseUrl"] ?? "";
+                await indexing.NotifyPublishedAsync(jobId, JobUrlHelper.BuildPublicUrl(baseUrl, jobId), ct);
+            }
+
             return result.ToMinimalApiResult();
         });
 
         group.MapPost("/{jobId:guid}/close", async (
             [FromServices] CloseJobHandler handler,
+            [FromServices] IGoogleIndexingService indexing,
+            [FromServices] IConfiguration config,
             Guid jobId,
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(jobId, ct);
+
+            if (result.Succeeded)
+            {
+                var baseUrl = config["Email:WebBaseUrl"] ?? config["ApiBaseUrl"] ?? "";
+                await indexing.NotifyRemovedAsync(jobId, JobUrlHelper.BuildPublicUrl(baseUrl, jobId), ct);
+            }
+
             return result.ToMinimalApiResult();
         });
 

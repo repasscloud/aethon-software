@@ -4,14 +4,26 @@
 @rendermode InteractiveServer
 @using System.Net
 @using System.Net.Http.Json
+@using System.Text
+@using System.Text.Json
 @using System.Text.RegularExpressions
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Jobs
+@using Aethon.Shared.Utilities
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @inject AethonApiClient Api
 @inject NavigationManager NavigationManager
+@inject IConfiguration Configuration
 
 <PageTitle>@(_job?.Title ?? "Job") | Aethon</PageTitle>
+
+@if (_job is not null)
+{
+    <HeadContent>
+        <script type="application/ld+json">@((MarkupString)BuildJsonLd())</script>
+    </HeadContent>
+}
 
 @if (!_loaded)
 {
@@ -51,6 +63,15 @@ else
                         {
                             <div class="mb-2">
                                 <span class="badge bg-success rounded-pill">Immediate Start</span>
+                            </div>
+                        }
+
+                        @if (_job.PostingExpiresUtc.HasValue && _job.PostingExpiresUtc.Value > DateTime.UtcNow)
+                        {
+                            <div class="mb-2">
+                                <span class="badge bg-warning text-dark rounded-pill">
+                                    <i class="bi bi-clock me-1"></i>Apply by @_job.PostingExpiresUtc.Value.ToString("d MMM yyyy")
+                                </span>
                             </div>
                         }
 
@@ -554,4 +575,120 @@ else
         "Respectful workplace" => "bi-hand-thumbs-up-fill",
         _ => "bi-check-lg"
     };
+
+    private string BuildJsonLd()
+    {
+        if (_job is null) return "{}";
+
+        var webBase = (Configuration["Email:WebBaseUrl"] ?? Configuration["ApiBaseUrl"] ?? NavigationManager.BaseUri.TrimEnd('/'));
+        var jobUrl = JobUrlHelper.BuildPublicUrl(webBase, _jobId);
+
+        var employmentType = _job.EmploymentType switch
+        {
+            EmploymentType.FullTime  => "FULL_TIME",
+            EmploymentType.PartTime  => "PART_TIME",
+            EmploymentType.Contract  => "CONTRACTOR",
+            EmploymentType.Temporary => "TEMPORARY",
+            EmploymentType.Internship => "INTERN",
+            _ => "OTHER"
+        };
+
+        var obj = new Dictionary<string, object?>
+        {
+            ["@context"]         = "https://schema.org",
+            ["@type"]            = "JobPosting",
+            ["title"]            = _job.Title,
+            ["description"]      = HtmlStripper.Strip(_job.Description),
+            ["datePosted"]       = (_job.PublishedUtc ?? DateTime.UtcNow).ToString("yyyy-MM-dd"),
+            ["employmentType"]   = employmentType,
+            ["url"]              = jobUrl,
+            ["hiringOrganization"] = new Dictionary<string, object?>
+            {
+                ["@type"] = "Organization",
+                ["name"]  = _job.Organisation.Name,
+                ["sameAs"] = string.IsNullOrWhiteSpace(_job.Organisation.WebsiteUrl)
+                    ? null
+                    : _job.Organisation.WebsiteUrl
+            }
+        };
+
+        // validThrough only when expiry is in the future
+        if (_job.PostingExpiresUtc.HasValue && _job.PostingExpiresUtc.Value > DateTime.UtcNow)
+            obj["validThrough"] = _job.PostingExpiresUtc.Value.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+        // jobLocation
+        var hasCity    = !string.IsNullOrWhiteSpace(_job.LocationCity);
+        var hasCountry = !string.IsNullOrWhiteSpace(_job.LocationCountry);
+
+        if (hasCity || hasCountry)
+        {
+            var address = new Dictionary<string, object?> { ["@type"] = "PostalAddress" };
+            if (hasCity)    address["addressLocality"] = _job.LocationCity;
+            if (!string.IsNullOrWhiteSpace(_job.LocationState))
+                address["addressRegion"] = _job.LocationState;
+            if (hasCountry) address["addressCountry"] = _job.LocationCountryCode ?? _job.LocationCountry;
+
+            var place = new Dictionary<string, object?>
+            {
+                ["@type"]          = "Place",
+                ["address"]        = address
+            };
+
+            if (_job.LocationLatitude.HasValue && _job.LocationLongitude.HasValue)
+            {
+                place["geo"] = new Dictionary<string, object?>
+                {
+                    ["@type"]     = "GeoCoordinates",
+                    ["latitude"]  = _job.LocationLatitude.Value,
+                    ["longitude"] = _job.LocationLongitude.Value
+                };
+            }
+
+            obj["jobLocation"] = place;
+        }
+
+        if (_job.WorkplaceType == WorkplaceType.Remote)
+            obj["jobLocationType"] = "TELECOMMUTE";
+
+        // salary
+        if (_job.SalaryFrom.HasValue || _job.SalaryTo.HasValue)
+        {
+            var currency = _job.SalaryCurrency?.ToString() ?? "AUD";
+            if (_job.SalaryFrom.HasValue && _job.SalaryTo.HasValue)
+            {
+                obj["baseSalary"] = new Dictionary<string, object?>
+                {
+                    ["@type"]    = "MonetaryAmount",
+                    ["currency"] = currency,
+                    ["value"]    = new Dictionary<string, object?>
+                    {
+                        ["@type"]    = "QuantitativeValue",
+                        ["minValue"] = _job.SalaryFrom.Value,
+                        ["maxValue"] = _job.SalaryTo.Value,
+                        ["unitText"] = "YEAR"
+                    }
+                };
+            }
+            else
+            {
+                obj["baseSalary"] = new Dictionary<string, object?>
+                {
+                    ["@type"]    = "MonetaryAmount",
+                    ["currency"] = currency,
+                    ["value"]    = new Dictionary<string, object?>
+                    {
+                        ["@type"]    = "QuantitativeValue",
+                        ["value"]    = (_job.SalaryFrom ?? _job.SalaryTo)!.Value,
+                        ["unitText"] = "YEAR"
+                    }
+                };
+            }
+        }
+
+        return JsonSerializer.Serialize(obj, new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
+    }
 }

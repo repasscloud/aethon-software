@@ -15,6 +15,13 @@ public sealed class CreateJobCommand
     public string? Summary { get; init; }
     public string? Department { get; init; }
     public string? LocationText { get; init; }
+    public string? LocationCity { get; init; }
+    public string? LocationState { get; init; }
+    public string? LocationCountry { get; init; }
+    public string? LocationCountryCode { get; init; }
+    public double? LocationLatitude { get; init; }
+    public double? LocationLongitude { get; init; }
+    public string? LocationPlaceId { get; init; }
     public WorkplaceType WorkplaceType { get; init; }
     public EmploymentType EmploymentType { get; init; }
     public string? Requirements { get; init; }
