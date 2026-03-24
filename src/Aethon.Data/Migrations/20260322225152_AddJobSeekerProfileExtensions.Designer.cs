@@ -3,6 +3,7 @@ using System;
 using Aethon.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    partial class AethonDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260322225152_AddJobSeekerProfileExtensions")]
+    partial class AddJobSeekerProfileExtensions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1460,10 +1463,6 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("BannerImageUrl")
                         .HasColumnType("text");
 
-                    b.Property<string>("BusinessRegistrationNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<int>("ClaimStatus")
                         .HasColumnType("integer");
 
@@ -1555,16 +1554,12 @@ namespace Aethon.Data.Migrations
                         .HasColumnType("character varying(320)");
 
                     b.Property<string>("PrimaryContactName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("PrimaryContactPhone")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
-
-                    b.Property<string>("PrimaryContactPhoneDialCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
 
                     b.Property<Guid?>("PrimaryDomainId")
                         .HasColumnType("uuid");
@@ -1577,41 +1572,9 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("PublicContactPhoneDialCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.Property<string>("PublicLocationText")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
-
-                    b.Property<string>("RegisteredAddressLine1")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("RegisteredAddressLine2")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("RegisteredCity")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<string>("RegisteredCountry")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<string>("RegisteredCountryCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("RegisteredPostcode")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("RegisteredState")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("Slug")
                         .HasMaxLength(150)
@@ -1623,10 +1586,6 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("Summary")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
-
-                    b.Property<string>("TaxRegistrationNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TikTokHandle")
                         .HasColumnType("text");

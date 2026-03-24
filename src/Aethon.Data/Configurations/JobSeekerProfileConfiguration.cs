@@ -76,6 +76,15 @@ public sealed class JobSeekerProfileConfiguration : IEntityTypeConfiguration<Job
             .HasSentinel(Aethon.Shared.Enums.ProfileVisibility.Private)
             .HasDefaultValue(Aethon.Shared.Enums.ProfileVisibility.Private);
 
+        builder.Property(x => x.LinkedInId)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.IsIdVerified)
+            .IsRequired();
+
+        builder.Property(x => x.IsNameLocked)
+            .IsRequired();
+
         builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
 

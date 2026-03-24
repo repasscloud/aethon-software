@@ -24,10 +24,14 @@ public sealed class AethonDbContext
     public DbSet<JobApplicationNote> JobApplicationNotes => Set<JobApplicationNote>();
     public DbSet<JobApplicationStatusHistory> JobApplicationStatusHistoryEntries => Set<JobApplicationStatusHistory>();
 
+    public DbSet<JobSeekerCertificate> JobSeekerCertificates => Set<JobSeekerCertificate>();
     public DbSet<JobSeekerLanguage> JobSeekerLanguages => Set<JobSeekerLanguage>();
     public DbSet<JobSeekerNationality> JobSeekerNationalities => Set<JobSeekerNationality>();
     public DbSet<JobSeekerProfile> JobSeekerProfiles => Set<JobSeekerProfile>();
+    public DbSet<JobSeekerQualification> JobSeekerQualifications => Set<JobSeekerQualification>();
     public DbSet<JobSeekerResume> JobSeekerResumes => Set<JobSeekerResume>();
+    public DbSet<JobSeekerSkill> JobSeekerSkills => Set<JobSeekerSkill>();
+    public DbSet<JobSeekerWorkExperience> JobSeekerWorkExperiences => Set<JobSeekerWorkExperience>();
     public DbSet<ResumeAnalysis> ResumeAnalyses => Set<ResumeAnalysis>();
 
     public DbSet<Organisation> Organisations => Set<Organisation>();

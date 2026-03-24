@@ -1,3 +1,7 @@
+using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Aethon.Api.Auth;
 using Aethon.Api.Endpoints;
@@ -25,6 +29,7 @@ using Aethon.Data.Identity;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -176,5 +181,183 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapApplicationEndpoints();
+
+// LinkedIn OAuth callback — mapped outside /api/v1 to match the registered redirect URI
+app.MapGet("/signin-linkedin", async (
+    HttpContext http,
+    IConfiguration config,
+    AethonDbContext db,
+    IHttpClientFactory httpClientFactory,
+    IFileStorageService fileStorage,
+    CancellationToken ct) =>
+{
+    var query = http.Request.Query;
+    var webBaseUrl = config["WebBaseUrl"] ?? "http://localhost:5200";
+    var profileUrl = $"{webBaseUrl}/app/jobseeker/profile";
+
+    if (query.TryGetValue("error", out var liError))
+        return Results.Redirect($"{profileUrl}?linkedin_error={Uri.EscapeDataString(liError.ToString())}");
+
+    var code = query["code"].ToString();
+    var returnedState = query["state"].ToString();
+    var expectedState = http.Request.Cookies["li_state"];
+    var userIdStr = http.Request.Cookies["li_user_id"];
+
+    if (string.IsNullOrWhiteSpace(code) ||
+        string.IsNullOrWhiteSpace(expectedState) ||
+        !string.Equals(expectedState, returnedState, StringComparison.Ordinal) ||
+        !Guid.TryParse(userIdStr, out var userId))
+    {
+        return Results.Redirect($"{profileUrl}?linkedin_error=invalid_state");
+    }
+
+    http.Response.Cookies.Delete("li_state");
+    http.Response.Cookies.Delete("li_user_id");
+
+    var clientId = config["LinkedIn:ClientId"];
+    var clientSecret = config["LinkedIn:ClientSecret"];
+    var redirectUri = config["LinkedIn:RedirectUri"];
+
+    if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret) || string.IsNullOrWhiteSpace(redirectUri))
+        return Results.Redirect($"{profileUrl}?linkedin_error=not_configured");
+
+    using var httpClient = httpClientFactory.CreateClient();
+
+    // Exchange code for access token
+    var tokenReq = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "authorization_code",
+        ["code"] = code,
+        ["client_id"] = clientId,
+        ["client_secret"] = clientSecret,
+        ["redirect_uri"] = redirectUri
+    });
+
+    using var tokenResp = await httpClient.PostAsync("https://www.linkedin.com/oauth/v2/accessToken", tokenReq, ct);
+    if (!tokenResp.IsSuccessStatusCode)
+        return Results.Redirect($"{profileUrl}?linkedin_error=token_exchange_failed");
+
+    var tokenJson = await tokenResp.Content.ReadAsStringAsync(ct);
+    using var tokenDoc = JsonDocument.Parse(tokenJson);
+    if (!tokenDoc.RootElement.TryGetProperty("access_token", out var atEl))
+        return Results.Redirect($"{profileUrl}?linkedin_error=no_access_token");
+
+    var accessToken = atEl.GetString()!;
+
+    // Fetch LinkedIn profile (r_liteprofile scope — name + profile picture)
+    using var profileReq = new HttpRequestMessage(HttpMethod.Get, "https://api.linkedin.com/v2/me?projection=(id,firstName,lastName,profilePicture(displayImage~:playableStreams))");
+    profileReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    profileReq.Headers.Add("LinkedIn-Version", "202510.03");
+
+    using var profileResp = await httpClient.SendAsync(profileReq, ct);
+    if (!profileResp.IsSuccessStatusCode)
+        return Results.Redirect($"{profileUrl}?linkedin_error=profile_fetch_failed");
+
+    var profileJson = await profileResp.Content.ReadAsStringAsync(ct);
+    using var profileDoc = JsonDocument.Parse(profileJson);
+    var root = profileDoc.RootElement;
+
+    var linkedInId = root.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+
+    // Extract firstName / lastName from localized property
+    static string? GetLocalized(JsonElement nameEl)
+    {
+        if (!nameEl.TryGetProperty("localized", out var loc)) return null;
+        foreach (var prop in loc.EnumerateObject())
+            return prop.Value.GetString();
+        return null;
+    }
+
+    string? firstName = root.TryGetProperty("firstName", out var fnEl) ? GetLocalized(fnEl) : null;
+    string? lastName = root.TryGetProperty("lastName", out var lnEl) ? GetLocalized(lnEl) : null;
+
+    // Extract best-quality profile picture URL
+    string? pictureUrl = null;
+    if (root.TryGetProperty("profilePicture", out var ppEl) &&
+        ppEl.TryGetProperty("displayImage~", out var displayEl) &&
+        displayEl.TryGetProperty("elements", out var elements))
+    {
+        // Take the last (highest resolution) element
+        JsonElement? best = null;
+        foreach (var el in elements.EnumerateArray()) best = el;
+        if (best.HasValue &&
+            best.Value.TryGetProperty("identifiers", out var ids) &&
+            ids.GetArrayLength() > 0)
+        {
+            pictureUrl = ids[0].TryGetProperty("identifier", out var urlEl) ? urlEl.GetString() : null;
+        }
+    }
+
+    // Load or create the job seeker profile
+    var profile = await db.JobSeekerProfiles
+        .FirstOrDefaultAsync(p => p.UserId == userId, ct);
+
+    var now = DateTime.UtcNow;
+
+    if (profile is null)
+    {
+        profile = new JobSeekerProfile
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            CreatedUtc = now,
+            CreatedByUserId = userId
+        };
+        db.JobSeekerProfiles.Add(profile);
+    }
+
+    profile.LinkedInId = linkedInId;
+    profile.LinkedInVerifiedAt = now;
+    profile.UpdatedUtc = now;
+    profile.UpdatedByUserId = userId;
+
+    // Only update name if not locked
+    if (!profile.IsNameLocked)
+    {
+        if (!string.IsNullOrWhiteSpace(firstName)) profile.FirstName = firstName;
+        if (!string.IsNullOrWhiteSpace(lastName)) profile.LastName = lastName;
+    }
+
+    // Download and store profile picture
+    if (!string.IsNullOrWhiteSpace(pictureUrl))
+    {
+        try
+        {
+            using var picResp = await httpClient.GetAsync(pictureUrl, ct);
+            if (picResp.IsSuccessStatusCode)
+            {
+                var bytes = await picResp.Content.ReadAsByteArrayAsync(ct);
+                var ext = picResp.Content.Headers.ContentType?.MediaType?.Contains("png") == true ? "png" : "jpg";
+                var storagePath = await fileStorage.SaveAsync($"profile-picture-{userId}.{ext}", bytes);
+
+                var storedFile = new StoredFile
+                {
+                    Id = Guid.NewGuid(),
+                    FileName = $"profile-picture-{userId}.{ext}",
+                    OriginalFileName = $"linkedin-profile-picture.{ext}",
+                    ContentType = picResp.Content.Headers.ContentType?.MediaType ?? "image/jpeg",
+                    LengthBytes = bytes.Length,
+                    StorageProvider = "local",
+                    StoragePath = storagePath,
+                    UploadedByUserId = userId,
+                    CreatedUtc = now,
+                    CreatedByUserId = userId
+                };
+                db.StoredFiles.Add(storedFile);
+                await db.SaveChangesAsync(ct);
+
+                profile.ProfilePictureStoredFileId = storedFile.Id;
+            }
+        }
+        catch
+        {
+            // Profile picture download failure is non-fatal
+        }
+    }
+
+    await db.SaveChangesAsync(ct);
+
+    return Results.Redirect($"{profileUrl}?linkedin_connected=1");
+});
 
 app.Run();

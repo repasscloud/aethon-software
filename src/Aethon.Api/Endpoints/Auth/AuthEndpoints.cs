@@ -8,6 +8,9 @@ using Aethon.Shared.Auth;
 using Aethon.Shared.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 namespace Aethon.Api.Endpoints.Auth;
 
@@ -540,6 +543,74 @@ public static class AuthEndpoints
             var user = await userManager.FindByEmailAsync(email);
             // Return same shape whether user exists or not — just vary requiresMfa
             return Results.Ok(new { requiresMfa = user?.TwoFactorEnabled == true });
+        });
+
+        // GET /auth/linkedin/connect?token={jwt} — initiates LinkedIn OAuth for a job seeker
+        // The JWT is passed as a query param because this is a browser redirect, not an API call.
+        group.MapGet("/linkedin/connect", (
+            HttpContext http,
+            IConfiguration config,
+            string? token) =>
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return Results.BadRequest("Missing token.");
+
+            // Validate the JWT to extract userId
+            var jwtKey = config["Auth:JwtKey"] ?? "dev-secret-key-change-me-dev-secret-key-change-me";
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var handler = new JwtSecurityTokenHandler();
+
+            Guid userId;
+            try
+            {
+                var principal = handler.ValidateToken(token, new TokenValidationParameters
+                {
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    IssuerSigningKey = key,
+                    ClockSkew = TimeSpan.FromSeconds(30)
+                }, out _);
+                var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(sub, out userId))
+                    return Results.BadRequest("Invalid token.");
+            }
+            catch
+            {
+                return Results.BadRequest("Invalid or expired token.");
+            }
+
+            var clientId = config["LinkedIn:ClientId"];
+            var redirectUri = config["LinkedIn:RedirectUri"];
+
+            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(redirectUri))
+                return Results.Problem("LinkedIn OAuth is not configured.");
+
+            // Store state + userId in a short-lived cookie so the callback can identify the user
+            var state = Guid.NewGuid().ToString("N");
+            http.Response.Cookies.Append("li_state", state, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromMinutes(10)
+            });
+            http.Response.Cookies.Append("li_user_id", userId.ToString(), new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromMinutes(10)
+            });
+
+            var authUrl = "https://www.linkedin.com/oauth/v2/authorization" +
+                $"?response_type=code" +
+                $"&client_id={Uri.EscapeDataString(clientId)}" +
+                $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
+                $"&state={Uri.EscapeDataString(state)}" +
+                $"&scope={Uri.EscapeDataString("r_liteprofile")}";
+
+            return Results.Redirect(authUrl);
         });
 
         // POST /auth/reset-password — completes password reset; requires TOTP if MFA is enabled

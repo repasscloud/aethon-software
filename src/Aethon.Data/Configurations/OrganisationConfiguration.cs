@@ -76,13 +76,46 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
             .IsRequired();
 
         builder.Property(x => x.PrimaryContactName)
-            .HasMaxLength(150);
+            .HasMaxLength(200);
 
         builder.Property(x => x.PrimaryContactEmail)
             .HasMaxLength(320);
 
+        builder.Property(x => x.PrimaryContactPhoneDialCode)
+            .HasMaxLength(10);
+
         builder.Property(x => x.PrimaryContactPhone)
             .HasMaxLength(50);
+
+        builder.Property(x => x.PublicContactPhoneDialCode)
+            .HasMaxLength(10);
+
+        builder.Property(x => x.RegisteredAddressLine1)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.RegisteredAddressLine2)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.RegisteredCity)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.RegisteredState)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.RegisteredPostcode)
+            .HasMaxLength(20);
+
+        builder.Property(x => x.RegisteredCountry)
+            .HasMaxLength(150);
+
+        builder.Property(x => x.RegisteredCountryCode)
+            .HasMaxLength(10);
+
+        builder.Property(x => x.TaxRegistrationNumber)
+            .HasMaxLength(100);
+
+        builder.Property(x => x.BusinessRegistrationNumber)
+            .HasMaxLength(100);
 
         builder.Ignore(x => x.IsVerified);
 

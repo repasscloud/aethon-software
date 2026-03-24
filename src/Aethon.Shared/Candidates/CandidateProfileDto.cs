@@ -38,9 +38,18 @@ public sealed class CandidateProfileDto
     public string? Slug { get; set; }
     public ProfileVisibility ProfileVisibility { get; set; }
 
+    public string? LinkedInId { get; set; }
+    public DateTime? LinkedInVerifiedAt { get; set; }
+    public bool IsIdVerified { get; set; }
+    public bool IsNameLocked { get; set; }
+
     public DateTime? LastProfileUpdatedUtc { get; set; }
 
     public IReadOnlyList<CandidateResumeDto> Resumes { get; set; } = [];
     public IReadOnlyList<CandidateNationalityDto> Nationalities { get; set; } = [];
     public IReadOnlyList<CandidateLanguageDto> Languages { get; set; } = [];
+    public IReadOnlyList<JobSeekerWorkExperienceDto> WorkExperiences { get; set; } = [];
+    public IReadOnlyList<JobSeekerQualificationDto> Qualifications { get; set; } = [];
+    public IReadOnlyList<JobSeekerCertificateDto> Certificates { get; set; } = [];
+    public IReadOnlyList<JobSeekerSkillDto> Skills { get; set; } = [];
 }

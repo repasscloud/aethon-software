@@ -27,7 +27,7 @@ else
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
                 <h1 class="h3 fw-bold mb-2">Organisation profile</h1>
-                <p class="text-secondary mb-0">Manage branding and public company page details.</p>
+                <p class="text-secondary mb-0">Manage your organisation's branding, contact details, and legal information.</p>
             </div>
         </div>
 
@@ -41,21 +41,23 @@ else
             <div class="alert alert-danger rounded-4 mb-0">@_error</div>
         }
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <EditForm Model="_model" OnValidSubmit="SaveAsync">
-                    <DataAnnotationsValidator />
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
 
+            <!-- ── 1. Organisation details ───────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Organisation details</h2>
                     <div class="row g-3">
                         <div class="col-12 col-lg-6">
-                            <label class="form-label fw-semibold">Display name</label>
-                            <InputText @bind-Value="_model.Name" class="form-control rounded-4" />
+                            <label class="form-label fw-semibold">Display name <span class="text-danger">*</span></label>
+                            <InputText @bind-Value="_model.Name" class="form-control rounded-4" placeholder="Acme Corp" />
                             <ValidationMessage For="@(() => _model.Name)" />
                         </div>
 
                         <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Legal name</label>
-                            <InputText @bind-Value="_model.LegalName" class="form-control rounded-4" />
+                            <InputText @bind-Value="_model.LegalName" class="form-control rounded-4" placeholder="Acme Corporation Pty Ltd" />
                         </div>
 
                         <div class="col-12 col-lg-6">
@@ -73,7 +75,7 @@ else
                         <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Slug</label>
                             <div class="input-group">
-                                <InputText @bind-Value="_model.Slug" class="form-control rounded-start-4" />
+                                <InputText @bind-Value="_model.Slug" class="form-control rounded-start-4" placeholder="acme-corp" />
                                 <button type="button" class="btn btn-outline-secondary rounded-end-4"
                                         @onclick="CheckSlugAsync" disabled="@_checkingSlug">
                                     @(_checkingSlug ? "Checking…" : "Check availability")
@@ -95,7 +97,7 @@ else
                             <label class="form-label fw-semibold">Logo URL</label>
                             <div class="input-group">
                                 <span class="input-group-text rounded-start-4">https://</span>
-                                <InputText @bind-Value="_model.LogoUrl" class="form-control rounded-end-4" placeholder="example.com/logo.png" />
+                                <InputText @bind-Value="_model.LogoUrl" class="form-control rounded-end-4" placeholder="cdn.yourcompany.com/logo.png" />
                             </div>
                             <div class="form-text">Square image, min 200×200px recommended.</div>
                             @if (_urlErrors.TryGetValue("LogoUrl", out var logoErr))
@@ -108,9 +110,9 @@ else
                             <label class="form-label fw-semibold">Banner image URL</label>
                             <div class="input-group">
                                 <span class="input-group-text rounded-start-4">https://</span>
-                                <InputText @bind-Value="_model.BannerImageUrl" class="form-control rounded-end-4" placeholder="example.com/banner.jpg" />
+                                <InputText @bind-Value="_model.BannerImageUrl" class="form-control rounded-end-4" placeholder="cdn.yourcompany.com/banner.jpg" />
                             </div>
-                            <div class="form-text">Wide header image shown at the top of your public page (e.g. 1200×300px).</div>
+                            <div class="form-text">Wide header image (e.g. 1200×300px).</div>
                             @if (_urlErrors.TryGetValue("BannerImageUrl", out var bannerErr))
                             {
                                 <div class="form-text text-danger">@bannerErr</div>
@@ -164,10 +166,19 @@ else
 
                         <div class="col-12">
                             <label class="form-label fw-semibold">Summary</label>
-                            <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="5" />
+                            <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="5" placeholder="Describe your organisation, culture, and what makes you a great employer..." />
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <div class="col-12 col-lg-4">
+            <!-- ── 2. Public profile ─────────────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-1">Public profile</h2>
+                    <p class="text-secondary small mb-3">This information is shown on your public organisation page and job listings.</p>
+                    <div class="row g-3">
+                        <div class="col-12">
                             <label class="form-label fw-semibold">Public location</label>
                             <LocationPicker
                                 LocationText="@_model.PublicLocationText"
@@ -189,24 +200,42 @@ else
                                 Placeholder="Start typing a city or address..." />
                         </div>
 
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Public contact email</label>
-                            <InputText @bind-Value="_model.PublicContactEmail" class="form-control rounded-4" />
+                            <InputText @bind-Value="_model.PublicContactEmail" class="form-control rounded-4" placeholder="contact@example.com" />
+                            <ValidationMessage For="@(() => _model.PublicContactEmail)" />
                         </div>
 
-                        <div class="col-12 col-lg-4">
+                        <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold">Public contact phone</label>
-                            <InputText @bind-Value="_model.PublicContactPhone" class="form-control rounded-4" />
-                        </div>
-
-                        <div class="col-12">
-                            <div class="form-check">
-                                <InputCheckbox @bind-Value="_model.IsPublicProfileEnabled" class="form-check-input" />
-                                <label class="form-check-label">Enable public organisation page and public job branding</label>
+                            <div class="input-group">
+                                <select class="form-select flex-shrink-0 rounded-start-4" style="max-width:220px;"
+                                        value="@_model.PublicContactPhoneDialCode"
+                                        @onchange="e => _model.PublicContactPhoneDialCode = e.Value?.ToString()">
+                                    <option value="">— Country —</option>
+                                    @foreach (var c in Countries)
+                                    {
+                                        <option value="@c.DialCode">@c.Flag @c.Name (@c.DialCode)</option>
+                                    }
+                                </select>
+                                <InputText @bind-Value="_model.PublicContactPhone" class="form-control rounded-end-4" placeholder="400 000 000" />
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="col-12">
+                            <hr class="my-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_model.IsPublicProfileEnabled" class="form-check-input" id="publicProfileCheck" />
+                                <label class="form-check-label" for="publicProfileCheck">
+                                    🌐 Enable public organisation page and public job branding
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="form-check">
                                 <InputCheckbox @bind-Value="_model.IsEqualOpportunityEmployer" class="form-check-input" id="eoeCheck" />
                                 <label class="form-check-label" for="eoeCheck">
@@ -216,7 +245,7 @@ else
                             </div>
                         </div>
 
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-6 col-lg-4">
                             <div class="form-check">
                                 <InputCheckbox @bind-Value="_model.IsAccessibleWorkplace" class="form-check-input" id="accessibleCheck" />
                                 <label class="form-check-label" for="accessibleCheck">
@@ -225,11 +254,24 @@ else
                                 </label>
                             </div>
                         </div>
-                    </div>
 
-                    <hr class="my-4" />
+                        @if (!string.IsNullOrWhiteSpace(_model.Slug))
+                        {
+                            <div class="col-12">
+                                <a class="btn btn-sm btn-outline-secondary rounded-4" href="/organisations/@_model.Slug" target="_blank">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i>Open public page
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 3. Social media ───────────────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
                     <h2 class="h5 fw-bold mb-3">Social media</h2>
-                    <div class="row g-3 mb-2">
+                    <div class="row g-3">
                         <div class="col-12 col-lg-6">
                             <label class="form-label fw-semibold"><i class="bi bi-linkedin me-1 text-primary"></i> LinkedIn company slug</label>
                             <div class="input-group">
@@ -293,20 +335,114 @@ else
                             }
                         </div>
                     </div>
-
-                    <div class="d-flex gap-2 mt-4">
-                        <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
-                            @(_saving ? "Saving..." : "Save profile")
-                        </button>
-
-                        @if (!string.IsNullOrWhiteSpace(_model.Slug))
-                        {
-                            <a class="btn btn-outline-dark rounded-4 px-4" href="/organisations/@_model.Slug" target="_blank">Open public page</a>
-                        }
-                    </div>
-                </EditForm>
+                </div>
             </div>
-        </div>
+
+            <!-- ── 4. Primary contact ────────────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-1">Primary contact</h2>
+                    <p class="text-secondary small mb-3">Used internally for communications and verification. Not shown publicly.</p>
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Full name</label>
+                            <InputText @bind-Value="_model.PrimaryContactName" class="form-control rounded-4" placeholder="Jane Smith" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Email address</label>
+                            <InputText @bind-Value="_model.PrimaryContactEmail" class="form-control rounded-4" placeholder="jane.smith@example.com" />
+                            <ValidationMessage For="@(() => _model.PrimaryContactEmail)" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Phone number</label>
+                            <div class="input-group">
+                                <select class="form-select flex-shrink-0 rounded-start-4" style="max-width:220px;"
+                                        value="@_model.PrimaryContactPhoneDialCode"
+                                        @onchange="e => _model.PrimaryContactPhoneDialCode = e.Value?.ToString()">
+                                    <option value="">— Country —</option>
+                                    @foreach (var c in Countries)
+                                    {
+                                        <option value="@c.DialCode">@c.Flag @c.Name (@c.DialCode)</option>
+                                    }
+                                </select>
+                                <InputText @bind-Value="_model.PrimaryContactPhone" class="form-control rounded-end-4" placeholder="400 000 000" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── 5. Legal & verification ───────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-1">Legal &amp; verification</h2>
+                    <p class="text-secondary small mb-3">Registered business address and identifiers used for account verification. Not shown publicly.</p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Registered address line 1</label>
+                            <InputText @bind-Value="_model.RegisteredAddressLine1" class="form-control rounded-4" placeholder="Level 5, 123 Collins Street" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Address line 2 <span class="text-secondary fw-normal">(optional)</span></label>
+                            <InputText @bind-Value="_model.RegisteredAddressLine2" class="form-control rounded-4" placeholder="Building B, Suite 200" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">City / Suburb</label>
+                            <InputText @bind-Value="_model.RegisteredCity" class="form-control rounded-4" placeholder="Melbourne" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">State / Province</label>
+                            <InputText @bind-Value="_model.RegisteredState" class="form-control rounded-4" placeholder="Victoria" />
+                        </div>
+
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Postcode / ZIP</label>
+                            <InputText @bind-Value="_model.RegisteredPostcode" class="form-control rounded-4" placeholder="3000" />
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Country</label>
+                            <select class="form-select rounded-4"
+                                    value="@_model.RegisteredCountryCode"
+                                    @onchange="OnRegisteredCountryChange">
+                                <option value="">— Select country —</option>
+                                @foreach (var c in Countries)
+                                {
+                                    <option value="@c.IsoCode">@c.Flag @c.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Tax registration number</label>
+                            <InputText @bind-Value="_model.TaxRegistrationNumber" class="form-control rounded-4" placeholder="e.g. ABN 12 345 678 901" />
+                            <div class="form-text">ABN, EIN, VAT, GST, etc.</div>
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Business registration number</label>
+                            <InputText @bind-Value="_model.BusinessRegistrationNumber" class="form-control rounded-4" placeholder="e.g. ACN 123 456 789" />
+                            <div class="form-text">ACN, company number, etc.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Save ──────────────────────────────────────────────────── -->
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                        @(_saving ? "Saving..." : "Save profile")
+                    </button>
+                </div>
+            </div>
+
+        </EditForm>
     </div>
 }
 
@@ -324,6 +460,75 @@ else
     private bool? _slugAvailable;
     private string? _slugMessage;
     private Dictionary<string, string> _urlErrors = new();
+
+    // ── Country / dial-code data ────────────────────────────────────────────
+
+    private record CountryEntry(string Flag, string Name, string IsoCode, string DialCode);
+
+    private static readonly CountryEntry[] Countries =
+    [
+        new("🇦🇺", "Australia",           "AU", "+61"),
+        new("🇳🇿", "New Zealand",          "NZ", "+64"),
+        new("🇵🇬", "Papua New Guinea",     "PG", "+675"),
+        new("🇫🇯", "Fiji",                 "FJ", "+679"),
+        new("🇸🇧", "Solomon Islands",      "SB", "+677"),
+        new("🇻🇺", "Vanuatu",              "VU", "+678"),
+        new("🇺🇸", "United States",        "US", "+1"),
+        new("🇨🇦", "Canada",               "CA", "+1"),
+        new("🇬🇧", "United Kingdom",       "GB", "+44"),
+        new("🇮🇪", "Ireland",              "IE", "+353"),
+        new("🇿🇦", "South Africa",         "ZA", "+27"),
+        new("🇮🇳", "India",                "IN", "+91"),
+        new("🇸🇬", "Singapore",            "SG", "+65"),
+        new("🇭🇰", "Hong Kong",            "HK", "+852"),
+        new("🇯🇵", "Japan",                "JP", "+81"),
+        new("🇨🇳", "China",                "CN", "+86"),
+        new("🇰🇷", "South Korea",          "KR", "+82"),
+        new("🇹🇭", "Thailand",             "TH", "+66"),
+        new("🇲🇾", "Malaysia",             "MY", "+60"),
+        new("🇵🇭", "Philippines",          "PH", "+63"),
+        new("🇮🇩", "Indonesia",            "ID", "+62"),
+        new("🇻🇳", "Vietnam",              "VN", "+84"),
+        new("🇧🇩", "Bangladesh",           "BD", "+880"),
+        new("🇵🇰", "Pakistan",             "PK", "+92"),
+        new("🇩🇪", "Germany",              "DE", "+49"),
+        new("🇫🇷", "France",               "FR", "+33"),
+        new("🇮🇹", "Italy",                "IT", "+39"),
+        new("🇪🇸", "Spain",                "ES", "+34"),
+        new("🇳🇱", "Netherlands",          "NL", "+31"),
+        new("🇧🇪", "Belgium",              "BE", "+32"),
+        new("🇨🇭", "Switzerland",          "CH", "+41"),
+        new("🇦🇹", "Austria",              "AT", "+43"),
+        new("🇸🇪", "Sweden",               "SE", "+46"),
+        new("🇳🇴", "Norway",               "NO", "+47"),
+        new("🇩🇰", "Denmark",              "DK", "+45"),
+        new("🇫🇮", "Finland",              "FI", "+358"),
+        new("🇵🇱", "Poland",               "PL", "+48"),
+        new("🇵🇹", "Portugal",             "PT", "+351"),
+        new("🇬🇷", "Greece",               "GR", "+30"),
+        new("🇨🇿", "Czech Republic",       "CZ", "+420"),
+        new("🇷🇴", "Romania",              "RO", "+40"),
+        new("🇭🇺", "Hungary",              "HU", "+36"),
+        new("🇷🇺", "Russia",               "RU", "+7"),
+        new("🇺🇦", "Ukraine",              "UA", "+380"),
+        new("🇧🇷", "Brazil",               "BR", "+55"),
+        new("🇲🇽", "Mexico",               "MX", "+52"),
+        new("🇦🇷", "Argentina",            "AR", "+54"),
+        new("🇨🇱", "Chile",                "CL", "+56"),
+        new("🇨🇴", "Colombia",             "CO", "+57"),
+        new("🇵🇪", "Peru",                 "PE", "+51"),
+        new("🇦🇪", "United Arab Emirates", "AE", "+971"),
+        new("🇸🇦", "Saudi Arabia",         "SA", "+966"),
+        new("🇮🇱", "Israel",               "IL", "+972"),
+        new("🇹🇷", "Turkey",               "TR", "+90"),
+        new("🇪🇬", "Egypt",                "EG", "+20"),
+        new("🇲🇦", "Morocco",              "MA", "+212"),
+        new("🇳🇬", "Nigeria",              "NG", "+234"),
+        new("🇰🇪", "Kenya",                "KE", "+254"),
+        new("🇬🇭", "Ghana",                "GH", "+233"),
+    ];
+
+    // ── Lifecycle ───────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -351,6 +556,7 @@ else
                     LocationLongitude = profile.LocationLongitude,
                     LocationPlaceId = profile.LocationPlaceId,
                     PublicContactEmail = profile.PublicContactEmail,
+                    PublicContactPhoneDialCode = profile.PublicContactPhoneDialCode,
                     PublicContactPhone = profile.PublicContactPhone,
                     IsPublicProfileEnabled = profile.IsPublicProfileEnabled,
                     IsEqualOpportunityEmployer = profile.IsEqualOpportunityEmployer,
@@ -363,7 +569,20 @@ else
                     FacebookUrl = StripSocialPrefix(profile.FacebookUrl, FacebookBase),
                     TikTokHandle = profile.TikTokHandle,
                     InstagramHandle = profile.InstagramHandle,
-                    YouTubeUrl = StripSocialPrefix(profile.YouTubeUrl, YouTubeBase)
+                    YouTubeUrl = StripSocialPrefix(profile.YouTubeUrl, YouTubeBase),
+                    PrimaryContactName = profile.PrimaryContactName,
+                    PrimaryContactEmail = profile.PrimaryContactEmail,
+                    PrimaryContactPhoneDialCode = profile.PrimaryContactPhoneDialCode,
+                    PrimaryContactPhone = profile.PrimaryContactPhone,
+                    RegisteredAddressLine1 = profile.RegisteredAddressLine1,
+                    RegisteredAddressLine2 = profile.RegisteredAddressLine2,
+                    RegisteredCity = profile.RegisteredCity,
+                    RegisteredState = profile.RegisteredState,
+                    RegisteredPostcode = profile.RegisteredPostcode,
+                    RegisteredCountry = profile.RegisteredCountry,
+                    RegisteredCountryCode = profile.RegisteredCountryCode,
+                    TaxRegistrationNumber = profile.TaxRegistrationNumber,
+                    BusinessRegistrationNumber = profile.BusinessRegistrationNumber,
                 };
             }
         }
@@ -375,6 +594,16 @@ else
         {
             _loaded = true;
         }
+    }
+
+    // ── Event handlers ──────────────────────────────────────────────────────
+
+    private void OnRegisteredCountryChange(ChangeEventArgs e)
+    {
+        var code = e.Value?.ToString() ?? "";
+        _model.RegisteredCountryCode = string.IsNullOrEmpty(code) ? null : code;
+        var entry = Countries.FirstOrDefault(c => c.IsoCode == code);
+        _model.RegisteredCountry = entry?.Name;
     }
 
     private async Task CheckSlugAsync()
@@ -425,10 +654,10 @@ else
         _error = null;
         _urlErrors.Clear();
 
-        // Format validation for social handles
+        // Social handle format validation
         if (!string.IsNullOrWhiteSpace(_model.LinkedInUrl) &&
             !Regex.IsMatch(_model.LinkedInUrl.Trim(), @"^[a-zA-Z0-9\-_]+$"))
-            _urlErrors["LinkedInUrl"] = "Enter only your company slug — letters, numbers, and hyphens only. No slashes or https://.";
+            _urlErrors["LinkedInUrl"] = "Enter only your company slug — letters, numbers, and hyphens only.";
 
         if (!string.IsNullOrWhiteSpace(_model.FacebookUrl) &&
             (_model.FacebookUrl.Contains('/') || _model.FacebookUrl.Contains(' ')))
@@ -444,40 +673,54 @@ else
             return;
         }
 
-        // Build submit model with full URLs restored
+        // Build submit model with full URLs
         var submit = new UpdateOrganisationProfileRequestDto
         {
             Name = _model.Name,
             LegalName = _model.LegalName,
-            WebsiteUrl    = BuildHttpsUrl(_model.WebsiteUrl),
-            Slug          = _model.Slug,
-            LogoUrl       = BuildHttpsUrl(_model.LogoUrl),
+            WebsiteUrl     = BuildHttpsUrl(_model.WebsiteUrl),
+            Slug           = _model.Slug,
+            LogoUrl        = BuildHttpsUrl(_model.LogoUrl),
             BannerImageUrl = BuildHttpsUrl(_model.BannerImageUrl),
-            Summary       = _model.Summary,
-            PublicLocationText    = _model.PublicLocationText,
-            LocationCity          = _model.LocationCity,
-            LocationState         = _model.LocationState,
-            LocationCountry       = _model.LocationCountry,
-            LocationCountryCode   = _model.LocationCountryCode,
-            LocationLatitude      = _model.LocationLatitude,
-            LocationLongitude     = _model.LocationLongitude,
-            LocationPlaceId       = _model.LocationPlaceId,
-            PublicContactEmail    = _model.PublicContactEmail,
-            PublicContactPhone    = _model.PublicContactPhone,
-            IsPublicProfileEnabled       = _model.IsPublicProfileEnabled,
-            IsEqualOpportunityEmployer   = _model.IsEqualOpportunityEmployer,
-            IsAccessibleWorkplace        = _model.IsAccessibleWorkplace,
-            Industry      = _model.Industry,
-            CompanySize   = _model.CompanySize,
-            LinkedInUrl   = BuildSocialUrl(_model.LinkedInUrl, LinkedInBase),
-            TwitterHandle = _model.TwitterHandle,
-            FacebookUrl   = BuildSocialUrl(_model.FacebookUrl, FacebookBase),
-            TikTokHandle  = _model.TikTokHandle,
+            Summary        = _model.Summary,
+            PublicLocationText   = _model.PublicLocationText,
+            LocationCity         = _model.LocationCity,
+            LocationState        = _model.LocationState,
+            LocationCountry      = _model.LocationCountry,
+            LocationCountryCode  = _model.LocationCountryCode,
+            LocationLatitude     = _model.LocationLatitude,
+            LocationLongitude    = _model.LocationLongitude,
+            LocationPlaceId      = _model.LocationPlaceId,
+            PublicContactEmail         = _model.PublicContactEmail,
+            PublicContactPhoneDialCode = _model.PublicContactPhoneDialCode,
+            PublicContactPhone         = _model.PublicContactPhone,
+            IsPublicProfileEnabled     = _model.IsPublicProfileEnabled,
+            IsEqualOpportunityEmployer = _model.IsEqualOpportunityEmployer,
+            IsAccessibleWorkplace      = _model.IsAccessibleWorkplace,
+            Industry       = _model.Industry,
+            CompanySize    = _model.CompanySize,
+            LinkedInUrl    = BuildSocialUrl(_model.LinkedInUrl, LinkedInBase),
+            TwitterHandle  = _model.TwitterHandle,
+            FacebookUrl    = BuildSocialUrl(_model.FacebookUrl, FacebookBase),
+            TikTokHandle   = _model.TikTokHandle,
             InstagramHandle = _model.InstagramHandle,
-            YouTubeUrl    = BuildSocialUrl(_model.YouTubeUrl, YouTubeBase)
+            YouTubeUrl     = BuildSocialUrl(_model.YouTubeUrl, YouTubeBase),
+            PrimaryContactName         = _model.PrimaryContactName,
+            PrimaryContactEmail        = _model.PrimaryContactEmail,
+            PrimaryContactPhoneDialCode = _model.PrimaryContactPhoneDialCode,
+            PrimaryContactPhone        = _model.PrimaryContactPhone,
+            RegisteredAddressLine1     = _model.RegisteredAddressLine1,
+            RegisteredAddressLine2     = _model.RegisteredAddressLine2,
+            RegisteredCity             = _model.RegisteredCity,
+            RegisteredState            = _model.RegisteredState,
+            RegisteredPostcode         = _model.RegisteredPostcode,
+            RegisteredCountry          = _model.RegisteredCountry,
+            RegisteredCountryCode      = _model.RegisteredCountryCode,
+            TaxRegistrationNumber      = _model.TaxRegistrationNumber,
+            BusinessRegistrationNumber = _model.BusinessRegistrationNumber,
         };
 
-        // URL reachability checks (website, logo, banner) — run in parallel
+        // URL reachability checks (website, logo, banner) — parallel
         var checks = new List<Task>();
         if (!string.IsNullOrWhiteSpace(submit.WebsiteUrl))
             checks.Add(CheckUrlAsync(submit.WebsiteUrl, "WebsiteUrl"));
@@ -538,7 +781,7 @@ else
         }
     }
 
-    // ── URL helpers ────────────────────────────────────────────────────────────
+    // ── URL helpers ─────────────────────────────────────────────────────────
 
     private static string StripHttps(string? url)
     {
@@ -552,11 +795,9 @@ else
     {
         if (string.IsNullOrWhiteSpace(url)) return "";
         url = url.Trim();
-        // Try exact base and base without www
         foreach (var p in new[] { baseUrl, baseUrl.Replace("www.", "") })
             if (url.StartsWith(p, StringComparison.OrdinalIgnoreCase))
                 return url[p.Length..].Trim('/');
-        // Fall back: just strip https://
         return StripHttps(url);
     }
 

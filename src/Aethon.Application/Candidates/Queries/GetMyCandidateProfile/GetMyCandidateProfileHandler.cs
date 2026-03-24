@@ -51,6 +51,10 @@ public sealed class GetMyCandidateProfileHandler
                         .ThenInclude(x => x.StoredFile)
                     .Include(x => x.Nationalities)
                     .Include(x => x.Languages)
+                    .Include(x => x.WorkExperiences)
+                    .Include(x => x.Qualifications)
+                    .Include(x => x.Certificates)
+                    .Include(x => x.Skills)
                     .SingleOrDefaultAsync(x => x.UserId == currentUserId, ct);
 
                 if (profile is null)
@@ -88,6 +92,10 @@ public sealed class GetMyCandidateProfileHandler
                     IsSearchable = profile.IsSearchable,
                     Slug = profile.Slug,
                     ProfileVisibility = profile.ProfileVisibility,
+                    LinkedInId = profile.LinkedInId,
+                    LinkedInVerifiedAt = profile.LinkedInVerifiedAt,
+                    IsIdVerified = profile.IsIdVerified,
+                    IsNameLocked = profile.IsNameLocked,
                     LastProfileUpdatedUtc = profile.LastProfileUpdatedUtc,
                     Resumes = profile.Resumes
                         .OrderByDescending(x => x.IsDefault)
@@ -123,6 +131,62 @@ public sealed class GetMyCandidateProfileHandler
                             AbilityType = x.AbilityType,
                             ProficiencyLevel = x.ProficiencyLevel,
                             IsVerified = x.IsVerified
+                        })
+                        .ToList(),
+                    WorkExperiences = profile.WorkExperiences
+                        .OrderBy(x => x.SortOrder)
+                        .ThenByDescending(x => x.StartYear)
+                        .ThenByDescending(x => x.StartMonth)
+                        .Select(x => new JobSeekerWorkExperienceDto
+                        {
+                            Id = x.Id,
+                            JobTitle = x.JobTitle,
+                            EmployerName = x.EmployerName,
+                            StartMonth = x.StartMonth,
+                            StartYear = x.StartYear,
+                            EndMonth = x.EndMonth,
+                            EndYear = x.EndYear,
+                            IsCurrent = x.IsCurrent,
+                            Description = x.Description,
+                            SortOrder = x.SortOrder
+                        })
+                        .ToList(),
+                    Qualifications = profile.Qualifications
+                        .OrderBy(x => x.SortOrder)
+                        .Select(x => new JobSeekerQualificationDto
+                        {
+                            Id = x.Id,
+                            Title = x.Title,
+                            Institution = x.Institution,
+                            CompletedYear = x.CompletedYear,
+                            Description = x.Description,
+                            SortOrder = x.SortOrder
+                        })
+                        .ToList(),
+                    Certificates = profile.Certificates
+                        .OrderBy(x => x.SortOrder)
+                        .Select(x => new JobSeekerCertificateDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name,
+                            IssuingOrganisation = x.IssuingOrganisation,
+                            IssuedMonth = x.IssuedMonth,
+                            IssuedYear = x.IssuedYear,
+                            ExpiryYear = x.ExpiryYear,
+                            CredentialId = x.CredentialId,
+                            CredentialUrl = x.CredentialUrl,
+                            SortOrder = x.SortOrder
+                        })
+                        .ToList(),
+                    Skills = profile.Skills
+                        .OrderBy(x => x.SortOrder)
+                        .ThenBy(x => x.Name)
+                        .Select(x => new JobSeekerSkillDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name,
+                            SkillLevel = x.SkillLevel,
+                            SortOrder = x.SortOrder
                         })
                         .ToList()
                 };

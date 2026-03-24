@@ -15,5 +15,11 @@ public sealed class PublicJobSeekerProfileDto
     public bool OpenToWork { get; set; }
     public string? Slug { get; set; }
     public ProfileVisibility ProfileVisibility { get; set; }
+    public bool IsLinkedInVerified { get; set; }
+    public bool IsIdVerified { get; set; }
     public DateTime? LastProfileUpdatedUtc { get; set; }
+    public IReadOnlyList<JobSeekerWorkExperienceDto> WorkExperiences { get; set; } = [];
+    public IReadOnlyList<JobSeekerQualificationDto> Qualifications { get; set; } = [];
+    public IReadOnlyList<JobSeekerCertificateDto> Certificates { get; set; } = [];
+    public IReadOnlyList<JobSeekerSkillDto> Skills { get; set; } = [];
 }

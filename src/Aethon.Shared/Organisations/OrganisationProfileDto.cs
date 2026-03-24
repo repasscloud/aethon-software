@@ -21,8 +21,24 @@ public sealed class OrganisationProfileDto
     public double? LocationLatitude { get; set; }
     public double? LocationLongitude { get; set; }
     public string? LocationPlaceId { get; set; }
+    public string? PrimaryContactName { get; set; }
+    public string? PrimaryContactEmail { get; set; }
+    public string? PrimaryContactPhoneDialCode { get; set; }
+    public string? PrimaryContactPhone { get; set; }
     public string? PublicContactEmail { get; set; }
+    public string? PublicContactPhoneDialCode { get; set; }
     public string? PublicContactPhone { get; set; }
+
+    // Legal & verification
+    public string? RegisteredAddressLine1 { get; set; }
+    public string? RegisteredAddressLine2 { get; set; }
+    public string? RegisteredCity { get; set; }
+    public string? RegisteredState { get; set; }
+    public string? RegisteredPostcode { get; set; }
+    public string? RegisteredCountry { get; set; }
+    public string? RegisteredCountryCode { get; set; }
+    public string? TaxRegistrationNumber { get; set; }
+    public string? BusinessRegistrationNumber { get; set; }
     public bool IsPublicProfileEnabled { get; set; }
     public bool IsEqualOpportunityEmployer { get; set; }
     public bool IsAccessibleWorkplace { get; set; }

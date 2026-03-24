@@ -3,6 +3,8 @@
 @attribute [Authorize]
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
 @using Aethon.Shared.Candidates
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Files
@@ -11,6 +13,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject AethonApiClient Api
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Job seeker profile | Aethon</PageTitle>
 
@@ -49,6 +52,39 @@ else
         {
             <div class="alert alert-danger rounded-4 mb-0">@_error</div>
         }
+
+        <!-- LinkedIn verification -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div>
+                        <h2 class="h5 fw-bold mb-1">LinkedIn verification</h2>
+                        @if (_profile?.LinkedInVerifiedAt.HasValue == true)
+                        {
+                            <p class="text-secondary small mb-0">
+                                <i class="bi bi-patch-check-fill text-primary me-1"></i>
+                                Verified via LinkedIn on @_profile.LinkedInVerifiedAt.Value.ToLocalTime().ToString("dd MMM yyyy")
+                                @if (!string.IsNullOrWhiteSpace(_profile.LinkedInId))
+                                {
+                                    <span class="text-muted ms-1">(ID: @_profile.LinkedInId)</span>
+                                }
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="text-secondary small mb-0">Connect your LinkedIn account to verify your identity and auto-fill your name.</p>
+                        }
+                    </div>
+                    <button class="btn p-0 border-0 bg-transparent" @onclick="ConnectLinkedInAsync" disabled="@_connectingLinkedIn" style="line-height:0;">
+                        <img src="/img/LinkedIn-Sign-in-Small---Default-146.png"
+                             srcset="/img/LinkedIn-Sign-in-Small---Default-146.png 1x, /img/LinkedIn-Sign-In-Small---Default-292.png 2x"
+                             width="146" height="21"
+                             alt="Sign in with LinkedIn"
+                             style="cursor:pointer;" />
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Profile details -->
         <div class="card border-0 shadow-sm rounded-4">
@@ -236,6 +272,241 @@ else
             </div>
         </div>
 
+        <!-- Work Experience -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Work experience</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddWorkExperience">+ Add</button>
+                </div>
+
+                @if (_workExperiences.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No work experience added yet.</p>
+                }
+
+                @foreach (var (we, idx) in _workExperiences.Select((x, i) => (x, i)))
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Job title</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="we.JobTitle" placeholder="e.g. Senior Developer" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Employer</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="we.EmployerName" placeholder="e.g. Acme Corp" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Start month</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="we.StartMonth">
+                                    <option value="0">Month</option>
+                                    @foreach (var m in Enumerable.Range(1, 12))
+                                    {
+                                        <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Start year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="we.StartYear">
+                                    <option value="0">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 50, 51).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (!we.IsCurrent)
+                            {
+                                <div class="col-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">End month</label>
+                                    <select class="form-select form-select-sm rounded-3" @bind="we.EndMonth">
+                                        <option value="">Month</option>
+                                        @foreach (var m in Enumerable.Range(1, 12))
+                                        {
+                                            <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">End year</label>
+                                    <select class="form-select form-select-sm rounded-3" @bind="we.EndYear">
+                                        <option value="">Year</option>
+                                        @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 50, 51).Reverse())
+                                        {
+                                            <option value="@y">@y</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="current_@idx" @bind="we.IsCurrent" />
+                                    <label class="form-check-label small" for="current_@idx">Currently working here</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">Description <span class="text-secondary fw-normal">(optional)</span></label>
+                                <textarea class="form-control form-control-sm rounded-3" rows="2" @bind="we.Description" placeholder="Brief description of responsibilities…"></textarea>
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveWorkExperienceAsync(we)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteWorkExperienceAsync(we)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Skills -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Skills</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddSkill">+ Add</button>
+                </div>
+
+                @if (_skills.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No skills added yet.</p>
+                }
+
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var skill in _skills)
+                    {
+                        <div class="d-flex align-items-center gap-1 border rounded-pill px-3 py-1">
+                            <input type="text" class="border-0 bg-transparent form-control form-control-sm p-0" style="min-width:80px;max-width:150px;" @bind="skill.Name" placeholder="Skill name" />
+                            <select class="border-0 bg-transparent form-select form-select-sm p-0" style="max-width:90px;" @bind="skill.SkillLevel">
+                                <option value="">Level</option>
+                                <option value="@SkillLevel.Beginner">Beginner</option>
+                                <option value="@SkillLevel.Intermediate">Intermediate</option>
+                                <option value="@SkillLevel.Advanced">Advanced</option>
+                                <option value="@SkillLevel.Expert">Expert</option>
+                            </select>
+                            <button class="btn btn-link btn-sm p-0 ms-1 text-success" @onclick="() => SaveSkillAsync(skill)" title="Save"><i class="bi bi-check-lg"></i></button>
+                            <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DeleteSkillAsync(skill)" title="Remove"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Qualifications -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Qualifications</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddQualification">+ Add</button>
+                </div>
+
+                @if (_qualifications.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No qualifications added yet.</p>
+                }
+
+                @foreach (var q in _qualifications)
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Title</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="q.Title" placeholder="e.g. Bachelor of Computer Science" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Institution</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="q.Institution" placeholder="e.g. University of Sydney" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Completed year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="q.CompletedYear">
+                                    <option value="">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 60, 61).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveQualificationAsync(q)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteQualificationAsync(q)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Certificates -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Certificates</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddCertificate">+ Add</button>
+                </div>
+
+                @if (_certificates.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No certificates added yet.</p>
+                }
+
+                @foreach (var c in _certificates)
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Certificate name</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="c.Name" placeholder="e.g. AWS Solutions Architect" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Issuing organisation</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="c.IssuingOrganisation" placeholder="e.g. Amazon Web Services" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Issued month</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.IssuedMonth">
+                                    <option value="">Month</option>
+                                    @foreach (var m in Enumerable.Range(1, 12))
+                                    {
+                                        <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Issued year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.IssuedYear">
+                                    <option value="">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 30, 31).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Expiry year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.ExpiryYear">
+                                    <option value="">No expiry</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year, 20))
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Credential URL <span class="text-secondary fw-normal">(optional)</span></label>
+                                <input type="url" class="form-control form-control-sm rounded-3" @bind="c.CredentialUrl" placeholder="https://..." />
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveCertificateAsync(c)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteCertificateAsync(c)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
         @if (_activeResumeId.HasValue)
         {
             <div class="card border-0 shadow-sm rounded-4">
@@ -335,6 +606,7 @@ else
     private bool _triggeringAnalysis;
     private bool _checkingSlug;
     private bool _slugConfirmed;
+    private bool _connectingLinkedIn;
     private string? _message;
     private string? _error;
     private string? _slugMessage;
@@ -345,7 +617,62 @@ else
     private Guid? _activeResumeId;
     private ResumeAnalysisDto? _analysis;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // Extended profile sections
+    private List<JobSeekerWorkExperienceDto> _workExperiences = new();
+    private List<JobSeekerQualificationDto> _qualifications = new();
+    private List<JobSeekerCertificateDto> _certificates = new();
+    private List<JobSeekerSkillDto> _skills = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+
+        // Check for LinkedIn callback result in the URL
+        var uri = new Uri(NavigationManager.Uri);
+        var qsStr = uri.Query.TrimStart('?');
+        var qsParts = qsStr.Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Split('=', 2))
+            .Where(p => p.Length == 2)
+            .ToDictionary(p => Uri.UnescapeDataString(p[0]), p => Uri.UnescapeDataString(p[1]));
+
+        if (qsParts.TryGetValue("linkedin_connected", out var lc) && lc == "1")
+        {
+            _message = "LinkedIn connected! Your name and profile picture have been updated.";
+            NavigationManager.NavigateTo("/app/jobseeker/profile", replace: true);
+        }
+        else if (qsParts.TryGetValue("linkedin_error", out var lerr) && !string.IsNullOrWhiteSpace(lerr))
+        {
+            _error = $"LinkedIn connection failed: {lerr}";
+            NavigationManager.NavigateTo("/app/jobseeker/profile", replace: true);
+        }
+    }
+
+    private async Task ConnectLinkedInAsync()
+    {
+        _connectingLinkedIn = true;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var token = authState.User.FindFirstValue("access_token");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                _error = "Could not retrieve your session token. Please log in again.";
+                return;
+            }
+
+            // Navigate the browser to the API LinkedIn connect endpoint with the JWT
+            var apiBase = new Uri(NavigationManager.BaseUri).GetLeftPart(UriPartial.Authority);
+            // The API base URL — derive from the client's configured base address
+            var client = await Api.CreateAsync();
+            var apiBaseUrl = client.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:5100";
+            NavigationManager.NavigateTo($"{apiBaseUrl}/api/v1/auth/linkedin/connect?token={Uri.EscapeDataString(token)}", forceLoad: true);
+        }
+        catch
+        {
+            _error = "Could not initiate LinkedIn connection.";
+            _connectingLinkedIn = false;
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -356,6 +683,11 @@ else
 
             if (_profile is not null)
             {
+                _workExperiences = _profile.WorkExperiences.ToList();
+                _qualifications = _profile.Qualifications.ToList();
+                _certificates = _profile.Certificates.ToList();
+                _skills = _profile.Skills.ToList();
+
                 _model = new UpdateJobSeekerProfileRequestDto
                 {
                     Headline             = _profile.Headline,
@@ -547,6 +879,175 @@ else
         catch { }
         finally { _triggeringAnalysis = false; }
     }
+
+    // ── Work Experience ──────────────────────────────────────────────────────────
+
+    private void AddWorkExperience() =>
+        _workExperiences.Add(new JobSeekerWorkExperienceDto { StartYear = DateTime.UtcNow.Year, StartMonth = DateTime.UtcNow.Month });
+
+    private async Task SaveWorkExperienceAsync(JobSeekerWorkExperienceDto we)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (we.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/work-experiences", we);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    we.Id = created?.Id ?? Guid.Empty;
+                    _message = "Work experience saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/work-experiences/{we.Id}", we);
+                _message = "Work experience updated.";
+            }
+        }
+        catch { _error = "Could not save work experience."; }
+    }
+
+    private async Task DeleteWorkExperienceAsync(JobSeekerWorkExperienceDto we)
+    {
+        try
+        {
+            if (we.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/work-experiences/{we.Id}");
+            }
+            _workExperiences.Remove(we);
+        }
+        catch { _error = "Could not remove work experience."; }
+    }
+
+    // ── Skills ───────────────────────────────────────────────────────────────────
+
+    private void AddSkill() => _skills.Add(new JobSeekerSkillDto());
+
+    private async Task SaveSkillAsync(JobSeekerSkillDto skill)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (skill.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/skills", skill);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    skill.Id = created?.Id ?? Guid.Empty;
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/skills/{skill.Id}", skill);
+            }
+        }
+        catch { _error = "Could not save skill."; }
+    }
+
+    private async Task DeleteSkillAsync(JobSeekerSkillDto skill)
+    {
+        try
+        {
+            if (skill.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/skills/{skill.Id}");
+            }
+            _skills.Remove(skill);
+        }
+        catch { _error = "Could not remove skill."; }
+    }
+
+    // ── Qualifications ───────────────────────────────────────────────────────────
+
+    private void AddQualification() => _qualifications.Add(new JobSeekerQualificationDto());
+
+    private async Task SaveQualificationAsync(JobSeekerQualificationDto q)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (q.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/qualifications", q);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    q.Id = created?.Id ?? Guid.Empty;
+                    _message = "Qualification saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/qualifications/{q.Id}", q);
+                _message = "Qualification updated.";
+            }
+        }
+        catch { _error = "Could not save qualification."; }
+    }
+
+    private async Task DeleteQualificationAsync(JobSeekerQualificationDto q)
+    {
+        try
+        {
+            if (q.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/qualifications/{q.Id}");
+            }
+            _qualifications.Remove(q);
+        }
+        catch { _error = "Could not remove qualification."; }
+    }
+
+    // ── Certificates ─────────────────────────────────────────────────────────────
+
+    private void AddCertificate() => _certificates.Add(new JobSeekerCertificateDto());
+
+    private async Task SaveCertificateAsync(JobSeekerCertificateDto c)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (c.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/certificates", c);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    c.Id = created?.Id ?? Guid.Empty;
+                    _message = "Certificate saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/certificates/{c.Id}", c);
+                _message = "Certificate updated.";
+            }
+        }
+        catch { _error = "Could not save certificate."; }
+    }
+
+    private async Task DeleteCertificateAsync(JobSeekerCertificateDto c)
+    {
+        try
+        {
+            if (c.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/certificates/{c.Id}");
+            }
+            _certificates.Remove(c);
+        }
+        catch { _error = "Could not remove certificate."; }
+    }
+
+    private sealed record IdResult(Guid Id);
 
     private void HandleResumeSelected(InputFileChangeEventArgs e)
     {

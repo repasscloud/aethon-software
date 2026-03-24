@@ -26,8 +26,18 @@ public sealed class GetPublicJobSeekerProfileHandler
         CancellationToken ct = default)
     {
         var profile = Guid.TryParse(identifier, out var userId)
-            ? await _db.JobSeekerProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == userId, ct)
-            : await _db.JobSeekerProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == identifier.ToLowerInvariant(), ct);
+            ? await _db.JobSeekerProfiles.AsNoTracking().AsSplitQuery()
+                .Include(p => p.WorkExperiences)
+                .Include(p => p.Qualifications)
+                .Include(p => p.Certificates)
+                .Include(p => p.Skills)
+                .FirstOrDefaultAsync(p => p.UserId == userId, ct)
+            : await _db.JobSeekerProfiles.AsNoTracking().AsSplitQuery()
+                .Include(p => p.WorkExperiences)
+                .Include(p => p.Qualifications)
+                .Include(p => p.Certificates)
+                .Include(p => p.Skills)
+                .FirstOrDefaultAsync(p => p.Slug == identifier.ToLowerInvariant(), ct);
 
         if (profile is null)
             return Result<PublicJobSeekerProfileDto>.Failure("profile.not_found", "Profile not found.");
@@ -64,7 +74,65 @@ public sealed class GetPublicJobSeekerProfileHandler
             OpenToWork           = profile.OpenToWork,
             Slug                 = profile.Slug,
             ProfileVisibility    = profile.ProfileVisibility,
-            LastProfileUpdatedUtc = profile.LastProfileUpdatedUtc
+            IsLinkedInVerified   = profile.LinkedInVerifiedAt.HasValue,
+            IsIdVerified         = profile.IsIdVerified,
+            LastProfileUpdatedUtc = profile.LastProfileUpdatedUtc,
+            WorkExperiences = profile.WorkExperiences
+                .OrderBy(x => x.SortOrder)
+                .ThenByDescending(x => x.StartYear)
+                .ThenByDescending(x => x.StartMonth)
+                .Select(x => new JobSeekerWorkExperienceDto
+                {
+                    Id = x.Id,
+                    JobTitle = x.JobTitle,
+                    EmployerName = x.EmployerName,
+                    StartMonth = x.StartMonth,
+                    StartYear = x.StartYear,
+                    EndMonth = x.EndMonth,
+                    EndYear = x.EndYear,
+                    IsCurrent = x.IsCurrent,
+                    Description = x.Description,
+                    SortOrder = x.SortOrder
+                })
+                .ToList(),
+            Qualifications = profile.Qualifications
+                .OrderBy(x => x.SortOrder)
+                .Select(x => new JobSeekerQualificationDto
+                {
+                    Id = x.Id,
+                    Title = x.Title,
+                    Institution = x.Institution,
+                    CompletedYear = x.CompletedYear,
+                    Description = x.Description,
+                    SortOrder = x.SortOrder
+                })
+                .ToList(),
+            Certificates = profile.Certificates
+                .OrderBy(x => x.SortOrder)
+                .Select(x => new JobSeekerCertificateDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    IssuingOrganisation = x.IssuingOrganisation,
+                    IssuedMonth = x.IssuedMonth,
+                    IssuedYear = x.IssuedYear,
+                    ExpiryYear = x.ExpiryYear,
+                    CredentialId = x.CredentialId,
+                    CredentialUrl = x.CredentialUrl,
+                    SortOrder = x.SortOrder
+                })
+                .ToList(),
+            Skills = profile.Skills
+                .OrderBy(x => x.SortOrder)
+                .ThenBy(x => x.Name)
+                .Select(x => new JobSeekerSkillDto
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    SkillLevel = x.SkillLevel,
+                    SortOrder = x.SortOrder
+                })
+                .ToList()
         });
     }
 }

@@ -153,6 +153,34 @@ public class JobSeekerProfile : EntityBase
     public ProfileVisibility ProfileVisibility { get; set; } = ProfileVisibility.Private;
 
     /// <summary>
+    /// LinkedIn account ID, populated after the user connects via LinkedIn OAuth.
+    /// </summary>
+    public string? LinkedInId { get; set; }
+
+    /// <summary>
+    /// When the candidate last verified their identity via LinkedIn OAuth.
+    /// </summary>
+    public DateTime? LinkedInVerifiedAt { get; set; }
+
+    /// <summary>
+    /// FK to a StoredFile record for the candidate's profile picture.
+    /// </summary>
+    public Guid? ProfilePictureStoredFileId { get; set; }
+
+    /// <summary>
+    /// Whether the candidate has been ID-verified (e.g. via document check).
+    /// When true, name fields are locked for the candidate — only staff can change them.
+    /// </summary>
+    public bool IsIdVerified { get; set; }
+
+    /// <summary>
+    /// When set, prevents the candidate from changing FirstName/LastName/MiddleName.
+    /// Set automatically when IsIdVerified becomes true.
+    /// Only staff can set this back to false.
+    /// </summary>
+    public bool IsNameLocked { get; set; }
+
+    /// <summary>
     /// When the candidate profile was last meaningfully updated.
     /// Useful for profile freshness and search ranking later.
     /// </summary>
@@ -175,4 +203,9 @@ public class JobSeekerProfile : EntityBase
     /// Spoken/written and verification should be tracked per item.
     /// </summary>
     public ICollection<JobSeekerLanguage> Languages { get; set; } = new List<JobSeekerLanguage>();
+
+    public ICollection<JobSeekerWorkExperience> WorkExperiences { get; set; } = new List<JobSeekerWorkExperience>();
+    public ICollection<JobSeekerQualification> Qualifications { get; set; } = new List<JobSeekerQualification>();
+    public ICollection<JobSeekerCertificate> Certificates { get; set; } = new List<JobSeekerCertificate>();
+    public ICollection<JobSeekerSkill> Skills { get; set; } = new List<JobSeekerSkill>();
 }

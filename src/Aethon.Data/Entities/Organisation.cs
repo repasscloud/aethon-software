@@ -52,7 +52,21 @@ public class Organisation : EntityBase
 
     public string? PrimaryContactName { get; set; }
     public string? PrimaryContactEmail { get; set; }
+    public string? PrimaryContactPhoneDialCode { get; set; }
     public string? PrimaryContactPhone { get; set; }
+
+    public string? PublicContactPhoneDialCode { get; set; }
+
+    // Legal & verification
+    public string? RegisteredAddressLine1 { get; set; }
+    public string? RegisteredAddressLine2 { get; set; }
+    public string? RegisteredCity { get; set; }
+    public string? RegisteredState { get; set; }
+    public string? RegisteredPostcode { get; set; }
+    public string? RegisteredCountry { get; set; }
+    public string? RegisteredCountryCode { get; set; }
+    public string? TaxRegistrationNumber { get; set; }
+    public string? BusinessRegistrationNumber { get; set; }
 
     public VerificationTier VerificationTier { get; set; } = VerificationTier.None;
     public DateTime? VerifiedUtc { get; set; }

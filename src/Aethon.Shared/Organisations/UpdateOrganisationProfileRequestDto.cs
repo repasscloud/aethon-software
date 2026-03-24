@@ -43,12 +43,56 @@ public sealed class UpdateOrganisationProfileRequestDto
     [MaxLength(500)]
     public string? LocationPlaceId { get; set; }
 
+    [MaxLength(200)]
+    public string? PrimaryContactName { get; set; }
+
+    [MaxLength(320)]
+    [EmailAddress]
+    public string? PrimaryContactEmail { get; set; }
+
+    [MaxLength(10)]
+    public string? PrimaryContactPhoneDialCode { get; set; }
+
+    [MaxLength(50)]
+    public string? PrimaryContactPhone { get; set; }
+
     [MaxLength(320)]
     [EmailAddress]
     public string? PublicContactEmail { get; set; }
 
+    [MaxLength(10)]
+    public string? PublicContactPhoneDialCode { get; set; }
+
     [MaxLength(50)]
     public string? PublicContactPhone { get; set; }
+
+    // Legal & verification
+    [MaxLength(500)]
+    public string? RegisteredAddressLine1 { get; set; }
+
+    [MaxLength(500)]
+    public string? RegisteredAddressLine2 { get; set; }
+
+    [MaxLength(150)]
+    public string? RegisteredCity { get; set; }
+
+    [MaxLength(150)]
+    public string? RegisteredState { get; set; }
+
+    [MaxLength(20)]
+    public string? RegisteredPostcode { get; set; }
+
+    [MaxLength(150)]
+    public string? RegisteredCountry { get; set; }
+
+    [MaxLength(10)]
+    public string? RegisteredCountryCode { get; set; }
+
+    [MaxLength(100)]
+    public string? TaxRegistrationNumber { get; set; }
+
+    [MaxLength(100)]
+    public string? BusinessRegistrationNumber { get; set; }
 
     public bool IsPublicProfileEnabled { get; set; }
     public bool IsEqualOpportunityEmployer { get; set; }
