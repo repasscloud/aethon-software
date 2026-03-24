@@ -76,6 +76,8 @@ public sealed class UpdateJobHandler
         job.PostingExpiresUtc = request.PostingExpiresUtc;
         job.IncludeCompanyLogo = request.IncludeCompanyLogo;
         job.IsHighlighted = request.IsHighlighted;
+        job.HighlightColour = string.IsNullOrWhiteSpace(request.HighlightColour) ? null : request.HighlightColour.Trim();
+        job.HasAiCandidateMatching = request.HasAiCandidateMatching;
         job.StickyUntilUtc = request.StickyUntilUtc;
         job.AllowAutoMatch = request.AllowAutoMatch;
         job.BenefitsTags = request.BenefitsTags.Count > 0

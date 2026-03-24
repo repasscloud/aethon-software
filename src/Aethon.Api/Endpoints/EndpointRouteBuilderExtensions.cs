@@ -1,6 +1,7 @@
 using Aethon.Api.Endpoints.Admin;
 using Aethon.Api.Endpoints.Applications;
 using Aethon.Api.Endpoints.Auth;
+using Aethon.Api.Endpoints.Billing;
 using Aethon.Api.Endpoints.Candidates;
 using Aethon.Api.Endpoints.CompanyJobs;
 using Aethon.Api.Endpoints.CompanyRecruiters;
@@ -34,6 +35,7 @@ public static class EndpointRouteBuilderExtensions
         api.MapCompanyRecruiterEndpoints();
         api.MapRecruiterJobEndpoints();
         api.MapCompanyJobEndpoints();
+        api.MapBillingEndpoints();
         api.MapStripeWebhookEndpoints();
     }
 }

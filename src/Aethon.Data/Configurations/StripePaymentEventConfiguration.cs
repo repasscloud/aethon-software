@@ -34,5 +34,16 @@ public sealed class StripePaymentEventConfiguration : IEntityTypeConfiguration<S
 
         builder.Property(x => x.Status)
             .IsRequired();
+
+        builder.Property(x => x.PurchaseType).HasMaxLength(50);
+        builder.Property(x => x.ProductId).HasMaxLength(255);
+        builder.Property(x => x.PriceId).HasMaxLength(255);
+
+        builder.HasIndex(x => x.OrganisationId);
+
+        builder.HasOne(x => x.Organisation)
+            .WithMany()
+            .HasForeignKey(x => x.OrganisationId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

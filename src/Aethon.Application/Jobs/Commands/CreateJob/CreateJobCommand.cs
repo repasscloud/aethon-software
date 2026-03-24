@@ -40,8 +40,11 @@ public sealed class CreateJobCommand
     public List<JobRegion> Regions { get; init; } = [];
     public List<string> Countries { get; init; } = [];
     public DateTime? PostingExpiresUtc { get; init; }
+    public JobPostingTier PostingTier { get; init; } = JobPostingTier.Standard;
     public bool IncludeCompanyLogo { get; init; }
     public bool IsHighlighted { get; init; }
+    public string? HighlightColour { get; init; }
+    public bool HasAiCandidateMatching { get; init; }
     public DateTime? StickyUntilUtc { get; init; }
     public bool AllowAutoMatch { get; init; }
     public List<string> BenefitsTags { get; init; } = [];

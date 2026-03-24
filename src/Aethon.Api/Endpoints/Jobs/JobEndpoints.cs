@@ -1,5 +1,10 @@
 using Aethon.Api.Common;
+using Aethon.Api.Infrastructure.Stripe;
+using Aethon.Application.Abstractions.Authentication;
+using Aethon.Application.Abstractions.Caching;
+using Aethon.Application.Abstractions.Settings;
 using Aethon.Application.Abstractions.Syndication;
+using Aethon.Application.Common.Caching;
 using Aethon.Shared.Utilities;
 using Aethon.Application.Applications.Queries.GetApplicationsForJob;
 using Aethon.Application.Jobs.Commands.CloseJob;
@@ -98,12 +103,42 @@ public static class JobEndpoints
 
         group.MapPost("/{jobId:guid}/publish", async (
             [FromServices] PublishJobHandler handler,
+            [FromServices] JobPublishBillingService billing,
             [FromServices] IGoogleIndexingService indexing,
             [FromServices] IConfiguration config,
+            AethonDbContext db,
             Guid jobId,
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(jobId, ct);
+
+            // No posting credits — attempt off-session Stripe charge, then retry
+            if (!result.Succeeded && result.ErrorCode == "billing.no_credits")
+            {
+                var job = await db.Jobs.AsNoTracking()
+                    .Where(j => j.Id == jobId)
+                    .Select(j => new { j.OwnedByOrganisationId, j.PostingTier })
+                    .FirstOrDefaultAsync(ct);
+
+                if (job is null)
+                    return result.ToMinimalApiResult();
+
+                var requiredType = job.PostingTier == JobPostingTier.Premium
+                    ? CreditType.JobPostingPremium
+                    : CreditType.JobPostingStandard;
+
+                var (charged, chargeError) = await billing.ChargeAndGrantPostingCreditAsync(
+                    job.OwnedByOrganisationId, requiredType, ct);
+
+                if (!charged)
+                    return Results.Problem(
+                        title: "Payment required",
+                        detail: chargeError ?? "No posting credits available and payment failed.",
+                        statusCode: 402);
+
+                // Credit was granted — retry the publish handler
+                result = await handler.HandleAsync(jobId, ct);
+            }
 
             if (result.Succeeded)
             {
@@ -112,6 +147,107 @@ public static class JobEndpoints
             }
 
             return result.ToMinimalApiResult();
+        });
+
+        // POST /jobs/{jobId}/addons — apply paid add-ons to a published job
+        group.MapPost("/{jobId:guid}/addons", async (
+            [FromServices] JobAddonBillingService addonBilling,
+            [FromServices] IAppCache cache,
+            [FromServices] ICurrentUserAccessor currentUser,
+            AethonDbContext db,
+            Guid jobId,
+            JobAddonRequestDto request,
+            CancellationToken ct) =>
+        {
+            var job = await db.Jobs
+                .Include(j => j.OwnedByOrganisation)
+                .FirstOrDefaultAsync(j => j.Id == jobId, ct);
+
+            if (job is null)
+                return Results.NotFound(new { code = "jobs.not_found" });
+
+            if (job.Status is not (JobStatus.Published or JobStatus.OnHold))
+                return Results.BadRequest(new { code = "jobs.invalid_status", message = "Add-ons can only be applied to published or on-hold jobs." });
+
+            var isPremium  = job.PostingTier == JobPostingTier.Premium;
+            var isVerified = job.OwnedByOrganisation.IsVerified;
+            var orgId      = job.OwnedByOrganisationId;
+            var now        = DateTime.UtcNow;
+            var errors     = new List<string>();
+
+            // ── Highlight colour ──────────────────────────────────────────────
+            if (request.AddHighlight && !string.IsNullOrWhiteSpace(request.HighlightColour))
+            {
+                var alreadyHighlighted = job.IsHighlighted;
+                if (!alreadyHighlighted && !isPremium)
+                {
+                    var (ok, err) = await addonBilling.ChargeAddonAsync(
+                        orgId, SystemSettingKeys.StripePriceAddonHighlight, "Highlight colour add-on", ct);
+                    if (!ok) errors.Add($"Highlight: {err}");
+                }
+
+                if (errors.Count == 0)
+                {
+                    job.IsHighlighted    = true;
+                    job.HighlightColour  = request.HighlightColour.Trim();
+                }
+            }
+
+            // ── AI candidate matching ─────────────────────────────────────────
+            if (request.AddAiMatching && errors.Count == 0)
+            {
+                if (!job.HasAiCandidateMatching && !isPremium)
+                {
+                    var (ok, err) = await addonBilling.ChargeAddonAsync(
+                        orgId, SystemSettingKeys.StripePriceAddonAiMatching, "AI candidate matching add-on", ct);
+                    if (!ok) errors.Add($"AI matching: {err}");
+                }
+
+                if (errors.Count == 0)
+                    job.HasAiCandidateMatching = true;
+            }
+
+            // ── Sticky top ────────────────────────────────────────────────────
+            if (request.StickyDuration > 0 && errors.Count == 0)
+            {
+                var stickyType = request.StickyDuration switch
+                {
+                    1  => CreditType.StickyTop24h,
+                    7  => CreditType.StickyTop7d,
+                    _  => CreditType.StickyTop30d
+                };
+
+                // Only charge if not already sticky for a future date
+                var needsSticky = !job.StickyUntilUtc.HasValue || job.StickyUntilUtc.Value <= now;
+                if (needsSticky)
+                {
+                    var (ok, err) = await addonBilling.ConsumeOrChargeStickyAsync(
+                        orgId, jobId, stickyType, isVerified, ct);
+                    if (!ok) errors.Add($"Sticky: {err}");
+                }
+
+                if (errors.Count == 0)
+                    job.StickyUntilUtc = now.AddDays(request.StickyDuration);
+            }
+
+            if (errors.Count > 0)
+                return Results.Problem(
+                    title: "Payment required",
+                    detail: string.Join(" | ", errors),
+                    statusCode: 402);
+
+            job.UpdatedUtc      = now;
+            job.UpdatedByUserId = currentUser.IsAuthenticated ? currentUser.UserId : null;
+            await db.SaveChangesAsync(ct);
+            await cache.RemoveAsync(CacheKeys.JobDetail(jobId), ct);
+
+            return Results.Ok(new
+            {
+                isHighlighted         = job.IsHighlighted,
+                highlightColour       = job.HighlightColour,
+                hasAiCandidateMatching = job.HasAiCandidateMatching,
+                stickyUntilUtc        = job.StickyUntilUtc
+            });
         });
 
         group.MapPost("/{jobId:guid}/close", async (

@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using System.Net.Http.Json
 @using System.Security.Claims
+@using System.Text.Json
 @using Aethon.Shared.Auth
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
@@ -30,11 +31,17 @@ else
                         <option value="Pending">Pending</option>
                         <option value="Reviewed">Reviewed</option>
                         <option value="Completed">Completed</option>
+                        <option value="Failed">Failed</option>
                     </select>
                     <button class="btn btn-sm btn-primary" @onclick="LoadAsync">Refresh</button>
                 </div>
             </div>
         </div>
+
+        @if (!string.IsNullOrEmpty(_actionMessage))
+        {
+            <div class="alert @(_actionSuccess ? "alert-success" : "alert-danger") rounded-4 py-2">@_actionMessage</div>
+        }
 
         @if (_loading)
         {
@@ -49,9 +56,9 @@ else
                             <thead class="table-light">
                                 <tr>
                                     <th class="ps-4">Event</th>
+                                    <th>Organisation</th>
                                     <th>Type</th>
                                     <th>Amount</th>
-                                    <th>Customer</th>
                                     <th>Status</th>
                                     <th>Received</th>
                                     <th class="pe-4">Actions</th>
@@ -67,24 +74,50 @@ else
                                     <tr>
                                         <td class="ps-4">
                                             <div class="fw-semibold small">@e.StripeEventId</div>
+                                            @if (!string.IsNullOrEmpty(e.PurchaseType))
+                                            {
+                                                <div class="text-secondary" style="font-size:.7rem;">@e.PurchaseType</div>
+                                            }
+                                        </td>
+                                        <td class="small">
+                                            @if (e.OrganisationId.HasValue && !string.IsNullOrEmpty(e.OrganisationName))
+                                            {
+                                                <a href="/admin/organisations/@e.OrganisationId" class="text-decoration-none fw-semibold">@e.OrganisationName</a>
+                                            }
+                                            else if (!string.IsNullOrEmpty(e.CustomerEmail))
+                                            {
+                                                <span class="text-secondary">@e.CustomerEmail</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary">—</span>
+                                            }
                                         </td>
                                         <td class="small text-secondary">@e.EventType</td>
                                         <td class="small">@FormatAmount(e.AmountTotal, e.Currency)</td>
-                                        <td class="small text-secondary">@(e.CustomerEmail ?? "—")</td>
                                         <td>
                                             <span class="badge @StatusBadge(e.Status) rounded-pill small">@e.Status</span>
                                         </td>
                                         <td class="small text-secondary">@e.CreatedUtc?.ToString("dd MMM yyyy HH:mm")</td>
                                         <td class="pe-4">
-                                            @if (e.Status != "Completed")
-                                            {
-                                                <button class="btn btn-xs btn-outline-success rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
-                                                        @onclick="@(() => OpenModal(e))">Review</button>
-                                            }
-                                            else
-                                            {
-                                                <span class="text-secondary small">—</span>
-                                            }
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                @if (IsVerificationPending(e))
+                                                {
+                                                    <button class="btn btn-outline-success rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                            @onclick="@(() => OpenApproveModal(e))">Approve</button>
+                                                    <button class="btn btn-outline-danger rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                            @onclick="@(() => OpenRejectModal(e))">Reject</button>
+                                                }
+                                                else if (e.Status != "Completed" && e.Status != "Failed")
+                                                {
+                                                    <button class="btn btn-outline-secondary rounded-pill" style="font-size:.75rem;padding:.2rem .6rem;"
+                                                            @onclick="@(() => OpenModal(e))">Review</button>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-secondary small">—</span>
+                                                }
+                                            </div>
                                         </td>
                                     </tr>
                                     @if (!string.IsNullOrEmpty(e.InternalNotes))
@@ -94,7 +127,7 @@ else
                                                 <i class="bi bi-chat-left-text me-1"></i>@e.InternalNotes
                                                 @if (e.CompletedUtc.HasValue)
                                                 {
-                                                    <span class="ms-2">— completed @e.CompletedUtc.Value.ToString("dd MMM yyyy")</span>
+                                                    <span class="ms-2">— @e.CompletedUtc.Value.ToString("dd MMM yyyy")</span>
                                                 }
                                             </td>
                                         </tr>
@@ -121,7 +154,8 @@ else
     </div>
 }
 
-@if (_modalEvent is not null)
+@* ── Generic review modal ── *@
+@if (_modalEvent is not null && _modalMode == "review")
 {
     <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.4);">
         <div class="modal-dialog modal-dialog-centered">
@@ -136,8 +170,8 @@ else
                         <code class="small">@_modalEvent.StripeEventId</code>
                     </div>
                     <div class="mb-3">
-                        <div class="small text-secondary mb-1">Type</div>
-                        <div class="small">@_modalEvent.EventType</div>
+                        <div class="small text-secondary mb-1">Organisation</div>
+                        <div class="small">@(_modalEvent.OrganisationName ?? _modalEvent.CustomerEmail ?? "—")</div>
                     </div>
                     <div class="mb-3">
                         <div class="small text-secondary mb-1">Amount</div>
@@ -171,6 +205,70 @@ else
     </div>
 }
 
+@* ── Approve verification modal ── *@
+@if (_modalEvent is not null && _modalMode == "approve")
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.4);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Approve verification</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning rounded-3 small mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        This will set <strong>@(_modalEvent.OrganisationName ?? "this organisation")</strong> to
+                        <strong>@GetVerificationTierLabel(_modalEvent)</strong> and convert any unused launch promo credits to Premium.
+                    </div>
+                    @if (!string.IsNullOrEmpty(_modalMessage))
+                    {
+                        <div class="alert @(_modalSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 small">@_modalMessage</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button class="btn btn-secondary btn-sm rounded-pill" @onclick="CloseModal">Cancel</button>
+                    <button class="btn btn-success btn-sm rounded-pill" @onclick="ApproveVerification" disabled="@_modalSaving">
+                        @(_modalSaving ? "Approving…" : "Approve")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Reject verification modal ── *@
+@if (_modalEvent is not null && _modalMode == "reject")
+{
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.4);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Reject verification</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Reason (optional — shown in notes)</label>
+                        <textarea class="form-control form-control-sm" rows="3" @bind="_rejectReason"
+                                  placeholder="e.g. Could not verify business registration number."></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_modalMessage))
+                    {
+                        <div class="alert @(_modalSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 small">@_modalMessage</div>
+                    }
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button class="btn btn-secondary btn-sm rounded-pill" @onclick="CloseModal">Cancel</button>
+                    <button class="btn btn-danger btn-sm rounded-pill" @onclick="RejectVerification" disabled="@_modalSaving">
+                        @(_modalSaving ? "Rejecting…" : "Reject")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool _isStaff;
     private bool _loading = true;
@@ -180,11 +278,16 @@ else
     private const int _pageSize = 50;
 
     private EventRow? _modalEvent;
+    private string _modalMode = "review"; // "review" | "approve" | "reject"
     private string _modalStatus = "Pending";
     private string _modalNotes = "";
+    private string _rejectReason = "";
     private bool _modalSaving;
     private string? _modalMessage;
     private bool _modalSuccess;
+
+    private string? _actionMessage;
+    private bool _actionSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -201,6 +304,7 @@ else
     private async Task LoadAsync()
     {
         _loading = true;
+        _actionMessage = null;
         try
         {
             var client = await Api.CreateAsync();
@@ -219,8 +323,26 @@ else
     private void OpenModal(EventRow e)
     {
         _modalEvent = e;
+        _modalMode = "review";
         _modalStatus = e.Status ?? "Pending";
         _modalNotes = e.InternalNotes ?? "";
+        _modalMessage = null;
+        _modalSuccess = false;
+    }
+
+    private void OpenApproveModal(EventRow e)
+    {
+        _modalEvent = e;
+        _modalMode = "approve";
+        _modalMessage = null;
+        _modalSuccess = false;
+    }
+
+    private void OpenRejectModal(EventRow e)
+    {
+        _modalEvent = e;
+        _modalMode = "reject";
+        _rejectReason = "";
         _modalMessage = null;
         _modalSuccess = false;
     }
@@ -261,11 +383,93 @@ else
         _modalSaving = false;
     }
 
+    private async Task ApproveVerification()
+    {
+        if (_modalEvent is null) return;
+        _modalSaving = true;
+        _modalMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsync(
+                $"/api/v1/admin/stripe-events/{_modalEvent.Id}/approve-verification", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                _actionSuccess = true;
+                _actionMessage = $"Verification approved for {_modalEvent.OrganisationName ?? "organisation"}.";
+                _modalEvent = null;
+                await LoadAsync();
+            }
+            else
+            {
+                _modalSuccess = false;
+                _modalMessage = "Failed to approve. Check the event has a valid organisation.";
+            }
+        }
+        catch
+        {
+            _modalSuccess = false;
+            _modalMessage = "An error occurred.";
+        }
+        _modalSaving = false;
+    }
+
+    private async Task RejectVerification()
+    {
+        if (_modalEvent is null) return;
+        _modalSaving = true;
+        _modalMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync(
+                $"/api/v1/admin/stripe-events/{_modalEvent.Id}/reject-verification",
+                new { reason = _rejectReason },
+                AethonApiClient.JsonOptions);
+            if (resp.IsSuccessStatusCode)
+            {
+                _actionSuccess = true;
+                _actionMessage = $"Verification rejected for {_modalEvent.OrganisationName ?? "organisation"}.";
+                _modalEvent = null;
+                await LoadAsync();
+            }
+            else
+            {
+                _modalSuccess = false;
+                _modalMessage = "Failed to reject.";
+            }
+        }
+        catch
+        {
+            _modalSuccess = false;
+            _modalMessage = "An error occurred.";
+        }
+        _modalSaving = false;
+    }
+
+    private static bool IsVerificationPending(EventRow e) =>
+        e.Status == "Pending" &&
+        (e.PurchaseType == "verification" || e.PurchaseType == "bundle_verification_post");
+
+    private static string GetVerificationTierLabel(EventRow e)
+    {
+        if (string.IsNullOrEmpty(e.PurchaseMetaJson)) return "Standard Employer";
+        try
+        {
+            var meta = JsonSerializer.Deserialize<Dictionary<string, string>>(e.PurchaseMetaJson);
+            if (meta?.TryGetValue("verification_tier", out var t) == true && t == "enhanced")
+                return "Enhanced Trusted Employer";
+        }
+        catch { }
+        return "Standard Employer";
+    }
+
     private static string StatusBadge(string? s) => s switch
     {
         "Completed" => "bg-success",
-        "Reviewed" => "bg-info text-dark",
-        _ => "bg-warning text-dark"
+        "Reviewed"  => "bg-info text-dark",
+        "Failed"    => "bg-danger",
+        _           => "bg-warning text-dark"
     };
 
     private static string FormatAmount(long? cents, string? currency)
@@ -276,10 +480,12 @@ else
         return $"{curr} {val:F2}";
     }
 
-    private sealed record EventRow(Guid Id, string StripeEventId, string EventType,
+    private sealed record EventRow(
+        Guid Id, string StripeEventId, string EventType,
         long? AmountTotal, string? Currency, string? CustomerEmail,
         string? Status, string? InternalNotes, Guid? CompletedByUserId, DateTime? CompletedUtc,
-        DateTime? CreatedUtc);
+        DateTime? CreatedUtc, Guid? OrganisationId, string? OrganisationName,
+        string? PurchaseType, string? PurchaseMetaJson);
 
     private sealed class PagedResult<T>
     {

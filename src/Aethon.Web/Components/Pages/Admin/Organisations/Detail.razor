@@ -137,6 +137,106 @@ else
             </div>
         </div>
 
+        <!-- Credits panel -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <h2 class="h5 fw-bold mb-0 flex-grow-1">Job Credits</h2>
+                    @if (_isSuperAdmin || _isAdmin)
+                    {
+                        <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="ToggleGrantForm">
+                            @(_showGrantForm ? "Cancel" : "+ Grant credits")
+                        </button>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(_creditsMessage))
+                {
+                    <div class="alert @(_creditsSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3">@_creditsMessage</div>
+                }
+
+                @if (_showGrantForm && (_isSuperAdmin || _isAdmin))
+                {
+                    <div class="border rounded-3 p-3 mb-3 bg-light">
+                        <h3 class="h6 fw-semibold mb-3">Grant credits</h3>
+                        <div class="row g-2 mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold mb-1">Credit type</label>
+                                <select class="form-select form-select-sm" @bind="_grantCreditType">
+                                    <option value="JobPostingStandard">Standard Job Post</option>
+                                    <option value="JobPostingPremium">Premium Job Post</option>
+                                    <option value="StickyTop24h">Sticky 24h</option>
+                                    <option value="StickyTop7d">Sticky 7d</option>
+                                    <option value="StickyTop30d">Sticky 30d</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold mb-1">Quantity</label>
+                                <input type="number" class="form-control form-control-sm" min="1" max="100" @bind="_grantQuantity" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold mb-1">Expires (optional)</label>
+                                <input type="date" class="form-control form-control-sm" @bind="_grantExpiry" />
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold mb-1">Note (optional)</label>
+                            <input type="text" class="form-control form-control-sm" @bind="_grantNote" placeholder="e.g. Goodwill credit" />
+                        </div>
+                        <button class="btn btn-sm btn-primary rounded-pill" @onclick="GrantCredits" disabled="@_grantSaving">
+                            @(_grantSaving ? "Granting…" : "Grant credits")
+                        </button>
+                    </div>
+                }
+
+                @if (_creditsLoading)
+                {
+                    <div class="text-secondary small">Loading…</div>
+                }
+                else if (_credits.Count == 0)
+                {
+                    <div class="text-secondary small">No credits on this account yet.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Source</th>
+                                    <th class="text-end">Remaining</th>
+                                    <th class="text-end">Original</th>
+                                    <th>Expires</th>
+                                    <th>Note</th>
+                                    <th>Granted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in _credits)
+                                {
+                                    var expired = c.ExpiresAt.HasValue && c.ExpiresAt.Value < DateTime.UtcNow;
+                                    <tr class="@(c.QuantityRemaining == 0 ? "text-muted text-decoration-line-through" : "") @(expired ? "text-secondary" : "")">
+                                        <td>
+                                            <span class="badge @CreditTypeBadge(c.CreditType) rounded-pill">@c.CreditType</span>
+                                        </td>
+                                        <td>@c.Source</td>
+                                        <td class="text-end fw-bold">@c.QuantityRemaining</td>
+                                        <td class="text-end text-secondary">@c.QuantityOriginal</td>
+                                        <td class="@(expired ? "text-danger" : "")">
+                                            @(c.ExpiresAt.HasValue ? (expired ? $"Expired {c.ExpiresAt.Value:d MMM yyyy}" : c.ExpiresAt.Value.ToString("d MMM yyyy")) : "No expiry")
+                                        </td>
+                                        <td class="text-secondary">@(c.GrantNote ?? "—")</td>
+                                        <td class="text-secondary">@c.CreatedUtc.ToString("d MMM yyyy")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
         <!-- Partnerships panel -->
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
@@ -280,6 +380,18 @@ else
     private string? _partnershipMessage;
     private bool _partnershipSuccess;
 
+    // Credits
+    private bool _creditsLoading = true;
+    private List<CreditRow> _credits = [];
+    private string? _creditsMessage;
+    private bool _creditsSuccess;
+    private bool _showGrantForm;
+    private string _grantCreditType = "JobPostingStandard";
+    private int _grantQuantity = 1;
+    private DateTime? _grantExpiry;
+    private string? _grantNote;
+    private bool _grantSaving;
+
     // Create partnership form
     private bool _showCreateForm;
     private string _createSearch = "";
@@ -313,6 +425,7 @@ else
             catch { }
 
             await LoadPartnershipsAsync();
+            await LoadCreditsAsync();
         }
 
         _ready = true;
@@ -505,6 +618,82 @@ else
         _createSaving = false;
     }
 
+    private async Task LoadCreditsAsync()
+    {
+        _creditsLoading = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<List<CreditRow>>(
+                $"/api/v1/admin/organisations/{Id}/credits", AethonApiClient.JsonOptions);
+            _credits = result ?? [];
+        }
+        catch { _credits = []; }
+        _creditsLoading = false;
+    }
+
+    private void ToggleGrantForm()
+    {
+        _showGrantForm = !_showGrantForm;
+        _grantCreditType = "JobPostingStandard";
+        _grantQuantity = 1;
+        _grantExpiry = null;
+        _grantNote = null;
+        _creditsMessage = null;
+    }
+
+    private async Task GrantCredits()
+    {
+        if (_grantQuantity <= 0) return;
+        _grantSaving = true;
+        _creditsMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync(
+                $"/api/v1/admin/organisations/{Id}/credits/grant",
+                new
+                {
+                    creditType = _grantCreditType,
+                    quantity = _grantQuantity,
+                    expiresAt = _grantExpiry,
+                    note = string.IsNullOrWhiteSpace(_grantNote) ? (string?)null : _grantNote
+                },
+                AethonApiClient.JsonOptions);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _creditsSuccess = true;
+                _creditsMessage = $"{_grantQuantity}x {_grantCreditType} credit(s) granted.";
+                _showGrantForm = false;
+                await LoadCreditsAsync();
+            }
+            else if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                _creditsSuccess = false;
+                _creditsMessage = "Invalid request. Quantity must be greater than zero.";
+            }
+            else
+            {
+                _creditsSuccess = false;
+                _creditsMessage = "Failed to grant credits.";
+            }
+        }
+        catch
+        {
+            _creditsSuccess = false;
+            _creditsMessage = "An error occurred.";
+        }
+        _grantSaving = false;
+    }
+
+    private static string CreditTypeBadge(string? t) => t switch
+    {
+        "JobPostingPremium" => "bg-primary",
+        "StickyTop24h" or "StickyTop7d" or "StickyTop30d" => "bg-info text-dark",
+        _ => "bg-secondary"
+    };
+
     private static string PartnershipStatusBadge(string? s) => s switch
     {
         "Active" => "bg-success",
@@ -526,6 +715,12 @@ else
         DateTime? ApprovedUtc, string? Notes);
 
     private sealed record OrgSearchRow(Guid Id, string Name, string? Type);
+
+    private sealed record CreditRow(
+        Guid Id, string? CreditType, string? Source,
+        int QuantityOriginal, int QuantityRemaining,
+        DateTime? ExpiresAt, DateTime? ConvertedAt,
+        string? GrantNote, DateTime CreatedUtc);
 
     private sealed class PagedOrgs
     {

@@ -100,8 +100,11 @@ public sealed class GetJobByIdHandler
                         x.Regions,
                         x.Countries,
                         x.PostingExpiresUtc,
+                        x.PostingTier,
                         x.IncludeCompanyLogo,
                         x.IsHighlighted,
+                        x.HighlightColour,
+                        x.HasAiCandidateMatching,
                         x.StickyUntilUtc,
                         x.AllowAutoMatch,
                         x.BenefitsTags,
@@ -175,8 +178,11 @@ public sealed class GetJobByIdHandler
                         ? JsonSerializer.Deserialize<List<string>>(raw.Countries) ?? []
                         : [],
                     PostingExpiresUtc = raw.PostingExpiresUtc,
+                    PostingTier = raw.PostingTier,
                     IncludeCompanyLogo = raw.IncludeCompanyLogo,
                     IsHighlighted = raw.IsHighlighted,
+                    HighlightColour = raw.HighlightColour,
+                    HasAiCandidateMatching = raw.HasAiCandidateMatching,
                     StickyUntilUtc = raw.StickyUntilUtc,
                     AllowAutoMatch = raw.AllowAutoMatch,
                     BenefitsTags = raw.BenefitsTags is not null

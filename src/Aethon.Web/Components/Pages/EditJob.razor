@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using System.Net
 @using System.Net.Http.Json
+@using Aethon.Shared.Billing
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
@@ -472,23 +473,65 @@ else
 
                         <div class="col-12 col-lg-4">
                             <div class="form-check form-switch">
-                                <InputCheckbox @bind-Value="_model.IsHighlighted" class="form-check-input" id="editHighlightCheck" />
-                                <label class="form-check-label" for="editHighlightCheck">Highlight in search results</label>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-lg-4">
-                            <div class="form-check form-switch">
                                 <InputCheckbox @bind-Value="_model.AllowAutoMatch" class="form-check-input" id="editAutoMatchCheck" />
                                 <label class="form-check-label" for="editAutoMatchCheck">Auto-match to candidate profiles</label>
                             </div>
                         </div>
 
-                        <div class="col-12 col-lg-4">
-                            <label class="form-label fw-semibold">Sticky to top until</label>
-                            <InputDate @bind-Value="_stickyUntilDate" class="form-control rounded-4" />
-                            <div class="form-text">Leave blank for no sticky promotion.</div>
-                        </div>
+                        @* Highlight colour — editable for drafts and Premium; read-only for published Standard *@
+                        @if (_jobStatus != JobStatus.Published || _postingTier == JobPostingTier.Premium)
+                        {
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">
+                                    Highlight colour
+                                    @if (_postingTier == JobPostingTier.Premium)
+                                    {
+                                        <span class="badge bg-primary rounded-pill ms-2 small">Included with Premium</span>
+                                    }
+                                </label>
+                                <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                                    <button type="button" class="btn btn-sm rounded-3 @(string.IsNullOrEmpty(_model.HighlightColour) ? "btn-secondary" : "btn-outline-secondary")"
+                                            @onclick='() => { _model.HighlightColour = null; _model.IsHighlighted = false; }'>None</button>
+                                    @foreach (var c in _highlightColours)
+                                    {
+                                        <button type="button"
+                                                class="rounded-3 @(_model.HighlightColour == c.Hex ? "border border-dark border-2" : "border")"
+                                                style="width:2rem;height:2rem;background:@c.Hex;"
+                                                title="@c.Name"
+                                                @onclick="@(() => { _model.HighlightColour = c.Hex; _model.IsHighlighted = true; })"></button>
+                                    }
+                                </div>
+                            </div>
+
+                            @* AI matching — editable for drafts and Premium *@
+                            <div class="col-12 col-lg-6">
+                                <div class="form-check form-switch">
+                                    @if (_postingTier == JobPostingTier.Premium)
+                                    {
+                                        <input type="checkbox" class="form-check-input" id="editAiMatchCheck" checked disabled />
+                                        <label class="form-check-label" for="editAiMatchCheck">
+                                            AI candidate matching <span class="badge bg-primary rounded-pill ms-1 small">Included with Premium</span>
+                                        </label>
+                                    }
+                                    else
+                                    {
+                                        <InputCheckbox @bind-Value="_model.HasAiCandidateMatching" class="form-check-input" id="editAiMatchCheck" />
+                                        <label class="form-check-label" for="editAiMatchCheck">AI candidate matching</label>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            @* Published Standard — show current state, direct to add-ons panel *@
+                            <div class="col-12">
+                                <p class="text-secondary small mb-0">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Highlight colour and AI matching for this published listing are managed in the
+                                    <strong>Listing add-ons</strong> panel below.
+                                </p>
+                            </div>
+                        }
                     </div>
 
                     <div class="d-flex gap-2 mt-2">
@@ -500,6 +543,142 @@ else
                 </EditForm>
             </div>
         </div>
+
+        @* ── Listing add-ons (published jobs only) ──────────────────────── *@
+        @if (_jobStatus == JobStatus.Published)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-1">Listing add-ons</h2>
+                    <p class="text-secondary small mb-3">
+                        Upgrade this live listing. Changes take effect immediately.
+                        @if (_postingTier == JobPostingTier.Premium)
+                        {
+                            <span>Highlight and AI matching are included with your Premium listing.</span>
+                        }
+                        else
+                        {
+                            <span>Standard listings can add highlight, AI matching, and sticky top. Each will be charged to your saved payment method or consume credits.</span>
+                        }
+                    </p>
+
+                    @if (!string.IsNullOrWhiteSpace(_addonError))
+                    {
+                        <div class="alert alert-danger rounded-4 mb-3">@_addonError</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_addonSuccess))
+                    {
+                        <div class="alert alert-success rounded-4 mb-3">@_addonSuccess</div>
+                    }
+
+                    <div class="d-flex flex-column gap-3">
+
+                        @* ── Highlight colour ── *@
+                        <div class="border rounded-4 p-3">
+                            <div class="fw-semibold mb-1">
+                                Highlight colour
+                                @if (_model.IsHighlighted)
+                                {
+                                    <span class="badge bg-success rounded-pill ms-2 small">Active</span>
+                                }
+                                @if (_postingTier == JobPostingTier.Premium)
+                                {
+                                    <span class="badge bg-primary rounded-pill ms-1 small">Included</span>
+                                }
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                <button type="button" class="btn btn-sm rounded-3 @(string.IsNullOrEmpty(_addonHighlightColour) ? "btn-secondary" : "btn-outline-secondary")"
+                                        @onclick='() => _addonHighlightColour = null'>None</button>
+                                @foreach (var c in _highlightColours)
+                                {
+                                    <button type="button"
+                                            class="rounded-3 @(_addonHighlightColour == c.Hex ? "border border-dark border-2" : "border")"
+                                            style="width:2rem;height:2rem;background:@c.Hex;"
+                                            title="@c.Name"
+                                            @onclick="@(() => _addonHighlightColour = c.Hex)"></button>
+                                }
+                            </div>
+                            <button type="button"
+                                    class="btn btn-sm btn-primary rounded-3"
+                                    disabled="@(string.IsNullOrEmpty(_addonHighlightColour) || _addonSaving)"
+                                    @onclick='() => ApplyAddonsAsync(addHighlight: true)'>
+                                @if (_addonSaving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                Apply highlight
+                                @if (_postingTier != JobPostingTier.Premium && !_model.IsHighlighted) { <span class="ms-1 opacity-75 small">(charged)</span> }
+                            </button>
+                        </div>
+
+                        @* ── AI candidate matching ── *@
+                        <div class="border rounded-4 p-3">
+                            <div class="fw-semibold mb-1">
+                                AI candidate matching
+                                @if (_model.HasAiCandidateMatching)
+                                {
+                                    <span class="badge bg-success rounded-pill ms-2 small">Active</span>
+                                }
+                                @if (_postingTier == JobPostingTier.Premium)
+                                {
+                                    <span class="badge bg-primary rounded-pill ms-1 small">Included</span>
+                                }
+                            </div>
+                            <p class="text-secondary small mb-2">Automatically surface best-matched candidates from the talent pool.</p>
+                            @if (_model.HasAiCandidateMatching)
+                            {
+                                <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Already enabled on this listing.</span>
+                            }
+                            else
+                            {
+                                <button type="button"
+                                        class="btn btn-sm btn-primary rounded-3"
+                                        disabled="@_addonSaving"
+                                        @onclick='() => ApplyAddonsAsync(addAiMatching: true)'>
+                                    @if (_addonSaving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                    Enable AI matching
+                                    @if (_postingTier != JobPostingTier.Premium) { <span class="ms-1 opacity-75 small">(charged)</span> }
+                                </button>
+                            }
+                        </div>
+
+                        @* ── Sticky top ── *@
+                        <div class="border rounded-4 p-3">
+                            <div class="fw-semibold mb-1">
+                                Sticky top
+                                @if (_model.StickyUntilUtc.HasValue && _model.StickyUntilUtc.Value > DateTime.UtcNow)
+                                {
+                                    <span class="badge bg-warning text-dark rounded-pill ms-2 small">Active until @_model.StickyUntilUtc.Value.ToLocalTime().ToString("d MMM yyyy")</span>
+                                }
+                            </div>
+                            <p class="text-secondary small mb-2">Pin this listing to the top of search results. Uses sticky credits or charges your saved card.</p>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button type="button" class="btn btn-sm @(_addonStickyDuration == 1  ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                        @onclick='() => _addonStickyDuration = 1'>
+                                    24 hours @(_sticky24hCredits > 0 ? $"({_sticky24hCredits} credit)" : "")
+                                </button>
+                                <button type="button" class="btn btn-sm @(_addonStickyDuration == 7  ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                        @onclick='() => _addonStickyDuration = 7'>
+                                    7 days @(_sticky7dCredits > 0 ? $"({_sticky7dCredits} credit)" : "")
+                                </button>
+                                <button type="button" class="btn btn-sm @(_addonStickyDuration == 30 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                        @onclick='() => _addonStickyDuration = 30'>
+                                    30 days @(_sticky30dCredits > 0 ? $"({_sticky30dCredits} credit)" : "")
+                                </button>
+                            </div>
+                            <button type="button"
+                                    class="btn btn-sm btn-primary rounded-3"
+                                    disabled="@(_addonStickyDuration == 0 || _addonSaving)"
+                                    @onclick='() => ApplyAddonsAsync(stickyDuration: _addonStickyDuration)'>
+                                @if (_addonSaving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                                Apply sticky
+                                @{ var stickyHasCredit = _addonStickyDuration == 1 ? _sticky24hCredits > 0 : _addonStickyDuration == 7 ? _sticky7dCredits > 0 : _sticky30dCredits > 0; }
+                                @if (!stickyHasCredit) { <span class="ms-1 opacity-75 small">(charged)</span> }
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        }
+
     </div>
 }
 
@@ -514,6 +693,32 @@ else
     private string? _pageError;
     private DateTime? _stickyUntilDate;
     private DateOnly? _expiryDate;
+
+    // Job meta — loaded on init
+    private JobStatus _jobStatus;
+    private JobPostingTier _postingTier;
+
+    // Add-on panel state
+    private string? _addonHighlightColour;
+    private int _addonStickyDuration;
+    private bool _addonSaving;
+    private string? _addonError;
+    private string? _addonSuccess;
+
+    // Credit balances for sticky
+    private int _sticky24hCredits;
+    private int _sticky7dCredits;
+    private int _sticky30dCredits;
+
+    private static readonly (string Hex, string Name)[] _highlightColours =
+    [
+        ("#FFF9C4", "Yellow"),
+        ("#E3F2FD", "Blue"),
+        ("#E8F5E9", "Green"),
+        ("#FCE4EC", "Pink"),
+        ("#EDE7F6", "Purple"),
+        ("#FFF3E0", "Orange"),
+    ];
 
     // ── Screening questions ─────────────────────────────────────────────
     private ScreeningConfig _screening = new();
@@ -771,6 +976,14 @@ else
             _model.IsImmediateStart = job.IsImmediateStart;
             _model.VideoYouTubeId = job.VideoYouTubeId;
             _model.VideoVimeoId = job.VideoVimeoId;
+            _model.HighlightColour = job.HighlightColour;
+            _model.HasAiCandidateMatching = job.HasAiCandidateMatching;
+
+            _jobStatus   = job.Status;
+            _postingTier = job.PostingTier;
+
+            // Pre-fill addon colour picker with current colour
+            _addonHighlightColour = job.HighlightColour;
 
             if (!string.IsNullOrWhiteSpace(job.ScreeningQuestionsJson))
             {
@@ -786,6 +999,21 @@ else
 
             _stickyUntilDate = job.StickyUntilUtc?.ToLocalTime();
             _expiryDate = job.PostingExpiresUtc.HasValue ? DateOnly.FromDateTime(job.PostingExpiresUtc.Value.ToLocalTime()) : null;
+
+            // Load credit balances for sticky add-on panel
+            try
+            {
+                var credits = await client.GetFromJsonAsync<List<CreditBalanceItemDto>>(
+                    "/api/v1/billing/me/credits", AethonApiClient.JsonOptions);
+                if (credits is not null)
+                {
+                    var now = DateTime.UtcNow;
+                    _sticky24hCredits = credits.Where(c => c.CreditType == CreditType.StickyTop24h && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                    _sticky7dCredits  = credits.Where(c => c.CreditType == CreditType.StickyTop7d  && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                    _sticky30dCredits = credits.Where(c => c.CreditType == CreditType.StickyTop30d && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                }
+            }
+            catch { /* non-fatal */ }
         }
         catch
         {
@@ -796,6 +1024,66 @@ else
             _loaded = true;
         }
     }
+
+    private async Task ApplyAddonsAsync(
+        bool addHighlight = false,
+        bool addAiMatching = false,
+        int stickyDuration = 0)
+    {
+        _addonSaving = true;
+        _addonError  = null;
+        _addonSuccess = null;
+
+        try
+        {
+            var request = new JobAddonRequestDto
+            {
+                AddHighlight    = addHighlight,
+                HighlightColour = addHighlight ? _addonHighlightColour : null,
+                AddAiMatching   = addAiMatching,
+                StickyDuration  = stickyDuration
+            };
+
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync($"/api/v1/jobs/{Id}/addons", request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                // Refresh job state from response
+                var result = await response.Content.ReadFromJsonAsync<AddonResultDto>(AethonApiClient.JsonOptions);
+                if (result is not null)
+                {
+                    _model.IsHighlighted          = result.IsHighlighted;
+                    _model.HighlightColour        = result.HighlightColour;
+                    _model.HasAiCandidateMatching = result.HasAiCandidateMatching;
+                    _model.StickyUntilUtc         = result.StickyUntilUtc;
+                    _stickyUntilDate              = result.StickyUntilUtc?.ToLocalTime();
+                    _addonStickyDuration          = 0; // reset selection
+                }
+                _addonSuccess = "Add-on applied successfully.";
+            }
+            else
+            {
+                _addonError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_addonError))
+                    _addonError = "Could not apply add-on. Check your payment method.";
+            }
+        }
+        catch
+        {
+            _addonError = "Could not apply add-on.";
+        }
+        finally
+        {
+            _addonSaving = false;
+        }
+    }
+
+    private sealed record AddonResultDto(
+        bool IsHighlighted,
+        string? HighlightColour,
+        bool HasAiCandidateMatching,
+        DateTime? StickyUntilUtc);
 
     private async Task SaveAsync()
     {

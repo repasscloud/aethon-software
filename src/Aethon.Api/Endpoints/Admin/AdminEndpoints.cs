@@ -139,15 +139,37 @@ public static class AdminEndpoints
             if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
                 return Results.Forbid();
 
-            var updated = await db.Organisations
-                .Where(o => o.Id == orgId)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(o => o.VerificationTier, request.Tier)
-                    .SetProperty(o => o.VerifiedUtc, request.Tier != VerificationTier.None ? DateTime.UtcNow : (DateTime?)null),
-                    ct);
-
-            if (updated == 0)
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == orgId, ct);
+            if (org is null)
                 return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            var now = DateTime.UtcNow;
+            var wasUnverified = org.VerificationTier == VerificationTier.None;
+            org.VerificationTier = request.Tier;
+            org.VerifiedUtc = request.Tier != VerificationTier.None ? now : null;
+            org.UpdatedUtc = now;
+
+            // Convert unused Standard promo credits → Premium when admin verifies the org
+            if (request.Tier != VerificationTier.None && wasUnverified)
+            {
+                var promoCredits = await db.OrganisationJobCredits
+                    .Where(c =>
+                        c.OrganisationId == orgId &&
+                        c.CreditType == CreditType.JobPostingStandard &&
+                        c.Source == CreditSource.LaunchPromotion &&
+                        c.QuantityRemaining > 0 &&
+                        c.ConvertedAt == null &&
+                        (c.ExpiresAt == null || c.ExpiresAt > now))
+                    .ToListAsync(ct);
+
+                foreach (var credit in promoCredits)
+                {
+                    credit.CreditType = CreditType.JobPostingPremium;
+                    credit.ConvertedAt = now;
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
 
             return Results.Ok(new { organisationId = orgId, tier = request.Tier.ToString() });
         });
@@ -653,11 +675,120 @@ public static class AdminEndpoints
                     e.InternalNotes,
                     e.CompletedByUserId,
                     e.CompletedUtc,
-                    e.CreatedUtc
+                    e.CreatedUtc,
+                    e.OrganisationId,
+                    OrganisationName = e.Organisation != null ? e.Organisation.Name : null,
+                    e.PurchaseType,
+                    e.PurchaseMetaJson
                 })
                 .ToListAsync(ct);
 
             return Results.Ok(new { total, page, pageSize, items = events });
+        });
+
+        // POST /api/v1/admin/stripe-events/{eventId}/approve-verification — Admin+ only
+        group.MapPost("/stripe-events/{eventId:guid}/approve-verification", async (
+            HttpContext http,
+            AethonDbContext db,
+            Guid eventId,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var stripeEvent = await db.StripePaymentEvents.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+            if (stripeEvent is null)
+                return Results.NotFound(new { code = "stripe_events.not_found", message = "Event not found." });
+
+            if (stripeEvent.OrganisationId is null)
+                return Results.BadRequest(new { code = "stripe_events.no_org", message = "Event has no associated organisation." });
+
+            // Determine verification tier from stored metadata
+            var tier = VerificationTier.StandardEmployer;
+            if (!string.IsNullOrEmpty(stripeEvent.PurchaseMetaJson))
+            {
+                try
+                {
+                    var meta = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(stripeEvent.PurchaseMetaJson);
+                    if (meta?.TryGetValue("verification_tier", out var tierStr) == true && tierStr == "enhanced")
+                        tier = VerificationTier.EnhancedTrusted;
+                }
+                catch { }
+            }
+
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == stripeEvent.OrganisationId, ct);
+            if (org is null)
+                return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            var now = DateTime.UtcNow;
+            var wasUnverified = org.VerificationTier == VerificationTier.None;
+
+            org.VerificationTier = tier;
+            org.VerifiedUtc = now;
+            org.UpdatedUtc = now;
+
+            if (wasUnverified)
+            {
+                var promoCredits = await db.OrganisationJobCredits
+                    .Where(c =>
+                        c.OrganisationId == org.Id &&
+                        c.CreditType == CreditType.JobPostingStandard &&
+                        c.Source == CreditSource.LaunchPromotion &&
+                        c.QuantityRemaining > 0 &&
+                        c.ConvertedAt == null &&
+                        (c.ExpiresAt == null || c.ExpiresAt > now))
+                    .ToListAsync(ct);
+
+                foreach (var credit in promoCredits)
+                {
+                    credit.CreditType = CreditType.JobPostingPremium;
+                    credit.ConvertedAt = now;
+                }
+            }
+
+            var userId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid = userId != null && Guid.TryParse(userId, out var g) ? (Guid?)g : null;
+
+            stripeEvent.Status = StripeEventStatus.Completed;
+            stripeEvent.InternalNotes = $"Approved: {tier} verification granted by admin.";
+            stripeEvent.CompletedByUserId = userGuid;
+            stripeEvent.CompletedUtc = now;
+
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { organisationId = org.Id, tier = tier.ToString() });
+        });
+
+        // POST /api/v1/admin/stripe-events/{eventId}/reject-verification — Admin+ only
+        group.MapPost("/stripe-events/{eventId:guid}/reject-verification", async (
+            HttpContext http,
+            AethonDbContext db,
+            Guid eventId,
+            RejectVerificationRequest request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var userId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid = userId != null && Guid.TryParse(userId, out var g) ? (Guid?)g : null;
+
+            var now = DateTime.UtcNow;
+            var updated = await db.StripePaymentEvents
+                .Where(e => e.Id == eventId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(e => e.Status, StripeEventStatus.Reviewed)
+                    .SetProperty(e => e.InternalNotes, string.IsNullOrWhiteSpace(request.Reason)
+                        ? "Verification rejected by admin."
+                        : $"Verification rejected by admin: {request.Reason}")
+                    .SetProperty(e => e.CompletedByUserId, userGuid)
+                    .SetProperty(e => e.CompletedUtc, now),
+                    ct);
+
+            if (updated == 0)
+                return Results.NotFound(new { code = "stripe_events.not_found", message = "Event not found." });
+
+            return Results.Ok(new { eventId });
         });
 
         // PUT /api/v1/admin/stripe-events/{eventId}
@@ -899,6 +1030,82 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // GET /api/v1/admin/organisations/{orgId}/credits
+        group.MapGet("/organisations/{orgId:guid}/credits", async (
+            AethonDbContext db,
+            Guid orgId,
+            CancellationToken ct) =>
+        {
+            var orgExists = await db.Organisations.AnyAsync(o => o.Id == orgId, ct);
+            if (!orgExists)
+                return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            var credits = await db.OrganisationJobCredits
+                .AsNoTracking()
+                .Where(c => c.OrganisationId == orgId)
+                .OrderByDescending(c => c.CreatedUtc)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.CreditType,
+                    c.Source,
+                    c.QuantityOriginal,
+                    c.QuantityRemaining,
+                    c.ExpiresAt,
+                    c.ConvertedAt,
+                    c.GrantedByUserId,
+                    c.GrantNote,
+                    c.StripePaymentEventId,
+                    c.CreatedUtc
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(credits);
+        });
+
+        // POST /api/v1/admin/organisations/{orgId}/credits/grant — Admin+ only
+        group.MapPost("/organisations/{orgId:guid}/credits/grant", async (
+            HttpContext http,
+            AethonDbContext db,
+            Guid orgId,
+            AdminGrantCreditRequest request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var orgExists = await db.Organisations.AnyAsync(o => o.Id == orgId, ct);
+            if (!orgExists)
+                return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            if (request.Quantity <= 0)
+                return Results.BadRequest(new { code = "credits.invalid_quantity", message = "Quantity must be greater than zero." });
+
+            var userId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid = userId != null && Guid.TryParse(userId, out var g) ? (Guid?)g : null;
+
+            var now = DateTime.UtcNow;
+            var credit = new OrganisationJobCredit
+            {
+                Id = Guid.NewGuid(),
+                OrganisationId = orgId,
+                CreditType = request.CreditType,
+                Source = CreditSource.AdminGrant,
+                QuantityOriginal = request.Quantity,
+                QuantityRemaining = request.Quantity,
+                ExpiresAt = request.ExpiresAt,
+                GrantedByUserId = userGuid,
+                GrantNote = request.Note,
+                CreatedUtc = now,
+                CreatedByUserId = userGuid
+            };
+
+            db.OrganisationJobCredits.Add(credit);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { creditId = credit.Id, organisationId = orgId, creditType = credit.CreditType.ToString(), quantity = request.Quantity });
+        });
+
         // GET /api/v1/admin/syndication-records?page=
         group.MapGet("/syndication-records", async (
             AethonDbContext db,
@@ -995,5 +1202,18 @@ public static class AdminEndpoints
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public bool IsActive { get; set; } = true;
+    }
+
+    public sealed class RejectVerificationRequest
+    {
+        public string? Reason { get; set; }
+    }
+
+    public sealed class AdminGrantCreditRequest
+    {
+        public CreditType CreditType { get; set; }
+        public int Quantity { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public string? Note { get; set; }
     }
 }

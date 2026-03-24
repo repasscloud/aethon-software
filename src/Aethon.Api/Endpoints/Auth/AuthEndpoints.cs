@@ -143,6 +143,21 @@ public static class AuthEndpoints
                             .Where(o => o.Id == orgId)
                             .ExecuteUpdateAsync(s => s.SetProperty(o => o.PrimaryDomainId, domainId));
                     }
+
+                    // Grant 10 Standard Job Post launch promo credits (90-day expiry)
+                    db.OrganisationJobCredits.Add(new OrganisationJobCredit
+                    {
+                        Id = Guid.NewGuid(),
+                        OrganisationId = orgId,
+                        CreditType = CreditType.JobPostingStandard,
+                        Source = CreditSource.LaunchPromotion,
+                        QuantityOriginal = 10,
+                        QuantityRemaining = 10,
+                        ExpiresAt = now.AddDays(90),
+                        CreatedUtc = now,
+                        CreatedByUserId = user.Id
+                    });
+                    await db.SaveChangesAsync();
                 }
 
                 await transaction.CommitAsync();

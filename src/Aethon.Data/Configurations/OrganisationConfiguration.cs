@@ -117,6 +117,9 @@ public sealed class OrganisationConfiguration : IEntityTypeConfiguration<Organis
         builder.Property(x => x.BusinessRegistrationNumber)
             .HasMaxLength(100);
 
+        builder.Property(x => x.StripeCustomerId).HasMaxLength(255);
+        builder.Property(x => x.VerificationStripeEventId).HasMaxLength(255);
+
         builder.Ignore(x => x.IsVerified);
 
         builder.Property(x => x.VerificationTier)

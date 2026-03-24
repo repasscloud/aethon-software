@@ -77,6 +77,9 @@ public sealed class UpdateJobRequestDto : IValidatableObject
 
     public bool IncludeCompanyLogo { get; set; }
     public bool IsHighlighted { get; set; }
+    [MaxLength(20)]
+    public string? HighlightColour { get; set; }
+    public bool HasAiCandidateMatching { get; set; }
     public DateTime? StickyUntilUtc { get; set; }
     public bool AllowAutoMatch { get; set; }
 

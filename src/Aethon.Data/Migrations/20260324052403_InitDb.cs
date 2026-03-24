@@ -39,6 +39,8 @@ namespace Aethon.Data.Migrations
                     IdentityVerificationNotes = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     IsPhoneNumberVerified = table.Column<bool>(type: "boolean", nullable: false),
                     PhoneNumberVerifiedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    MustChangePassword = table.Column<bool>(type: "boolean", nullable: false),
+                    MustEnableMfa = table.Column<bool>(type: "boolean", nullable: false),
                     UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
@@ -57,6 +59,27 @@ namespace Aethon.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Locations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    DisplayName = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    City = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    State = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    Country = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    CountryCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    Latitude = table.Column<double>(type: "double precision", nullable: false),
+                    Longitude = table.Column<double>(type: "double precision", nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Locations", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -79,6 +102,21 @@ namespace Aethon.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_StoredFiles", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SystemSettings",
+                columns: table => new
+                {
+                    Key = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Value = table.Column<string>(type: "character varying(8000)", maxLength: 8000, nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SystemSettings", x => x.Key);
                 });
 
             migrationBuilder.CreateTable(
@@ -216,6 +254,12 @@ namespace Aethon.Data.Migrations
                     IsSearchable = table.Column<bool>(type: "boolean", nullable: false),
                     Slug = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     AboutMe = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    ProfileVisibility = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
+                    LinkedInId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    LinkedInVerifiedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ProfilePictureStoredFileId = table.Column<Guid>(type: "uuid", nullable: true),
+                    IsIdVerified = table.Column<bool>(type: "boolean", nullable: false),
+                    IsNameLocked = table.Column<bool>(type: "boolean", nullable: false),
                     LastProfileUpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -229,6 +273,36 @@ namespace Aethon.Data.Migrations
                         name: "FK_JobSeekerProfiles_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "JobSeekerCertificates",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobSeekerProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    IssuingOrganisation = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    IssuedMonth = table.Column<int>(type: "integer", nullable: true),
+                    IssuedYear = table.Column<int>(type: "integer", nullable: true),
+                    ExpiryYear = table.Column<int>(type: "integer", nullable: true),
+                    CredentialId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CredentialUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_JobSeekerCertificates", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_JobSeekerCertificates_JobSeekerProfiles_JobSeekerProfileId",
+                        column: x => x.JobSeekerProfileId,
+                        principalTable: "JobSeekerProfiles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -288,6 +362,33 @@ namespace Aethon.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "JobSeekerQualifications",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobSeekerProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Title = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Institution = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CompletedYear = table.Column<int>(type: "integer", nullable: true),
+                    Description = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_JobSeekerQualifications", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_JobSeekerQualifications_JobSeekerProfiles_JobSeekerProfileId",
+                        column: x => x.JobSeekerProfileId,
+                        principalTable: "JobSeekerProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "JobSeekerResumes",
                 columns: table => new
                 {
@@ -318,6 +419,62 @@ namespace Aethon.Data.Migrations
                         principalTable: "StoredFiles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "JobSeekerSkills",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobSeekerProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    SkillLevel = table.Column<int>(type: "integer", nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_JobSeekerSkills", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_JobSeekerSkills_JobSeekerProfiles_JobSeekerProfileId",
+                        column: x => x.JobSeekerProfileId,
+                        principalTable: "JobSeekerProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "JobSeekerWorkExperiences",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobSeekerProfileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobTitle = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    EmployerName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    StartMonth = table.Column<int>(type: "integer", nullable: false),
+                    StartYear = table.Column<int>(type: "integer", nullable: false),
+                    EndMonth = table.Column<int>(type: "integer", nullable: true),
+                    EndYear = table.Column<int>(type: "integer", nullable: true),
+                    IsCurrent = table.Column<bool>(type: "boolean", nullable: false),
+                    Description = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_JobSeekerWorkExperiences", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_JobSeekerWorkExperiences_JobSeekerProfiles_JobSeekerProfile~",
+                        column: x => x.JobSeekerProfileId,
+                        principalTable: "JobSeekerProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -384,6 +541,28 @@ namespace Aethon.Data.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CreditConsumptionLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganisationJobCreditId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganisationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ConsumedByUserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ApprovedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    QuantityConsumed = table.Column<int>(type: "integer", nullable: false),
+                    ConsumedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CreditConsumptionLogs", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -701,6 +880,13 @@ namespace Aethon.Data.Migrations
                     ExternalReference = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     Department = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     LocationText = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
+                    LocationCity = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    LocationState = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    LocationCountry = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    LocationCountryCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    LocationLatitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationLongitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationPlaceId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     WorkplaceType = table.Column<int>(type: "integer", nullable: false),
                     EmploymentType = table.Column<int>(type: "integer", nullable: false),
                     Description = table.Column<string>(type: "character varying(20000)", maxLength: 20000, nullable: false),
@@ -723,8 +909,11 @@ namespace Aethon.Data.Migrations
                     Regions = table.Column<string>(type: "text", nullable: true),
                     Countries = table.Column<string>(type: "text", nullable: true),
                     PostingExpiresUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    PostingTier = table.Column<int>(type: "integer", nullable: false),
+                    HasAiCandidateMatching = table.Column<bool>(type: "boolean", nullable: false),
                     IncludeCompanyLogo = table.Column<bool>(type: "boolean", nullable: false),
                     IsHighlighted = table.Column<bool>(type: "boolean", nullable: false),
+                    HighlightColour = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     StickyUntilUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     BenefitsTags = table.Column<string>(type: "text", nullable: true),
                     ApplicationSpecialRequirements = table.Column<string>(type: "text", nullable: true),
@@ -759,6 +948,34 @@ namespace Aethon.Data.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "JobSyndicationRecords",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    JobId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Provider = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ExternalRef = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    SubmittedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastAttemptUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastErrorMessage = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_JobSyndicationRecords", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_JobSyndicationRecords_Jobs_JobId",
+                        column: x => x.JobId,
+                        principalTable: "Jobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -838,6 +1055,13 @@ namespace Aethon.Data.Migrations
                     LogoUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     Summary = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
                     PublicLocationText = table.Column<string>(type: "character varying(250)", maxLength: 250, nullable: true),
+                    LocationCity = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    LocationState = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    LocationCountry = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    LocationCountryCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    LocationLatitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationLongitude = table.Column<double>(type: "double precision", nullable: true),
+                    LocationPlaceId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     PublicContactEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
                     PublicContactPhone = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
                     IsPublicProfileEnabled = table.Column<bool>(type: "boolean", nullable: false),
@@ -856,12 +1080,27 @@ namespace Aethon.Data.Migrations
                     IsProvisionedByRecruiter = table.Column<bool>(type: "boolean", nullable: false),
                     ClaimedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
                     ClaimedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    PrimaryContactName = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    PrimaryContactName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     PrimaryContactEmail = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: true),
+                    PrimaryContactPhoneDialCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
                     PrimaryContactPhone = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
-                    IsVerified = table.Column<bool>(type: "boolean", nullable: false),
+                    PublicContactPhoneDialCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    RegisteredAddressLine1 = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RegisteredAddressLine2 = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RegisteredCity = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    RegisteredState = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    RegisteredPostcode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    RegisteredCountry = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    RegisteredCountryCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    TaxRegistrationNumber = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    BusinessRegistrationNumber = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    VerificationTier = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     VerifiedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     VerifiedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    VerificationPaidAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    VerificationExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    VerificationStripeEventId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    StripeCustomerId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -986,6 +1225,42 @@ namespace Aethon.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "StripePaymentEvents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    StripeEventId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    EventType = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    AmountTotal = table.Column<long>(type: "bigint", nullable: true),
+                    Currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    CustomerEmail = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    PayloadJson = table.Column<string>(type: "text", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    InternalNotes = table.Column<string>(type: "text", nullable: true),
+                    CompletedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CompletedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    OrganisationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    PurchaseType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    ProductId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    PriceId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    PurchaseMetaJson = table.Column<string>(type: "text", nullable: true),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StripePaymentEvents", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_StripePaymentEvents_Organisations_OrganisationId",
+                        column: x => x.OrganisationId,
+                        principalTable: "Organisations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "WebhookSubscriptions",
                 columns: table => new
                 {
@@ -1008,6 +1283,43 @@ namespace Aethon.Data.Migrations
                         principalTable: "Organisations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OrganisationJobCredits",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganisationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreditType = table.Column<int>(type: "integer", nullable: false),
+                    Source = table.Column<int>(type: "integer", nullable: false),
+                    QuantityOriginal = table.Column<int>(type: "integer", nullable: false),
+                    QuantityRemaining = table.Column<int>(type: "integer", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ConvertedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    StripePaymentEventId = table.Column<Guid>(type: "uuid", nullable: true),
+                    GrantedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    GrantNote = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CreatedByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByUserId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrganisationJobCredits", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrganisationJobCredits_Organisations_OrganisationId",
+                        column: x => x.OrganisationId,
+                        principalTable: "Organisations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_OrganisationJobCredits_StripePaymentEvents_StripePaymentEve~",
+                        column: x => x.StripePaymentEventId,
+                        principalTable: "StripePaymentEvents",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -1111,6 +1423,21 @@ namespace Aethon.Data.Migrations
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CreditConsumptionLogs_JobId",
+                table: "CreditConsumptionLogs",
+                column: "JobId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CreditConsumptionLogs_OrganisationId",
+                table: "CreditConsumptionLogs",
+                column: "OrganisationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CreditConsumptionLogs_OrganisationJobCreditId",
+                table: "CreditConsumptionLogs",
+                column: "OrganisationJobCreditId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_JobApplicationAttachments_JobApplicationId",
@@ -1360,6 +1687,11 @@ namespace Aethon.Data.Migrations
                 column: "ReferenceCode");
 
             migrationBuilder.CreateIndex(
+                name: "IX_JobSeekerCertificates_JobSeekerProfileId",
+                table: "JobSeekerCertificates",
+                column: "JobSeekerProfileId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_JobSeekerLanguages_JobSeekerProfileId",
                 table: "JobSeekerLanguages",
                 column: "JobSeekerProfileId");
@@ -1408,6 +1740,11 @@ namespace Aethon.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_JobSeekerQualifications_JobSeekerProfileId",
+                table: "JobSeekerQualifications",
+                column: "JobSeekerProfileId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_JobSeekerResumes_JobSeekerProfileId",
                 table: "JobSeekerResumes",
                 column: "JobSeekerProfileId");
@@ -1431,6 +1768,36 @@ namespace Aethon.Data.Migrations
                 name: "IX_JobSeekerResumes_StoredFileId",
                 table: "JobSeekerResumes",
                 column: "StoredFileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_JobSeekerSkills_JobSeekerProfileId",
+                table: "JobSeekerSkills",
+                column: "JobSeekerProfileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_JobSeekerWorkExperiences_JobSeekerProfileId",
+                table: "JobSeekerWorkExperiences",
+                column: "JobSeekerProfileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_JobSyndicationRecords_JobId_Provider",
+                table: "JobSyndicationRecords",
+                columns: new[] { "JobId", "Provider" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_JobSyndicationRecords_SubmittedUtc",
+                table: "JobSyndicationRecords",
+                column: "SubmittedUtc");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Locations_DisplayName",
+                table: "Locations",
+                column: "DisplayName");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Locations_IsActive_SortOrder",
+                table: "Locations",
+                columns: new[] { "IsActive", "SortOrder" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrganisationClaimRequests_EmailDomain",
@@ -1510,6 +1877,21 @@ namespace Aethon.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrganisationJobCredits_OrganisationId",
+                table: "OrganisationJobCredits",
+                column: "OrganisationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrganisationJobCredits_OrganisationId_CreditType_QuantityRe~",
+                table: "OrganisationJobCredits",
+                columns: new[] { "OrganisationId", "CreditType", "QuantityRemaining" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrganisationJobCredits_StripePaymentEventId",
+                table: "OrganisationJobCredits",
+                column: "StripePaymentEventId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrganisationMemberships_OrganisationId_Status",
                 table: "OrganisationMemberships",
                 columns: new[] { "OrganisationId", "Status" });
@@ -1557,11 +1939,6 @@ namespace Aethon.Data.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Organisations_IsVerified",
-                table: "Organisations",
-                column: "IsVerified");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Organisations_NormalizedName",
                 table: "Organisations",
                 column: "NormalizedName");
@@ -1582,6 +1959,11 @@ namespace Aethon.Data.Migrations
                 name: "IX_Organisations_Type_Status",
                 table: "Organisations",
                 columns: new[] { "Type", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Organisations_VerificationTier",
+                table: "Organisations",
+                column: "VerificationTier");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ResumeAnalyses_JobSeekerResumeId",
@@ -1616,6 +1998,17 @@ namespace Aethon.Data.Migrations
                 columns: new[] { "UploadedByUserId", "CreatedUtc" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_StripePaymentEvents_OrganisationId",
+                table: "StripePaymentEvents",
+                column: "OrganisationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StripePaymentEvents_StripeEventId",
+                table: "StripePaymentEvents",
+                column: "StripeEventId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_WebhookDeliveries_WebhookSubscriptionId",
                 table: "WebhookDeliveries",
                 column: "WebhookSubscriptionId");
@@ -1630,6 +2023,22 @@ namespace Aethon.Data.Migrations
                 table: "ActivityLogs",
                 column: "OrganisationId",
                 principalTable: "Organisations",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_CreditConsumptionLogs_Jobs_JobId",
+                table: "CreditConsumptionLogs",
+                column: "JobId",
+                principalTable: "Jobs",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_CreditConsumptionLogs_OrganisationJobCredits_OrganisationJo~",
+                table: "CreditConsumptionLogs",
+                column: "OrganisationJobCreditId",
+                principalTable: "OrganisationJobCredits",
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
 
@@ -1748,6 +2157,9 @@ namespace Aethon.Data.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "CreditConsumptionLogs");
+
+            migrationBuilder.DropTable(
                 name: "JobApplicationAttachments");
 
             migrationBuilder.DropTable(
@@ -1763,10 +2175,28 @@ namespace Aethon.Data.Migrations
                 name: "JobApplicationStatusHistory");
 
             migrationBuilder.DropTable(
+                name: "JobSeekerCertificates");
+
+            migrationBuilder.DropTable(
                 name: "JobSeekerLanguages");
 
             migrationBuilder.DropTable(
                 name: "JobSeekerNationalities");
+
+            migrationBuilder.DropTable(
+                name: "JobSeekerQualifications");
+
+            migrationBuilder.DropTable(
+                name: "JobSeekerSkills");
+
+            migrationBuilder.DropTable(
+                name: "JobSeekerWorkExperiences");
+
+            migrationBuilder.DropTable(
+                name: "JobSyndicationRecords");
+
+            migrationBuilder.DropTable(
+                name: "Locations");
 
             migrationBuilder.DropTable(
                 name: "OrganisationClaimRequests");
@@ -1781,10 +2211,16 @@ namespace Aethon.Data.Migrations
                 name: "ResumeAnalyses");
 
             migrationBuilder.DropTable(
+                name: "SystemSettings");
+
+            migrationBuilder.DropTable(
                 name: "WebhookDeliveries");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
+
+            migrationBuilder.DropTable(
+                name: "OrganisationJobCredits");
 
             migrationBuilder.DropTable(
                 name: "JobApplicationInterviews");
@@ -1794,6 +2230,9 @@ namespace Aethon.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "WebhookSubscriptions");
+
+            migrationBuilder.DropTable(
+                name: "StripePaymentEvents");
 
             migrationBuilder.DropTable(
                 name: "JobApplications");

@@ -83,6 +83,56 @@ namespace Aethon.Data.Migrations
                     b.ToTable("ActivityLogs", (string)null);
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.CreditConsumptionLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConsumedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationJobCreditId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityConsumed")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("OrganisationJobCreditId");
+
+                    b.ToTable("CreditConsumptionLogs", (string)null);
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.Job", b =>
                 {
                     b.Property<Guid>("Id")
@@ -159,8 +209,15 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("HasAiCandidateMatching")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("HasCommission")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("HighlightColour")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("IncludeCompanyLogo")
                         .HasColumnType("boolean");
@@ -227,6 +284,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("PostingExpiresUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PostingTier")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("PublishedUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1620,6 +1680,10 @@ namespace Aethon.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<string>("Summary")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -1642,6 +1706,16 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VerificationExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VerificationPaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerificationStripeEventId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<int>("VerificationTier")
                         .ValueGeneratedOnAdd()
@@ -1913,6 +1987,66 @@ namespace Aethon.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("OrganisationInvitations", (string)null);
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreditType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GrantNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("GrantedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityOriginal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityRemaining")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StripePaymentEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("StripePaymentEventId");
+
+                    b.HasIndex("OrganisationId", "CreditType", "QuantityRemaining");
+
+                    b.ToTable("OrganisationJobCredits", (string)null);
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationMembership", b =>
@@ -2202,9 +2336,27 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("InternalNotes")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("OrganisationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("PriceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ProductId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("PurchaseMetaJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PurchaseType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -2221,6 +2373,8 @@ namespace Aethon.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
 
                     b.HasIndex("StripeEventId")
                         .IsUnique();
@@ -2593,6 +2747,25 @@ namespace Aethon.Data.Migrations
                     b.Navigation("Organisation");
 
                     b.Navigation("PerformedByUser");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.CreditConsumptionLog", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Job", "Job")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Aethon.Data.Entities.OrganisationJobCredit", "Credit")
+                        .WithMany("ConsumptionLogs")
+                        .HasForeignKey("OrganisationJobCreditId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Credit");
+
+                    b.Navigation("Job");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.Job", b =>
@@ -2993,6 +3166,24 @@ namespace Aethon.Data.Migrations
                     b.Navigation("Organisation");
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Aethon.Data.Entities.StripePaymentEvent", "StripePaymentEvent")
+                        .WithMany()
+                        .HasForeignKey("StripePaymentEventId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organisation");
+
+                    b.Navigation("StripePaymentEvent");
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationMembership", b =>
                 {
                     b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
@@ -3048,6 +3239,16 @@ namespace Aethon.Data.Migrations
                     b.Navigation("JobSeekerResume");
 
                     b.Navigation("StoredFile");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.StripePaymentEvent", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organisation");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.WebhookDelivery", b =>
@@ -3181,6 +3382,11 @@ namespace Aethon.Data.Migrations
                     b.Navigation("OwnedJobs");
 
                     b.Navigation("RecruiterRelationships");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.Navigation("ConsumptionLogs");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationRecruitmentPartnership", b =>

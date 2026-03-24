@@ -49,6 +49,16 @@
                 <span class="aethon-nav-icon">⚡</span>
                 <span>Integrations</span>
             </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/verification" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-patch-check"></i></span>
+                <span>Verification</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/billing" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-credit-card"></i></span>
+                <span>Billing &amp; Credits</span>
+            </NavLink>
         }
         else if (_isRecruiter)
         {
@@ -91,6 +101,16 @@
                 <span class="aethon-nav-icon">⚡</span>
                 <span>Integrations</span>
             </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/verification" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-patch-check"></i></span>
+                <span>Verification</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/app/organisation/billing" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-credit-card"></i></span>
+                <span>Billing &amp; Credits</span>
+            </NavLink>
         }
         else if (_isStaff)
         {
@@ -122,6 +142,11 @@
             <NavLink class="nav-link aethon-nav-link" href="/admin/stripe-events" Match="NavLinkMatch.Prefix">
                 <span class="aethon-nav-icon"><i class="bi bi-credit-card"></i></span>
                 <span>Stripe Events</span>
+            </NavLink>
+
+            <NavLink class="nav-link aethon-nav-link" href="/admin/stripe-products" Match="NavLinkMatch.Prefix">
+                <span class="aethon-nav-icon"><i class="bi bi-tags"></i></span>
+                <span>Stripe Products</span>
             </NavLink>
 
             @if (_isAdmin || _isSuperAdmin)

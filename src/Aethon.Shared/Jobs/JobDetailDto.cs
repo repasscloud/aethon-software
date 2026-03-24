@@ -63,8 +63,11 @@ public sealed class JobDetailDto
     public List<string> Countries { get; set; } = [];
     public DateTime? PostingExpiresUtc { get; set; }
 
+    public JobPostingTier PostingTier { get; set; } = JobPostingTier.Standard;
     public bool IncludeCompanyLogo { get; set; }
     public bool IsHighlighted { get; set; }
+    public string? HighlightColour { get; set; }
+    public bool HasAiCandidateMatching { get; set; }
     public DateTime? StickyUntilUtc { get; set; }
     public bool AllowAutoMatch { get; set; }
 

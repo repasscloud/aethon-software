@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260322101210_AddStructuredLocation")]
-    partial class AddStructuredLocation
+    [Migration("20260324052403_InitDb")]
+    partial class InitDb
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -84,6 +84,56 @@ namespace Aethon.Data.Migrations
                     b.HasIndex("EntityType", "EntityId");
 
                     b.ToTable("ActivityLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.CreditConsumptionLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ConsumedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationJobCreditId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityConsumed")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("OrganisationJobCreditId");
+
+                    b.ToTable("CreditConsumptionLogs", (string)null);
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.Job", b =>
@@ -162,8 +212,15 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("HasAiCandidateMatching")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("HasCommission")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("HighlightColour")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("IncludeCompanyLogo")
                         .HasColumnType("boolean");
@@ -230,6 +287,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("PostingExpiresUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PostingTier")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("PublishedUtc")
                         .HasColumnType("timestamp with time zone");
@@ -849,6 +909,63 @@ namespace Aethon.Data.Migrations
                     b.ToTable("JobApplicationStatusHistory", (string)null);
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerCertificate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CredentialId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CredentialUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("ExpiryYear")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("IssuedMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("IssuedYear")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IssuingOrganisation")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("JobSeekerProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobSeekerProfileId");
+
+                    b.ToTable("JobSeekerCertificates", (string)null);
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.JobSeekerLanguage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -994,6 +1111,12 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
 
+                    b.Property<bool>("IsIdVerified")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsNameLocked")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsPublicProfileEnabled")
                         .HasColumnType("boolean");
 
@@ -1007,9 +1130,16 @@ namespace Aethon.Data.Migrations
                     b.Property<DateTime?>("LastProfileUpdatedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("LinkedInId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("LinkedInUrl")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LinkedInVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MiddleName")
                         .HasMaxLength(100)
@@ -1025,6 +1155,14 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("PreferredLocation")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
+
+                    b.Property<Guid?>("ProfilePictureStoredFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ProfileVisibility")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<bool?>("RequiresSponsorship")
                         .HasColumnType("boolean");
@@ -1069,6 +1207,53 @@ namespace Aethon.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("JobSeekerProfiles", (string)null);
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerQualification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CompletedYear")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Institution")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("JobSeekerProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobSeekerProfileId");
+
+                    b.ToTable("JobSeekerQualifications", (string)null);
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.JobSeekerResume", b =>
@@ -1125,6 +1310,105 @@ namespace Aethon.Data.Migrations
                     b.ToTable("JobSeekerResumes", (string)null);
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerSkill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("JobSeekerProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("SkillLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobSeekerProfileId");
+
+                    b.ToTable("JobSeekerSkills", (string)null);
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerWorkExperience", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("EmployerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("EndMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EndYear")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("JobSeekerProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("JobTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StartMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StartYear")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobSeekerProfileId");
+
+                    b.ToTable("JobSeekerWorkExperiences", (string)null);
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.JobSyndicationRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1179,6 +1463,57 @@ namespace Aethon.Data.Migrations
                     b.ToTable("JobSyndicationRecords", (string)null);
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.Location", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Country")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CountryCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("State")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DisplayName");
+
+                    b.HasIndex("IsActive", "SortOrder");
+
+                    b.ToTable("Locations", (string)null);
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.Organisation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1187,6 +1522,10 @@ namespace Aethon.Data.Migrations
 
                     b.Property<string>("BannerImageUrl")
                         .HasColumnType("text");
+
+                    b.Property<string>("BusinessRegistrationNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("ClaimStatus")
                         .HasColumnType("integer");
@@ -1279,12 +1618,16 @@ namespace Aethon.Data.Migrations
                         .HasColumnType("character varying(320)");
 
                     b.Property<string>("PrimaryContactName")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("PrimaryContactPhone")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("PrimaryContactPhoneDialCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<Guid?>("PrimaryDomainId")
                         .HasColumnType("uuid");
@@ -1297,9 +1640,41 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("PublicContactPhoneDialCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("PublicLocationText")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
+
+                    b.Property<string>("RegisteredAddressLine1")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RegisteredAddressLine2")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RegisteredCity")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RegisteredCountry")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RegisteredCountryCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("RegisteredPostcode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RegisteredState")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("Slug")
                         .HasMaxLength(150)
@@ -1308,9 +1683,17 @@ namespace Aethon.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("StripeCustomerId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
                     b.Property<string>("Summary")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("TaxRegistrationNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TikTokHandle")
                         .HasColumnType("text");
@@ -1326,6 +1709,16 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VerificationExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VerificationPaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VerificationStripeEventId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<int>("VerificationTier")
                         .ValueGeneratedOnAdd()
@@ -1597,6 +1990,66 @@ namespace Aethon.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("OrganisationInvitations", (string)null);
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreditType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GrantNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("GrantedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganisationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("QuantityOriginal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("QuantityRemaining")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StripePaymentEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
+
+                    b.HasIndex("StripePaymentEventId");
+
+                    b.HasIndex("OrganisationId", "CreditType", "QuantityRemaining");
+
+                    b.ToTable("OrganisationJobCredits", (string)null);
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationMembership", b =>
@@ -1886,9 +2339,27 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("InternalNotes")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("OrganisationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("PriceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("ProductId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("PurchaseMetaJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PurchaseType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -1905,6 +2376,8 @@ namespace Aethon.Data.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OrganisationId");
 
                     b.HasIndex("StripeEventId")
                         .IsUnique();
@@ -2279,6 +2752,25 @@ namespace Aethon.Data.Migrations
                     b.Navigation("PerformedByUser");
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.CreditConsumptionLog", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Job", "Job")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Aethon.Data.Entities.OrganisationJobCredit", "Credit")
+                        .WithMany("ConsumptionLogs")
+                        .HasForeignKey("OrganisationJobCreditId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Credit");
+
+                    b.Navigation("Job");
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.Job", b =>
                 {
                     b.HasOne("Aethon.Data.Identity.ApplicationUser", "CreatedByUser")
@@ -2519,6 +3011,17 @@ namespace Aethon.Data.Migrations
                     b.Navigation("JobApplication");
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerCertificate", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "Profile")
+                        .WithMany("Certificates")
+                        .HasForeignKey("JobSeekerProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.JobSeekerLanguage", b =>
                 {
                     b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "JobSeekerProfile")
@@ -2552,6 +3055,17 @@ namespace Aethon.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerQualification", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "Profile")
+                        .WithMany("Qualifications")
+                        .HasForeignKey("JobSeekerProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.JobSeekerResume", b =>
                 {
                     b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "JobSeekerProfile")
@@ -2569,6 +3083,28 @@ namespace Aethon.Data.Migrations
                     b.Navigation("JobSeekerProfile");
 
                     b.Navigation("StoredFile");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerSkill", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "Profile")
+                        .WithMany("Skills")
+                        .HasForeignKey("JobSeekerProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.JobSeekerWorkExperience", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.JobSeekerProfile", "Profile")
+                        .WithMany("WorkExperiences")
+                        .HasForeignKey("JobSeekerProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Profile");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.JobSyndicationRecord", b =>
@@ -2633,6 +3169,24 @@ namespace Aethon.Data.Migrations
                     b.Navigation("Organisation");
                 });
 
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Aethon.Data.Entities.StripePaymentEvent", "StripePaymentEvent")
+                        .WithMany()
+                        .HasForeignKey("StripePaymentEventId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organisation");
+
+                    b.Navigation("StripePaymentEvent");
+                });
+
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationMembership", b =>
                 {
                     b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
@@ -2688,6 +3242,16 @@ namespace Aethon.Data.Migrations
                     b.Navigation("JobSeekerResume");
 
                     b.Navigation("StoredFile");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.StripePaymentEvent", b =>
+                {
+                    b.HasOne("Aethon.Data.Entities.Organisation", "Organisation")
+                        .WithMany()
+                        .HasForeignKey("OrganisationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Organisation");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.WebhookDelivery", b =>
@@ -2791,11 +3355,19 @@ namespace Aethon.Data.Migrations
 
             modelBuilder.Entity("Aethon.Data.Entities.JobSeekerProfile", b =>
                 {
+                    b.Navigation("Certificates");
+
                     b.Navigation("Languages");
 
                     b.Navigation("Nationalities");
 
+                    b.Navigation("Qualifications");
+
                     b.Navigation("Resumes");
+
+                    b.Navigation("Skills");
+
+                    b.Navigation("WorkExperiences");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.Organisation", b =>
@@ -2813,6 +3385,11 @@ namespace Aethon.Data.Migrations
                     b.Navigation("OwnedJobs");
 
                     b.Navigation("RecruiterRelationships");
+                });
+
+            modelBuilder.Entity("Aethon.Data.Entities.OrganisationJobCredit", b =>
+                {
+                    b.Navigation("ConsumptionLogs");
                 });
 
             modelBuilder.Entity("Aethon.Data.Entities.OrganisationRecruitmentPartnership", b =>

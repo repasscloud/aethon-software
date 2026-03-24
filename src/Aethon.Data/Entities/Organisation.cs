@@ -71,6 +71,11 @@ public class Organisation : EntityBase
     public VerificationTier VerificationTier { get; set; } = VerificationTier.None;
     public DateTime? VerifiedUtc { get; set; }
     public Guid? VerifiedByUserId { get; set; }
+    public DateTime? VerificationPaidAt { get; set; }
+    public DateTime? VerificationExpiresAt { get; set; }
+    public string? VerificationStripeEventId { get; set; }
+
+    public string? StripeCustomerId { get; set; }
 
     [NotMapped]
     public bool IsVerified => VerificationTier != VerificationTier.None;

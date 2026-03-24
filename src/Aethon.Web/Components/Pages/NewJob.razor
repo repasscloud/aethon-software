@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using System.Net.Http.Json
+@using Aethon.Shared.Billing
 @using Aethon.Shared.Enums
 @using Aethon.Shared.Jobs
 @using Microsoft.AspNetCore.Authorization
@@ -27,6 +28,49 @@
         <div class="card-body p-4">
             <EditForm Model="_model" OnValidSubmit="CreateJobAsync">
                 <DataAnnotationsValidator />
+
+                <!-- ── Listing type ─────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-2">Listing type</h2>
+                <p class="text-secondary small mb-3">Choose how this job will be published. You can upgrade later.</p>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <div class="card rounded-4 h-100 @(_model.PostingTier == JobPostingTier.Standard ? "border-primary border-2" : "border") cursor-pointer"
+                             style="cursor:pointer;" @onclick='() => SetTier(JobPostingTier.Standard)'>
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <input type="radio" class="form-check-input mt-0" checked="@(_model.PostingTier == JobPostingTier.Standard)" @onchange='() => SetTier(JobPostingTier.Standard)' />
+                                    <span class="fw-bold">Standard</span>
+                                    <span class="badge bg-secondary rounded-pill ms-auto">@(_standardCredits > 0 ? $"{_standardCredits} credit{(_standardCredits == 1 ? "" : "s")} available" : "No credits")</span>
+                                </div>
+                                <ul class="small text-secondary mb-0 ps-3">
+                                    <li>Listed for up to 30 days</li>
+                                    <li>Standard search placement</li>
+                                    <li>Optional highlight colour add-on</li>
+                                    <li>Consumes 1 Standard credit</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card rounded-4 h-100 @(_model.PostingTier == JobPostingTier.Premium ? "border-primary border-2" : "border") cursor-pointer"
+                             style="cursor:pointer;" @onclick='() => SetTier(JobPostingTier.Premium)'>
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <input type="radio" class="form-check-input mt-0" checked="@(_model.PostingTier == JobPostingTier.Premium)" @onchange='() => SetTier(JobPostingTier.Premium)' />
+                                    <span class="fw-bold">Premium</span>
+                                    <span class="badge bg-primary rounded-pill ms-auto">@(_premiumCredits > 0 ? $"{_premiumCredits} credit{(_premiumCredits == 1 ? "" : "s")} available" : "No credits")</span>
+                                </div>
+                                <ul class="small text-secondary mb-0 ps-3">
+                                    <li>Listed for up to 60 days</li>
+                                    <li>Enhanced search visibility</li>
+                                    <li>Highlight colour included</li>
+                                    <li>AI candidate matching included</li>
+                                    <li>Consumes 1 Premium credit</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- ── Core details ─────────────────────────────────────── -->
                 <h2 class="h5 fw-bold mb-3">Job details</h2>
@@ -353,8 +397,12 @@
 
                     <div class="col-12 col-lg-3">
                         <label class="form-label fw-semibold">Listing expiry date <span class="text-danger">*</span></label>
-                        <InputDate @bind-Value="_expiryDate" class="form-control rounded-4" />
-                        <div class="form-text">Job will be hidden from public after this date.</div>
+                        <input type="date" class="form-control rounded-4"
+                               value="@(_expiryDate?.ToString("yyyy-MM-dd"))"
+                               min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")"
+                               max="@_expiryMax.ToString("yyyy-MM-dd")"
+                               @onchange="OnExpiryChanged" />
+                        <div class="form-text">Max @(_model.PostingTier == JobPostingTier.Premium ? 60 : 30) days for @(_model.PostingTier) listing.</div>
                     </div>
                 </div>
 
@@ -460,28 +508,125 @@
 
                     <div class="col-12 col-lg-4">
                         <div class="form-check form-switch">
-                            <InputCheckbox @bind-Value="_model.IsHighlighted" class="form-check-input" id="highlightCheck" />
-                            <label class="form-check-label" for="highlightCheck">Highlight in search results</label>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4">
-                        <div class="form-check form-switch">
                             <InputCheckbox @bind-Value="_model.AllowAutoMatch" class="form-check-input" id="autoMatchCheck" />
                             <label class="form-check-label" for="autoMatchCheck">Auto-match to candidate profiles</label>
                         </div>
                     </div>
 
-                    <div class="col-12 col-lg-4">
-                        <label class="form-label fw-semibold">Sticky to top until</label>
-                        <InputDate @bind-Value="_stickyUntilDate" class="form-control rounded-4" />
-                        <div class="form-text">Leave blank for no sticky promotion.</div>
+                    @* Highlight colour *@
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">
+                            Highlight colour
+                            @if (_model.PostingTier == JobPostingTier.Premium)
+                            {
+                                <span class="badge bg-primary rounded-pill ms-2 small">Included with Premium</span>
+                            }
+                        </label>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                            <button type="button" class="btn btn-sm rounded-3 @(string.IsNullOrEmpty(_model.HighlightColour) ? "btn-secondary" : "btn-outline-secondary")"
+                                    @onclick='() => { _model.HighlightColour = null; _model.IsHighlighted = false; }'>None</button>
+                            @foreach (var c in _highlightColours)
+                            {
+                                <button type="button"
+                                        class="rounded-3 @(_model.HighlightColour == c.Hex ? "border border-dark border-2" : "border")"
+                                        style="width:2rem;height:2rem;background:@c.Hex;"
+                                        title="@c.Name"
+                                        @onclick="@(() => { _model.HighlightColour = c.Hex; _model.IsHighlighted = true; })">
+                                </button>
+                            }
+                            @if (!string.IsNullOrEmpty(_model.HighlightColour))
+                            {
+                                <span class="small text-secondary ms-1">Preview: <span style="background:@_model.HighlightColour;padding:1px 10px;border-radius:4px;border:1px solid #ccc;">Job listing</span></span>
+                            }
+                        </div>
+                        <div class="form-text">Applies a background tint to your listing card in search results.</div>
+                    </div>
+
+                    @* AI Candidate Matching *@
+                    <div class="col-12 col-lg-6">
+                        <div class="form-check form-switch">
+                            @if (_model.PostingTier == JobPostingTier.Premium)
+                            {
+                                <input type="checkbox" class="form-check-input" id="aiMatchCheck" checked disabled />
+                                <label class="form-check-label" for="aiMatchCheck">
+                                    AI candidate matching <span class="badge bg-primary rounded-pill ms-1 small">Included with Premium</span>
+                                </label>
+                            }
+                            else
+                            {
+                                <InputCheckbox @bind-Value="_model.HasAiCandidateMatching" class="form-check-input" id="aiMatchCheck" />
+                                <label class="form-check-label" for="aiMatchCheck">
+                                    AI candidate matching <span class="badge bg-secondary rounded-pill ms-1 small">Add-on</span>
+                                </label>
+                            }
+                        </div>
+                        <div class="form-text">Automatically surface best-matched candidates from the talent pool.</div>
+                    </div>
+
+                    @* Sticky Top *@
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Sticky top</label>
+                        <div class="form-text mb-2">Pin to the top of search results. Uses a Sticky credit (separate from job posting credits).</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 0 ? "btn-secondary" : "btn-outline-secondary") rounded-3"
+                                    @onclick='() => _stickyDuration = 0'>None</button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 1 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 1'>
+                                24 hours @(_sticky24hCredits > 0 ? $"({_sticky24hCredits} credit{(_sticky24hCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 7 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 7'>
+                                7 days @(_sticky7dCredits > 0 ? $"({_sticky7dCredits} credit{(_sticky7dCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 30 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 30'>
+                                30 days @(_sticky30dCredits > 0 ? $"({_sticky30dCredits} credit{(_sticky30dCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                        </div>
                     </div>
                 </div>
 
+                @* ── Publish cost summary ── *@
+                @if (_model.Status == JobStatus.Published)
+                {
+                    var hasCredits = _model.PostingTier == JobPostingTier.Premium ? _premiumCredits > 0 : _standardCredits > 0;
+                    var tierLabel = _model.PostingTier == JobPostingTier.Premium ? "Premium" : "Standard";
+                    <div class="alert @(hasCredits ? "alert-success" : "alert-warning") rounded-4 mb-3">
+                        <div class="fw-semibold mb-1"><i class="bi bi-credit-card me-2"></i>Publish cost</div>
+                        @if (hasCredits)
+                        {
+                            <div class="small">1× <strong>@tierLabel</strong> posting credit will be consumed on publish.</div>
+                        }
+                        else
+                        {
+                            <div class="small">No <strong>@tierLabel</strong> credits available. Publishing will charge your saved payment method. <a href="/app/organisation/billing" class="alert-link">Buy credits</a></div>
+                        }
+                        @if (_stickyDuration > 0)
+                        {
+                            var stickyType = _stickyDuration == 1 ? "24h" : _stickyDuration == 7 ? "7d" : "30d";
+                            var stickyHas = _stickyDuration == 1 ? _sticky24hCredits > 0 : _stickyDuration == 7 ? _sticky7dCredits > 0 : _sticky30dCredits > 0;
+                            <div class="small mt-1">
+                                + 1× <strong>Sticky @stickyType</strong> credit @(stickyHas ? "will be consumed." : "— none available, will charge your card.")
+                            </div>
+                        }
+                    </div>
+                }
+
                 <div class="d-flex gap-2 mt-2">
                     <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
-                        @(_saving ? "Saving..." : "Create job")
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Saving…</span>
+                        }
+                        else if (_model.Status == JobStatus.Published)
+                        {
+                            <span>Publish job</span>
+                        }
+                        else
+                        {
+                            <span>Save as draft</span>
+                        }
                     </button>
                     <a class="btn btn-outline-secondary rounded-4 px-4" href="/app/jobs">Cancel</a>
                 </div>
@@ -500,8 +645,29 @@
 
     private bool _saving;
     private string? _pageError;
-    private DateTime? _stickyUntilDate;
+    private int _stickyDuration; // 0 = none, 1 = 24h, 7 = 7d, 30 = 30d
     private DateOnly? _expiryDate;
+
+    // Credits available (loaded on init)
+    private int _standardCredits;
+    private int _premiumCredits;
+    private int _sticky24hCredits;
+    private int _sticky7dCredits;
+    private int _sticky30dCredits;
+
+    private DateTime _expiryMax => _model.PostingTier == JobPostingTier.Premium
+        ? DateTime.Today.AddDays(60)
+        : DateTime.Today.AddDays(30);
+
+    private static readonly (string Hex, string Name)[] _highlightColours =
+    [
+        ("#FFF9C4", "Yellow"),
+        ("#E3F2FD", "Blue"),
+        ("#E8F5E9", "Green"),
+        ("#FCE4EC", "Pink"),
+        ("#EDE7F6", "Purple"),
+        ("#FFF3E0", "Orange"),
+    ];
 
     // ── Screening questions ─────────────────────────────────────────────
     private readonly ScreeningConfig _screening = new();
@@ -689,14 +855,72 @@
             _model.BenefitsTags.Remove(benefit);
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            var credits = await client.GetFromJsonAsync<List<CreditBalanceItemDto>>(
+                "/api/v1/billing/me/credits", AethonApiClient.JsonOptions);
+
+            if (credits is not null)
+            {
+                var now = DateTime.UtcNow;
+                _standardCredits  = credits.Where(c => c.CreditType == CreditType.JobPostingStandard  && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _premiumCredits   = credits.Where(c => c.CreditType == CreditType.JobPostingPremium   && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky24hCredits = credits.Where(c => c.CreditType == CreditType.StickyTop24h        && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky7dCredits  = credits.Where(c => c.CreditType == CreditType.StickyTop7d         && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky30dCredits = credits.Where(c => c.CreditType == CreditType.StickyTop30d        && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+            }
+        }
+        catch
+        {
+            // non-fatal — credit counts will show 0
+        }
+    }
+
+    private void SetTier(JobPostingTier tier)
+    {
+        _model.PostingTier = tier;
+
+        // Premium includes AI matching — force it on; Standard reverts to user choice
+        if (tier == JobPostingTier.Premium)
+            _model.HasAiCandidateMatching = true;
+
+        // Clamp expiry date to the new max
+        if (_expiryDate.HasValue)
+        {
+            var max = DateOnly.FromDateTime(_expiryMax);
+            if (_expiryDate.Value > max)
+                _expiryDate = max;
+        }
+    }
+
+    private void OnExpiryChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var parsed))
+        {
+            var max = DateOnly.FromDateTime(_expiryMax);
+            _expiryDate = parsed > max ? max : parsed;
+        }
+        else
+        {
+            _expiryDate = null;
+        }
+    }
+
     private async Task CreateJobAsync()
     {
         _saving = true;
         _pageError = null;
 
-        // map extra fields not directly bound
-        _model.StickyUntilUtc = _stickyUntilDate.HasValue
-            ? DateTime.SpecifyKind(_stickyUntilDate.Value, DateTimeKind.Utc)
+        // Ensure Premium jobs always have AI matching enabled
+        if (_model.PostingTier == JobPostingTier.Premium)
+            _model.HasAiCandidateMatching = true;
+
+        // Map sticky duration to a UTC datetime
+        _model.StickyUntilUtc = _stickyDuration > 0
+            ? DateTime.UtcNow.AddDays(_stickyDuration)
             : null;
 
         _model.PostingExpiresUtc = _expiryDate.HasValue

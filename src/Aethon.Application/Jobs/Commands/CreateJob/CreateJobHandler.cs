@@ -183,8 +183,11 @@ public sealed class CreateJobHandler
             Regions = command.Regions.Count > 0 ? JsonSerializer.Serialize(command.Regions, _enumJson) : null,
             Countries = command.Countries.Count > 0 ? JsonSerializer.Serialize(command.Countries) : null,
             PostingExpiresUtc = command.PostingExpiresUtc,
+            PostingTier = command.PostingTier,
             IncludeCompanyLogo = command.IncludeCompanyLogo,
             IsHighlighted = command.IsHighlighted,
+            HighlightColour = command.HighlightColour,
+            HasAiCandidateMatching = command.HasAiCandidateMatching,
             StickyUntilUtc = command.StickyUntilUtc,
             AllowAutoMatch = command.AllowAutoMatch,
             BenefitsTags = command.BenefitsTags.Count > 0

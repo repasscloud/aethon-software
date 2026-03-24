@@ -251,6 +251,14 @@ public class Job : EntityBase
     /// </summary>
     public DateTime? PostingExpiresUtc { get; set; }
 
+    // ─── Posting tier & billing ───────────────────────────────────────────────
+
+    /// <summary>Standard or Premium posting tier. Determines feature set and credit type consumed.</summary>
+    public JobPostingTier PostingTier { get; set; } = JobPostingTier.Standard;
+
+    /// <summary>Whether AI candidate matching is enabled for this listing (included in Premium, optional add-on for Standard).</summary>
+    public bool HasAiCandidateMatching { get; set; }
+
     // ─── Display & promotion ─────────────────────────────────────────────────
 
     /// <summary>Whether to show the owning organisation logo on the public listing.</summary>
@@ -258,6 +266,9 @@ public class Job : EntityBase
 
     /// <summary>Whether this job is highlighted in search results.</summary>
     public bool IsHighlighted { get; set; }
+
+    /// <summary>Hex highlight colour for the listing card (e.g. "#FFD700"). Null means no highlight colour.</summary>
+    public string? HighlightColour { get; set; }
 
     /// <summary>When the sticky-to-top promotion expires. Null means not sticky.</summary>
     public DateTime? StickyUntilUtc { get; set; }

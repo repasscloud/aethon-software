@@ -1,7 +1,10 @@
+using Aethon.Api.Infrastructure.Stripe;
+using Aethon.Application.Abstractions.Settings;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 namespace Aethon.Api.Endpoints.Webhooks;
 
@@ -13,66 +16,94 @@ public static class StripeWebhookEndpoints
             .WithTags("Webhooks");
 
         // POST /api/v1/webhooks/stripe
-        // Receives Stripe webhook events and stores them for manual review.
+        // Receives, verifies, deduplicates and processes Stripe webhook events.
         group.MapPost("/stripe", async (
-            HttpContext http,
+            HttpRequest request,
+            IConfiguration configuration,
+            ISystemSettingsService settings,
             AethonDbContext db,
+            StripeWebhookProcessor processor,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("StripeWebhook");
+
+            // Read raw body — must be done before any body parsing middleware
             string payload;
-            using (var reader = new StreamReader(http.Request.Body))
+            using (var reader = new StreamReader(request.Body))
                 payload = await reader.ReadToEndAsync(ct);
 
             if (string.IsNullOrWhiteSpace(payload))
                 return Results.BadRequest(new { code = "webhook.empty_payload", message = "Empty payload." });
 
-            // Extract basic fields from the payload for quick review; full payload is stored.
-            string? eventId = null;
-            string? eventType = null;
+            // ── Signature verification ──────────────────────────────────────
+            // Webhook secret is stored in SystemSettings (managed via admin UI).
+            // Falls back to appsettings if not yet configured in the DB.
+            var webhookSecret = await settings.GetStringAsync(SystemSettingKeys.StripeWebhookSecret, ct)
+                ?? configuration["Stripe:WebhookSecret"];
+
+            Event stripeEvent;
+
+            if (!string.IsNullOrEmpty(webhookSecret))
+            {
+                var signature = request.Headers["Stripe-Signature"].ToString();
+
+                try
+                {
+                    stripeEvent = EventUtility.ConstructEvent(payload, signature, webhookSecret,
+                        throwOnApiVersionMismatch: false);
+                }
+                catch (StripeException ex)
+                {
+                    logger.LogWarning("Stripe webhook signature validation failed: {Message}", ex.Message);
+                    return Results.BadRequest(new { code = "webhook.invalid_signature", message = "Signature validation failed." });
+                }
+            }
+            else
+            {
+                // No webhook secret configured — parse without verification.
+                // This should only happen in early local dev before a secret is set.
+                logger.LogWarning("Stripe webhook secret not configured — processing without signature verification.");
+                try
+                {
+                    stripeEvent = EventUtility.ParseEvent(payload, throwOnApiVersionMismatch: false);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to parse Stripe event payload.");
+                    return Results.BadRequest(new { code = "webhook.parse_failed", message = "Could not parse event payload." });
+                }
+            }
+
+            // ── Deduplication ───────────────────────────────────────────────
+            if (await db.StripePaymentEvents.AnyAsync(e => e.StripeEventId == stripeEvent.Id, ct))
+                return Results.Ok(new { received = true, duplicate = true });
+
+            // ── Persist the raw event ───────────────────────────────────────
             long? amountTotal = null;
             string? currency = null;
             string? customerEmail = null;
 
             try
             {
-                using var doc = System.Text.Json.JsonDocument.Parse(payload);
-                var root = doc.RootElement;
-                eventId = root.TryGetProperty("id", out var id) ? id.GetString() : null;
-                eventType = root.TryGetProperty("type", out var t) ? t.GetString() : null;
-
-                if (root.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("object", out var obj))
+                if (stripeEvent.Data.Object is Stripe.Checkout.Session session)
                 {
-                    if (obj.TryGetProperty("amount_total", out var amt))
-                        amountTotal = amt.TryGetInt64(out var a) ? a : null;
-                    if (obj.TryGetProperty("currency", out var cur))
-                        currency = cur.GetString();
-                    if (obj.TryGetProperty("customer_email", out var email))
-                        customerEmail = email.GetString();
-                    // Also check customer_details.email
-                    if (customerEmail == null &&
-                        obj.TryGetProperty("customer_details", out var details) &&
-                        details.TryGetProperty("email", out var detailEmail))
-                        customerEmail = detailEmail.GetString();
+                    amountTotal = session.AmountTotal;
+                    currency = session.Currency;
+                    customerEmail = session.CustomerEmail
+                        ?? session.CustomerDetails?.Email;
                 }
             }
             catch
             {
-                // If parsing fails, still store the raw payload for manual review
+                // Non-fatal — raw payload is always stored
             }
 
-            // Deduplicate by StripeEventId
-            if (!string.IsNullOrEmpty(eventId) &&
-                await db.StripePaymentEvents.AnyAsync(e => e.StripeEventId == eventId, ct))
-            {
-                return Results.Ok(new { received = true, duplicate = true });
-            }
-
-            var stripeEvent = new StripePaymentEvent
+            var dbEvent = new StripePaymentEvent
             {
                 Id = Guid.NewGuid(),
-                StripeEventId = eventId ?? $"unknown-{Guid.NewGuid()}",
-                EventType = eventType ?? "unknown",
+                StripeEventId = stripeEvent.Id,
+                EventType = stripeEvent.Type,
                 AmountTotal = amountTotal,
                 Currency = currency,
                 CustomerEmail = customerEmail,
@@ -81,8 +112,21 @@ public static class StripeWebhookEndpoints
                 CreatedUtc = DateTime.UtcNow
             };
 
-            db.StripePaymentEvents.Add(stripeEvent);
+            db.StripePaymentEvents.Add(dbEvent);
             await db.SaveChangesAsync(ct);
+
+            // ── Process the event ───────────────────────────────────────────
+            try
+            {
+                await processor.ProcessAsync(stripeEvent, dbEvent, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error processing Stripe event {EventId} ({EventType})", stripeEvent.Id, stripeEvent.Type);
+                dbEvent.Status = StripeEventStatus.Failed;
+                dbEvent.InternalNotes = $"Processing exception: {ex.Message}";
+                await db.SaveChangesAsync(ct);
+            }
 
             return Results.Ok(new { received = true });
         });

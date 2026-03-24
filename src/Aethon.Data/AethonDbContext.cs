@@ -43,6 +43,8 @@ public sealed class AethonDbContext
 
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<StripePaymentEvent> StripePaymentEvents => Set<StripePaymentEvent>();
+    public DbSet<OrganisationJobCredit> OrganisationJobCredits => Set<OrganisationJobCredit>();
+    public DbSet<CreditConsumptionLog> CreditConsumptionLogs => Set<CreditConsumptionLog>();
 
     public DbSet<JobApplicationAttachment> JobApplicationAttachments => Set<JobApplicationAttachment>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();

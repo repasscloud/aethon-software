@@ -11,7 +11,9 @@ using Aethon.Api.Infrastructure.Email;
 using Aethon.Api.Infrastructure.Files;
 using Aethon.Api.Infrastructure.ResumeAnalysis;
 using Aethon.Api.Infrastructure.Settings;
+using Aethon.Api.Infrastructure.Stripe;
 using Aethon.Api.Infrastructure.Syndication;
+using Stripe;
 using Aethon.Api.Infrastructure.Workers;
 using Aethon.Api.Middleware;
 using Aethon.Application.Abstractions.Caching;
@@ -79,6 +81,14 @@ services.AddHostedService<JobExpiryWorker>();
 
 services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 services.AddScoped<IGoogleIndexingService, GoogleIndexingService>();
+
+// Stripe
+StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
+services.AddScoped<IOrganisationAutoVerifier, StubOrganisationAutoVerifier>();
+services.AddScoped<StripeWebhookProcessor>();
+services.AddScoped<StripeCheckoutService>();
+services.AddScoped<JobPublishBillingService>();
+services.AddScoped<JobAddonBillingService>();
 
 services.AddApplicationServices();
 services.AddValidatorsFromAssembly(typeof(ApplicationAssemblyMarker).Assembly);
@@ -162,7 +172,45 @@ using (var scope = app.Services.CreateScope())
             Value = "",
             Description = "Google Service Account JSON key for the Indexing API (SuperAdmin only).",
             UpdatedUtc = DateTime.UtcNow
-        }
+        },
+
+        // ── Stripe ──────────────────────────────────────────────────────────
+        new SystemSetting { Key = SystemSettingKeys.StripeWebhookSecret,                    Value = "", Description = "Stripe webhook signing secret (whsec_xxx). Managed via admin UI.", UpdatedUtc = DateTime.UtcNow },
+
+        // Verification price IDs
+        new SystemSetting { Key = SystemSettingKeys.StripePriceVerificationStandard,        Value = "", Description = "Stripe Price ID: Standard Employer Verification (A$49).",        UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceVerificationEnhanced,        Value = "", Description = "Stripe Price ID: Enhanced Trusted Employer (A$149).",             UpdatedUtc = DateTime.UtcNow },
+
+        // Bundle price IDs
+        new SystemSetting { Key = SystemSettingKeys.StripePriceBundleStandardVerificationPost, Value = "", Description = "Stripe Price ID: Bundle Standard Verification + First Standard Post (A$68).", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceBundleEnhancedVerificationPost, Value = "", Description = "Stripe Price ID: Bundle Enhanced Verification + First Premium Post (A$208).", UpdatedUtc = DateTime.UtcNow },
+
+        // Job Standard credit packs
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobStandard1x,  Value = "", Description = "Stripe Price ID: 1x Standard Job Post credit.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobStandard5x,  Value = "", Description = "Stripe Price ID: 5x Standard Job Post credits.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobStandard10x, Value = "", Description = "Stripe Price ID: 10x Standard Job Post credits.", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobStandard20x, Value = "", Description = "Stripe Price ID: 20x Standard Job Post credits.", UpdatedUtc = DateTime.UtcNow },
+
+        // Job Premium credit packs
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobPremium1x,   Value = "", Description = "Stripe Price ID: 1x Premium Job Post credit.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobPremium5x,   Value = "", Description = "Stripe Price ID: 5x Premium Job Post credits.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobPremium10x,  Value = "", Description = "Stripe Price ID: 10x Premium Job Post credits.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceJobPremium20x,  Value = "", Description = "Stripe Price ID: 20x Premium Job Post credits.",  UpdatedUtc = DateTime.UtcNow },
+
+        // Sticky — verified org
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyVerified24h,  Value = "", Description = "Stripe Price ID: Sticky 24h — verified org (A$9).",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyVerified7d,   Value = "", Description = "Stripe Price ID: Sticky 7d — verified org (A$39).",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyVerified30d,  Value = "", Description = "Stripe Price ID: Sticky 30d — verified org (A$79).",  UpdatedUtc = DateTime.UtcNow },
+
+        // Sticky — unverified org
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyUnverified24h,  Value = "", Description = "Stripe Price ID: Sticky 24h — unverified org (A$15).",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyUnverified7d,   Value = "", Description = "Stripe Price ID: Sticky 7d — unverified org (A$49).",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceStickyUnverified30d,  Value = "", Description = "Stripe Price ID: Sticky 30d — unverified org (A$99).",  UpdatedUtc = DateTime.UtcNow },
+
+        // Standard add-ons
+        new SystemSetting { Key = SystemSettingKeys.StripePriceAddonHighlight,  Value = "", Description = "Stripe Price ID: Standard add-on — Highlight Colour (A$9).",       UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceAddonVideo,      Value = "", Description = "Stripe Price ID: Standard add-on — Video Embed (A$9).",             UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.StripePriceAddonAiMatching, Value = "", Description = "Stripe Price ID: Standard add-on — AI Candidate Matching (A$9).",   UpdatedUtc = DateTime.UtcNow },
     };
 
     foreach (var setting in settingsToSeed)
