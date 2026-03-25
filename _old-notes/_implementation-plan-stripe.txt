@@ -1,0 +1,95 @@
+ ---
+  1. Passing Company + Product Identifier to Stripe
+
+  When you create a Stripe Checkout Session on your backend, you attach metadata to it:
+
+  var options = new SessionCreateOptions
+  {
+      Mode = "payment", // or "subscription" for yearly auto-renew
+      LineItems = [ new() { Price = "price_xxx", Quantity = 1 } ],
+      Metadata = new Dictionary<string, string>
+      {
+          ["organisation_id"] = organisationId.ToString(),
+          ["verification_type"] = "standard" // or "enhanced"
+      },
+      SuccessUrl = "https://yoursite.com/app/verification/success?session_id={CHECKOUT_SESSION_ID}",
+      CancelUrl = "https://yoursite.com/app/verification/cancelled"
+  };
+
+  When Stripe fires checkout.session.completed to your webhook, the metadata comes back intact. That's how you correlate the payment to the company.
+
+  ---
+  2. Verification Flow
+
+  Standard ($49):
+  User pays → checkout.session.completed webhook →
+    → read metadata.organisation_id
+    → run auto-verification logic
+    → pass: set IsVerified=true, VerificationTier=Standard, create StripeEvent(status=completed, note="Auto-verified")
+    → fail: create StripeEvent(status=pending) → admin reviews manually
+
+  Enhanced ($149):
+  User pays → checkout.session.completed webhook →
+    → read metadata.organisation_id
+    → always create StripeEvent(status=pending) → admin reviews manually
+
+  ---
+  3. Yearly Verification — One-Time vs Subscription
+
+  Since it's "1-year of verification", you have two options:
+
+  ┌─────────────────────┬────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────┐
+  │      Approach       │                                      Pros                                      │                      Cons                      │
+  ├─────────────────────┼────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤
+  │ One-time payment    │ Simpler, no recurring complexity                                               │ You have to manually track expiry, remind them │
+  ├─────────────────────┼────────────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────┤
+  │ Yearly subscription │ Auto-renews, customer.subscription.deleted fires on cancellation, auto-invoice │ Slightly more complex setup                    │
+  └─────────────────────┴────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────┘
+
+  I'd recommend subscription — you get invoice.payment_succeeded each year, and customer.subscription.deleted tells you when they stopped paying so you can auto-revoke verification.
+
+  ---
+  4. Job Posting Billing — Card on File vs Pay-Per-Post
+
+  Option A: Card on file (recommended)
+  - Create a Stripe Customer for the org on first payment, store StripeCustomerId on the org record
+  - First checkout uses setup_future_usage: "off_session" to save the card
+  - Future job posts: charge silently via PaymentIntent with stored card — no checkout redirect needed
+  - Stripe's hosted Billing Portal (BillingPortal.Session) gives users a fully built page to manage their card, view invoices, download receipts — you just redirect them there
+
+  Option B: Pay-per-post (card entered each time)
+  - Each post opens a Stripe Checkout session
+  - Job only goes live after checkout.session.completed fires
+  - More friction, but no stored card risk
+
+  Card on file is the better UX for active employers posting multiple jobs. Pay-per-post might suit occasional posters.
+
+  ---
+  5. What Needs to Be Built
+
+  Database:
+  - StripeEvents table — Id, StripeEventId, OrganisationId, EventType, ProductId, Status (pending/completed/failed), Notes, CreatedAt
+  - StripeCustomerId column on Organisations table
+  - VerificationExpiresAt on Organisations (for subscription expiry tracking)
+
+  Backend:
+  - POST /api/v1/verification/checkout — creates Stripe Checkout Session, redirects
+  - POST /api/v1/stripe/webhook — receives all events, routes to handlers
+  - POST /api/v1/jobs/{id}/publish/checkout — creates checkout for job posting (Option B) or charges silently (Option A)
+  - GET /api/v1/billing/portal — creates Stripe Billing Portal session URL
+
+  Admin UI:
+  - /admin/stripe-events — list with status filter, ability to manually approve/reject pending items
+
+  Org UI:
+  - Verification purchase page
+  - Billing section showing charges/invoices (or just redirect to Stripe portal)
+
+  ---
+  Key Question Before Starting
+
+  For job posting billing: do you want card-on-file (Option A) or pay-per-post (Option B)? That decision shapes a significant portion of the billing architecture. Also — is job posting a flat fee per post, or tiered (e.g. featured
+  listing costs more)?
+
+
+FYI: We went with Option A

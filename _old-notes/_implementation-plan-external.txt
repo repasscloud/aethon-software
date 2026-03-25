@@ -1,0 +1,74 @@
+⏺ 1. Create a Google Cloud Service Account and download the JSON key
+
+  This is the server-side credential used by the Google Indexing API (not Places). It proves to Google that your server is authorised to submit indexing requests on behalf of your site.
+
+  Steps:
+  1. Go to console.cloud.google.com
+  2. Create a project (or use an existing one)
+  3. Enable the Web Search Indexing API in "APIs & Services → Library"
+  4. Go to "APIs & Services → Credentials → Create Credentials → Service Account" (aethon-indexing@aethon-software.iam.gserviceaccount.com)
+  5. Give it a name (e.g. aethon-indexing), click through, no special roles needed
+  6. Open the created service account → "Keys" tab → "Add Key → Create new key → JSON"
+  7. Download the .json file — it looks like:
+  {
+    "type": "service_account",
+    "project_id": "...",
+    "client_email": "aethon-indexing@your-project.iam.gserviceaccount.com",
+    "private_key": "-----BEGIN RSA PRIVATE KEY-----\n..."
+  }
+  8. Paste the entire contents into the Google Service Account JSON field on your Admin → Settings page. Never commit this file to source control.
+
+  ---
+  2. Verify your domain in Google Search Console
+
+  Google won't accept Indexing API requests for a site it hasn't confirmed you own. Verification proves you control the domain.
+
+  Steps:
+  1. Go to search.google.com/search-console
+  2. Click "Add property" → enter your domain (e.g. https://aethon.com.au)
+  3. Google will give you a verification method — the easiest is DNS TXT record:
+    - Copy the TXT record value Google gives you
+    - Add it to your domain's DNS (via your registrar or Cloudflare etc.)
+    - Click "Verify" in Search Console — can take a few minutes for DNS to propagate
+  4. Alternatively use the HTML file method: upload a small file Google gives you to your site's root
+
+  ---
+  3. Add the Service Account email as an Owner in Search Console
+
+  Even after domain verification, the Indexing API will return 403 Forbidden until you explicitly grant the service account permission to submit indexing requests for your property.
+
+  Steps:
+  1. In Search Console, open your property
+  2. Go to Settings → Users and permissions
+  3. Click "Add user"
+  4. Paste the client_email from your service account JSON (e.g. aethon-indexing@your-project.iam.gserviceaccount.com)
+  5. Set the permission to Owner (not just "Full" or "Restricted" — must be Owner for the Indexing API to work)
+  6. Save
+
+  ---
+  4. Set GooglePlaces__ApiKey in your environment
+
+  This is the browser-visible API key that powers the location autocomplete in the job and org profile forms. It's separate from the Indexing API — no service account needed, just a plain API key.
+
+  Steps:
+  1. In Google Cloud Console → "APIs & Services → Library" → enable the Places API (New)
+  2. Go to "Credentials → Create Credentials → API Key"
+  3. Click "Restrict key":
+    - Application restrictions: HTTP referrers → add your production domain (e.g. https://aethon.com.au/*)
+    - API restrictions: restrict to "Places API (New)" only
+  4. Set the key in your environment:
+    - In docker-compose.yml (already wired): GooglePlaces__ApiKey=AIza...
+    - Or in your hosting platform's environment variables as GooglePlaces__ApiKey
+
+  The double underscore (__) is the .NET convention for nested config — it maps to GooglePlaces:ApiKey in appsettings.json.
+
+  ---
+  Summary of which key does what:
+
+  ┌──────────────────────┬───────────────────┬───────────────────────────────────┬─────────────────────────────────┐
+  │         Key          │       Type        │              Used by              │       Visible to browser?       │
+  ├──────────────────────┼───────────────────┼───────────────────────────────────┼─────────────────────────────────┤
+  │ Service Account JSON │ OAuth2 credential │ Indexing API (server-side)        │ No — store in DB only           │
+  ├──────────────────────┼───────────────────┼───────────────────────────────────┼─────────────────────────────────┤
+  │ GooglePlaces__ApiKey │ API key           │ Places autocomplete (client-side) │ Yes — restrict by HTTP referrer │
+  └──────────────────────┴───────────────────┴───────────────────────────────────┴─────────────────────────────────┘

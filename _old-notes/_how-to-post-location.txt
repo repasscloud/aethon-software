@@ -1,0 +1,36 @@
+⏺ Let me check the auth endpoint to give you the exact call:
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Got it. The token comes from a direct API call to the login endpoint. Here's exactly how to do it:
+
+  Step 1 — Get a token (one-time, using curl or Postman):
+
+  curl -X POST http://localhost:51201/api/v1/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"email":"aethon@localhost.com","password":"Aethon@Admin2026!"}'
+
+  The response will contain an accessToken field. Copy that value.
+
+  Step 2 — Seed locations:
+
+  curl -X POST http://localhost:5100/api/v1/admin/locations/bulk \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <paste-token-here>" \
+    -d '[
+      {"displayName":"Sydney, NSW, Australia","city":"Sydney","state":"New South Wales","country":"Australia","countryCode":"AU","latitude":-33.8688,"longitude":151.2093,"sortOrder":1},
+      {"displayName":"Melbourne, VIC, Australia","city":"Melbourne","state":"Victoria","country":"Australia","countryCode":"AU","latitude":-37.8136,"longitude":144.9631,"sortOrder":2},
+      {"displayName":"Brisbane, QLD, Australia","city":"Brisbane","state":"Queensland","country":"Australia","countryCode":"AU","latitude":-27.4698,"longitude":153.0251,"sortOrder":3},
+      {"displayName":"Perth, WA, Australia","city":"Perth","state":"Western Australia","country":"Australia","countryCode":"AU","latitude":-31.9505,"longitude":115.8605,"sortOrder":4},
+      {"displayName":"Adelaide, SA, Australia","city":"Adelaide","state":"South Australia","country":"Australia","countryCode":"AU","latitude":-34.9285,"longitude":138.6007,"sortOrder":5},
+      {"displayName":"Gold Coast, QLD, Australia","city":"Gold Coast","state":"Queensland","country":"Australia","countryCode":"AU","latitude":-28.0167,"longitude":153.4000,"sortOrder":6},
+      {"displayName":"Canberra, ACT, Australia","city":"Canberra","state":"Australian Capital Territory","country":"Australia","countryCode":"AU","latitude":-35.2809,"longitude":149.1300,"sortOrder":7},
+      {"displayName":"Newcastle, NSW, Australia","city":"Newcastle","state":"New South Wales","country":"Australia","countryCode":"AU","latitude":-32.9283,"longitude":151.7817,"sortOrder":8},
+      {"displayName":"Wollongong, NSW, Australia","city":"Wollongong","state":"New South Wales","country":"Australia","countryCode":"AU","latitude":-34.4278,"longitude":150.8931,"sortOrder":9},
+      {"displayName":"Remote / Work from Home","city":null,"state":null,"country":"Australia","countryCode":"AU","latitude":-25.2744,"longitude":133.7751,"sortOrder":100}
+    ]'
+
+  The API port (5100) is wherever your API container is exposed. It's not exposed through the web UI anywhere — it's a direct API call. After redeploying with ./redeploy.sh, run step 1 to get a fresh token, then run step 2 once to seed
+  your locations. After that the picker will work with no further setup.
+
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6IjAxNDA5MjQxLTE1MjItNDBiYi1iZmY2LTZkZGRmNTM0N2IxMiIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL2VtYWlsYWRkcmVzcyI6ImFldGhvbkBsb2NhbGhvc3QuY29tIiwibmFtZSI6IkFldGhvbiBBZG1pbiIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IlN1cGVyQWRtaW4iLCJleHAiOjE3NzQyMjM3NDIsImlzcyI6ImFldGhvbi1hcGkiLCJhdWQiOiJhZXRob24td2ViIn0.2JjE_PzQjwrwtUQFd0k9cP8FXByGlWQPMQAU8r-36Zo","userId":"01409241-1522-40bb-bff6-6dddf5347b12","email":"aethon@localhost.com","displayName":"Aethon Admin","appType":"superadmin","isSuperAdmin":true,"isAdmin":false,"isSupport":false,"mustChangePassword":false,"mustEnableMfa":false,"requiresTwoFactor":false,"twoFactorTicket":null,"organisationId":null,"organisationName":null,"organisationType":null,"companyRole":null,"recruiterRole":null,"isOrganisationOwner":false}%

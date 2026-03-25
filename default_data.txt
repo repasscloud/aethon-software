@@ -1,0 +1,82 @@
+miss piggy
+logo: i.scdn.co/image/ab6761610000e5ebca8f0b183e6b7f1244e2210c
+banner: i.imgur.com/4tmaAQv.png
+URL: en.wikipedia.org/wiki/Miss_Piggy
+MISS PIGGY is a dynamic Advertising & PR company focused on helping brands stand out, build recognition, and connect with the right audience. Combining creative marketing, strategic communications, and strong brand storytelling, the company delivers campaigns designed to increase visibility and leave a lasting impression.
+
+With a modern approach to promotion and public relations, MISS PIGGY works across brand positioning, media outreach, advertising strategy, and audience engagement. The company is committed to creating bold, memorable, and effective campaigns that support business growth and strengthen public presence.
+
+
+billy bob
+https://img.pikbest.com/png-images/20241022/stealth-masked-hacker-gaming-logo-for-gamers_10991543.png!bw700
+
+
+
+Title:
+Junior Software Developer
+
+Department:
+Engineering
+
+Location:
+Sydney, NSW
+
+Summary:
+We are seeking a Junior Software Developer to join our growing engineering team. This role involves assisting in the development, testing, and maintenance of internal and client-facing applications. You will work alongside senior developers to deliver reliable and scalable software solutions.
+
+Description:
+We are looking for a Junior Software Developer to support the development and maintenance of internal and client-facing applications. In this role, you will work closely with senior developers to help build reliable, scalable, and well-structured software solutions that support both business operations and customer needs.
+
+You will contribute to day-to-day development tasks across the software lifecycle, including coding, testing, debugging, and application support. The position offers the opportunity to gain hands-on experience working with modern development practices, APIs, version control, and collaborative team workflows while continuing to build your technical capability in a practical environment.
+
+This role is suited to someone who is eager to learn, enjoys solving problems, and can work effectively as part of a team. You will be encouraged to contribute ideas, develop your skills, and grow within a supportive engineering environment focused on delivering quality software.
+
+Requirements:
+Basic experience with C# and .NET
+
+Understanding of REST APIs
+
+Familiarity with Git version control
+
+Strong problem-solving skills
+
+Good communication and teamwork abilities
+
+Benefits:
+Flexible working arrangements
+
+Professional development support
+
+Access to latest development tools
+
+Collaborative team environment
+
+Salary Range:
+AUD $70,000 – $90,000 per year
+
+Special Requirements:
+Must have full Australian working rights
+
+Must be able to communicate clearly in written and spoken English
+
+Must be willing to work collaboratively in a team environment
+
+Must be comfortable receiving feedback and learning from senior developers
+
+Must be able to manage tasks, priorities, and deadlines effectively
+
+Must demonstrate strong attention to detail
+
+Must have a genuine interest in software development and technology
+
+Must be willing to follow coding standards, development processes, and documentation practices
+
+Must be reliable, professional, and proactive in approach to work
+
+Relevant internship, personal projects, or portfolio examples will be viewed favourably
+
+Youtube Video ID:
+X6EGzi9qm3E
+
+Tags:
+junior software developer, software developer, junior developer, c#, .net, asp.net, rest api, api integration, git, version control, software testing, debugging, application maintenance, backend development, web development, problem solving, teamwork, communication skills, agile, sdlc, troubleshooting, entry level developer, internal systems, client-facing applications

@@ -1,0 +1,415 @@
+Implementation Plan
+Last updated: 2026-03-22
+
+================================================================================
+PHASE 1 — Database Schema
+================================================================================
+
+New columns on Organisations (7 columns):
+  LocationCity, LocationState, LocationCountry, LocationCountryCode,
+  LocationLatitude (double?), LocationLongitude (double?), LocationPlaceId
+  PublicLocationText stays — the Places component auto-populates it as the
+  display string.
+
+New columns on Jobs (same 7 columns as above):
+  LocationText stays as the human-readable display field; structured columns
+  sit alongside it.
+
+  NOTE: GPS coordinates (Latitude + Longitude) are mandatory for radius-based
+  job search to work. Jobs saved before this migration will have null coords
+  and will be excluded from radius searches — employers must re-save their
+  job location to opt in. Show a banner on EditJob.razor if coords are missing.
+
+New SystemSettings table (key-value, string PK):
+  Key, Value, Description, UpdatedUtc, UpdatedByUserId
+  Seeded with:
+    GoogleIndexing.Enabled           = "false"
+    GoogleIndexing.ServiceAccountJson = ""
+    GooglePlaces.ApiKey              = ""  (moved from env to DB for live reload)
+
+New JobSyndicationRecords table (future-proofing):
+  Id, JobId (FK), Provider (e.g. "GoogleIndexing"), Status, ExternalRef,
+  SubmittedUtc, LastAttemptUtc, LastErrorMessage, CreatedUtc
+  Index on (JobId, Provider).
+  Tracks per-job per-provider syndication history. Needed from day one because
+  Google Indexing API results start populating it immediately.
+
+EF migrations (3):
+  1. AddStructuredLocation
+  2. AddSystemSettings
+  3. AddJobSyndicationRecord
+
+================================================================================
+PHASE 2 — Google Places Autocomplete Component
+================================================================================
+
+New reusable LocationPicker.razor in Components/Shared/.
+
+Parameters (all two-way bindable via EventCallback):
+  LocationText, City, State, Country, CountryCode, Latitude, Longitude, PlaceId
+
+Architecture:
+  - Google Maps JS SDK loaded ONCE in App.razor via:
+      https://maps.googleapis.com/maps/api/js?key={KEY}&libraries=places
+    (not inside the component — avoids double-load)
+  - New wwwroot/js/locationPicker.js exposes:
+      initLocationPicker(elementId, dotNetRef)
+    When user selects a place it calls:
+      dotNetRef.InvokeVoidAsync("OnPlaceSelected", city, state, country,
+                                countryCode, lat, lng, placeId, displayText)
+  - Component calls JS in OnAfterRenderAsync(firstRender) guard
+  - New GooglePlacesOptions class in Web project bound from appsettings
+
+docker-compose.yml:
+  Add GooglePlaces__ApiKey env var to web service only (API does not need it).
+
+API key restrictions (Google Cloud Console):
+  - Application restrictions: HTTP referrers → your domain(s)
+  - API restrictions: Places API (New) only
+
+================================================================================
+PHASE 3 — Location on Organisation Profile
+================================================================================
+
+  - Extend Organisation entity with the 7 structured location columns
+  - Add EF configuration for new columns
+  - Update OrganisationDto, OrganisationProfileDto, UpdateOrganisationCommand/Handler
+  - Replace the free-text location input in OrganisationProfile.razor with
+    <LocationPicker> binding to all 7 new fields
+  - GPS coordinates (Latitude + Longitude) are saved to the org record so the
+    org's location can later be used as a "near me" search anchor
+
+================================================================================
+PHASE 4 — Location on Job Posting
+================================================================================
+
+  - Extend Job entity with the 7 structured location columns
+  - Update EF configuration
+  - Update all job DTOs: CreateJobDto, UpdateJobDto, PublicJobDetailDto,
+    JobListItemDto (lat/lng for map pins)
+  - Update CreateJobCommand/Handler, UpdateJobCommand/Handler,
+    GetPublicJobDetailQuery/Handler
+  - Replace LocationText plain input in EditJob.razor and NewJob.razor with
+    <LocationPicker>
+  - Show a warning banner on EditJob.razor if Latitude is null (pre-migration
+    jobs excluded from radius search until re-saved)
+
+================================================================================
+PHASE 5 — Radius-Based Job Search (GPS)
+================================================================================
+
+  Goal: searching "25KM around Parramatta NSW" returns jobs in Sydney CBD,
+  Chatswood, etc. — any job within the radius.
+
+  How the search query works:
+    PostgreSQL approach using the Haversine formula inline:
+      WHERE
+        (2 * 6371 *
+          asin(sqrt(
+            pow(sin((radians(j.Latitude) - radians(@lat)) / 2), 2) +
+            cos(radians(@lat)) * cos(radians(j.Latitude)) *
+            pow(sin((radians(j.Longitude) - radians(@lng)) / 2), 2)
+          ))
+        ) <= @radiusKm
+        AND j.Latitude IS NOT NULL
+        AND j.Longitude IS NOT NULL
+
+    Default radius: 25 KM (configurable per search).
+    Alternative: optional PostGIS extension (earth_distance / point ops) if
+    performance becomes a concern at scale — use Haversine first.
+
+  API changes:
+    - Add optional params to job search endpoint:
+        Latitude (double?), Longitude (double?), RadiusKm (double? default 25)
+    - When Latitude + Longitude are provided, apply the Haversine WHERE clause
+      AND sort results by distance ascending (nearest first)
+    - LocationText / City text search still works independently — user can
+      supply either text OR coordinates, or both
+    - Return DistanceKm in the job list item DTO when coords were supplied
+
+  Web changes:
+    - Job search page: add a "Near me" button that uses browser Geolocation API
+      (navigator.geolocation.getCurrentPosition) to pre-fill lat/lng
+    - LocationPicker on the search bar returns the selected place's lat/lng;
+      pass those to the API instead of (or alongside) a text query
+    - Display "X km away" badge on job cards when distance is returned
+
+================================================================================
+PHASE 6 — JSON-LD JobPosting Structured Data (Strict Google Compliance)
+================================================================================
+
+  On PublicJobDetail.razor, add a <HeadContent> block:
+
+    <HeadContent>
+        <script type="application/ld+json">@((MarkupString)BuildJsonLd())</script>
+    </HeadContent>
+
+  Mapping rules (strict schema.org / Google requirements):
+
+  Field              Source / Rule
+  ─────────────────  ──────────────────────────────────────────────────────────
+  @context           "https://schema.org"  (always)
+  @type              "JobPosting"          (always)
+  title              Job.Title             (plain text, no HTML)
+  description        Job.Description stripped to plain text — NO raw HTML.
+                     Use HtmlStripper utility (see below). Minimum 50 chars.
+  datePosted         Job.PublishedAt formatted as ISO 8601 date (YYYY-MM-DD)
+  validThrough       ONLY emitted when PostingExpiresUtc is set AND it is a
+                     future date. Format: ISO 8601 datetime with timezone
+                     (e.g. "2026-06-30T23:59:59+10:00"). If null → omit field
+                     entirely. NEVER emit a past date — Google will suppress.
+  employmentType     FullTime→"FULL_TIME", PartTime→"PART_TIME",
+                     Contract→"CONTRACTOR", Casual→"OTHER",
+                     Internship→"INTERN", Volunteer→"VOLUNTEER"
+                     Must be array if multiple apply: ["FULL_TIME","CONTRACTOR"]
+  hiringOrganization { "@type":"Organization", "name": org.Name,
+                       "sameAs": org.Website (if set),
+                       "logo": org.LogoUrl (if set) }
+  jobLocation        { "@type":"Place",
+                       "address": { "@type":"PostalAddress",
+                         "streetAddress": (omit unless available),
+                         "addressLocality": Job.LocationCity,
+                         "addressRegion": Job.LocationState,
+                         "addressCountry": Job.LocationCountryCode (ISO 3166-1)
+                       }
+                     }
+                     Degrade gracefully: if structured fields are null, use
+                     { "@type":"Place", "name": Job.LocationText }
+  jobLocationType    Only include "TELECOMMUTE" for remote jobs. Omit for
+                     on-site. For hybrid: omit (Google does not have a hybrid
+                     value — don't include jobLocationType for hybrid).
+  applicantLocationRequirements  Only for TELECOMMUTE jobs:
+                     { "@type":"Country", "name": "AU" } (or relevant country)
+  baseSalary         Only include if min/max salary fields are set:
+                     { "@type":"MonetaryAmount", "currency":"AUD",
+                       "value": { "@type":"QuantitativeValue",
+                         "minValue": x, "maxValue": y,
+                         "unitText": "YEAR" (or "HOUR", "MONTH") } }
+  url                Canonical public URL for the job. Use JobUrlHelper from
+                     Aethon.Shared so API + Web produce identical URLs.
+  identifier         { "@type":"PropertyValue", "name": org.Name,
+                       "value": Job.Id.ToString() }
+  directApply        true if direct application is enabled (no redirect)
+
+  HtmlStripper utility:
+    New static class in Aethon.Shared.Utilities.HtmlStripper.
+    Uses Regex to strip all HTML tags, then decodes HTML entities.
+    Also collapses multiple whitespace / newlines to single spaces.
+    Used ONLY for JSON-LD — the displayed description still uses HTML.
+
+  JobUrlHelper:
+    New static class in Aethon.Shared.Utilities.JobUrlHelper.
+    Method: BuildPublicUrl(string baseUrl, Guid jobId, string slug)
+    Both API (for Indexing API payload) and Web (for JSON-LD url field) call
+    this to ensure canonical URL is identical. Divergent URLs = broken indexing.
+
+  Expiry date on job detail page:
+    When PostingExpiresUtc is set, display a badge on the public job detail page:
+      "Applications close [date]"  (formatted in local timezone)
+    This is required for Google compliance and is good UX regardless.
+
+================================================================================
+PHASE 7 — SystemSettings Infrastructure
+================================================================================
+
+  SystemSetting entity:
+    Id (string PK = key), Value (string), Description (string?),
+    UpdatedUtc (DateTime), UpdatedByUserId (Guid?)
+
+  EF configuration: SystemSettingConfiguration.cs
+  Add DbSet<SystemSetting> to AethonDbContext
+  SystemSettingKeys.cs constants class:
+    GoogleIndexingEnabled        = "GoogleIndexing.Enabled"
+    GoogleIndexingServiceAccount = "GoogleIndexing.ServiceAccountJson"
+
+  ISystemSettingsService interface:
+    Task<bool> GetBoolAsync(string key, bool defaultValue = false)
+    Task<string?> GetStringAsync(string key)
+    Task SetAsync(string key, string value, Guid? updatedByUserId = null)
+
+  SystemSettingsService: scoped, uses AethonDbContext.
+  Register in DI: services.AddScoped<ISystemSettingsService, SystemSettingsService>()
+
+================================================================================
+PHASE 8 — Google Indexing API Service (Full Lifecycle)
+================================================================================
+
+  NuGet: Google.Apis.Auth (for ServiceAccountCredential)
+         Google.Apis.Indexing.v3 (or hand-roll the HTTP call — see below)
+
+  IGoogleIndexingService:
+    Task NotifyPublishedAsync(Guid jobId, string jobUrl)
+    Task NotifyUpdatedAsync(Guid jobId, string jobUrl)    ← NEW
+    Task NotifyRemovedAsync(string jobUrl)
+
+  GoogleIndexingService implementation:
+    1. Check GoogleIndexing.Enabled via ISystemSettingsService → return if false
+    2. Load SA JSON from GoogleIndexing.ServiceAccountJson setting
+    3. Create ServiceAccountCredential with scope:
+         https://www.googleapis.com/auth/indexing
+    4. Get OAuth 2.0 access token (Google.Apis.Auth handles refresh automatically)
+    5. POST to https://indexing.googleapis.com/v3/urlNotifications:publish
+       Body for publish/update:
+         { "url": "<jobUrl>", "type": "URL_UPDATED" }
+       Body for remove:
+         { "url": "<jobUrl>", "type": "URL_DELETED" }
+    6. Write a JobSyndicationRecord on success OR failure:
+         Status = "Success" / "Failed"
+         ExternalRef = response notification ID if available
+         LastErrorMessage = error body if failed
+
+  IMPORTANT — Google Indexing API lifecycle rules:
+    Event                Action to Google       Indexing API type
+    ─────────────────    ─────────────────────  ─────────────────
+    Job published        NotifyPublished        URL_UPDATED
+    Job edited/updated   NotifyUpdated          URL_UPDATED  ← MUST do this
+    Job closed manually  NotifyRemoved          URL_DELETED
+    Job expired (worker) NotifyRemoved          URL_DELETED
+    Job deleted (admin)  NotifyRemoved          URL_DELETED
+
+  Hooks (where to inject service calls):
+    PublishJobHandler    → NotifyPublishedAsync after successful save
+    UpdateJobHandler     → NotifyUpdatedAsync after successful save
+                           (only fires if GoogleIndexing.Enabled = true AND
+                            job.Status == Published — don't notify drafts)
+    CloseJobHandler      → NotifyRemovedAsync after status change saved
+    DeleteJobHandler     → NotifyRemovedAsync before/after deletion
+    JobExpiryWorker      → NotifyRemovedAsync for each expired job (see Phase 9)
+
+  Pre-requisites that must be done OUTSIDE the codebase:
+    1. Create a Google Cloud Service Account
+    2. Download the Service Account JSON key
+    3. In Google Search Console: add your site, verify ownership (DNS TXT or
+       HTML file), then go to Settings → Users and permissions → Add user →
+       enter the Service Account email as OWNER (not just a user)
+    Cannot be tested in dev without a public URL and verified Search Console
+    property. Use the Admin settings page to paste in the SA JSON once live.
+
+================================================================================
+PHASE 9 — JobExpiryWorker
+================================================================================
+
+  BackgroundService, registered in Program.cs alongside ResumeAnalysisWorker.
+  Runs on a configurable schedule — default: every 30 minutes.
+
+  On each tick:
+    1. Query jobs WHERE Status == Published AND PostingExpiresUtc <= UtcNow
+    2. For each expired job:
+       a. Set Status = Closed, ClosedAt = UtcNow, CloseReason = "Expired"
+       b. Save changes
+       c. Call IGoogleIndexingService.NotifyRemovedAsync(jobUrl)
+          (no-op if GoogleIndexing.Enabled = false)
+    3. Log count of expired jobs processed
+
+  This ensures:
+    - Expired jobs are removed from Google's index promptly
+    - validThrough in JSON-LD is always a future date for live listings
+    - Google never serves a job that the employer would consider closed
+
+================================================================================
+PHASE 10 — Admin Settings Page
+================================================================================
+
+  New API endpoints in AdminEndpoints.cs:
+    GET  /api/v1/admin/settings         — Admin+ can read (mask SA JSON value)
+    PUT  /api/v1/admin/settings/{key}   — SuperAdmin for SA JSON, Admin+ for toggles
+
+  New Settings.razor at /admin/settings:
+
+    Section: "Job Syndication"
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ Google Job Indexing                          [toggle ON/OFF]    │
+    │ Automatically submit new, updated and closed jobs to Google's   │
+    │ Indexing API for faster indexing in Google Jobs search.         │
+    │                                                                 │
+    │ Google Service Account JSON          [SuperAdmin only]          │
+    │ [textarea — paste JSON here]  [Save]                            │
+    │ ⚠ Requires site verified in Google Search Console and SA email   │
+    │   added as an Owner in Search Console settings.                 │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Indeed              [COMING SOON — disabled toggle]             │
+    │ LinkedIn            [COMING SOON — disabled toggle]             │
+    │ ZipRecruiter        [COMING SOON — disabled toggle]             │
+    │ Adzuna              [COMING SOON — disabled toggle]             │
+    │ Jora                [COMING SOON — disabled toggle]             │
+    │ Jooble              [COMING SOON — disabled toggle]             │
+    └─────────────────────────────────────────────────────────────────┘
+
+    Section: "Syndication History"
+    Table of recent JobSyndicationRecords (last 100) with columns:
+      Job title, Provider, Status, Submitted, Error message (truncated)
+
+  NavMenu: add "Settings" link under the Admin section (Admin+ only).
+
+================================================================================
+THINGS YOU MUST NOT OVERLOOK
+================================================================================
+
+1. Google Indexing API ≠ Places API — completely different credentials.
+   Places API = API key (browser-safe).
+   Indexing API = Service Account + OAuth 2.0 (server-side only, never expose
+   to browser). The SA JSON goes in the DB (SystemSettings), never in the
+   docker-compose env or source control.
+
+2. validThrough MUST be a future date. Google suppresses listings where
+   validThrough is in the past. When no expiry is set, OMIT the field entirely.
+   The JobExpiryWorker handles the DELETE notification when jobs expire so that
+   Google's index stays clean.
+
+3. URL_UPDATED on every edit. Google's documentation states: send URL_UPDATED
+   not just on publish, but on every significant update. If a salary, location,
+   or title changes, Google should re-crawl. Always fire NotifyUpdatedAsync in
+   UpdateJobHandler when the job is Published.
+
+4. Canonical job URL must be identical in JSON-LD and Indexing API payload.
+   Use JobUrlHelper from Aethon.Shared in both places. Divergent URLs = Google
+   treats them as two different pages and indexing breaks silently.
+
+5. HTML stripping for JSON-LD description. Job descriptions are stored as HTML.
+   Injecting raw HTML into the JSON-LD <script> block breaks JSON parsing.
+   Strip ALL tags and decode HTML entities before embedding in JSON-LD.
+
+6. Places API key is browser-visible — this is expected and acceptable.
+   Restrict it to HTTP referrers (your production domain) in Google Cloud Console
+   so it cannot be abused from other origins once you go live.
+
+7. Pre-migration data. Existing jobs have LocationText but null GPS coords.
+   They will be excluded from radius searches and their JSON-LD jobLocation
+   will degrade to a Place with just a name. Show a warning on EditJob.razor
+   prompting the employer to re-enter the location via the new picker.
+
+8. Search Console verification cannot be done in dev. You need a public URL.
+   All Indexing API calls will return 403 until: (a) site is verified in Search
+   Console, (b) Service Account email is added as an Owner in Search Console.
+   Test the toggle/SA JSON flow in dev, but don't expect actual indexing to work
+   until the site has a real domain.
+
+9. Google only accepts Indexing API requests for JobPosting pages. The URL you
+   submit must be a canonical, publicly accessible job detail page — not a
+   search results page, not an admin URL, and not behind a login.
+
+10. employmentType must be one of Google's exact enum values (see Phase 6 table).
+    Unknown values are silently ignored by Google's parser, which means the
+    structured data will be valid JSON but the enriched result may not appear.
+
+================================================================================
+IMPLEMENTATION ORDER
+================================================================================
+
+  Start with Phase 1 (schema migrations) — everything else depends on it.
+  Then Phase 7 (SystemSettings infra) — needed by Phases 8 and 10.
+  Then Phase 2 (LocationPicker component) — needed by Phases 3, 4, 5.
+  Then Phase 3 (org location), Phase 4 (job location) in parallel.
+  Then Phase 5 (JSON-LD) — needs structured job location fields to be populated.
+  Then Phase 6 (Haversine search) — needs lat/lng in job table.
+  Then Phase 8 (Indexing service) + Phase 9 (ExpiryWorker) in parallel.
+  Then Phase 10 (Admin settings page) — needs Phases 7 + 8 complete.
+
+
+
+------
+
+  The only remaining steps are operational (not code):
+  1. Set Stripe:SecretKey in appsettings.json or environment
+  2. Point Stripe's webhook to https://yourdomain/api/webhooks/stripe
+  3. Enter price IDs via /admin/stripe-products

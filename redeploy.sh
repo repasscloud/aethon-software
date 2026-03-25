@@ -6,6 +6,7 @@ BUILDER_IMAGE="aethon-build:mcr-dotnet-sdk-10.0"
 BUILDER_DOCKERFILE="./.docker/Dockerfile.builder"
 
 echo "==> Verifying build..."
+dotnet restore
 dotnet build --no-restore -p:TreatWarningsAsErrors=false
 echo "==> Build OK"
 
