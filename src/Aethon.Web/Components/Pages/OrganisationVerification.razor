@@ -91,7 +91,10 @@ else
                                     <li>Basic fraud screening</li>
                                     <li>Verified badge on all listings</li>
                                     <li>Lower Sticky to Top pricing</li>
-                                    <li>Unused promo credits upgrade to Premium</li>
+                                    @if (_launchPromoEnabled)
+                                    {
+                                        <li>Unused promo credits upgrade to Premium</li>
+                                    }
                                 </ul>
                                 <div class="fw-bold fs-5 mb-3">A$49 <span class="fw-normal fs-6 text-secondary">/ year</span></div>
                                 <button class="btn btn-primary rounded-4 w-100 @(_busy ? "disabled" : "")"
@@ -194,16 +197,19 @@ else
                 }
             </div>
 
-            <div class="card border-0 shadow-sm rounded-4">
-                <div class="card-body p-4">
-                    <h3 class="h6 fw-semibold mb-2"><i class="bi bi-info-circle me-2 text-primary"></i>Launch promotion</h3>
-                    <p class="text-secondary small mb-0">
-                        Your organisation's 10 free Standard Job Post credits (valid 90 days from signup) will automatically
-                        upgrade to <strong>Premium Job Post credits</strong> when you complete verification — at no extra cost.
-                        Unused credits only. Sticky to Top remains a separate paid add-on.
-                    </p>
+            @if (_launchPromoEnabled)
+            {
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h3 class="h6 fw-semibold mb-2"><i class="bi bi-info-circle me-2 text-primary"></i>Launch promotion</h3>
+                        <p class="text-secondary small mb-0">
+                            Your organisation's 10 free Standard Job Post credits (valid 90 days from signup) will automatically
+                            upgrade to <strong>Premium Job Post credits</strong> when you complete verification — at no extra cost.
+                            Unused credits only. Sticky to Top remains a separate paid add-on.
+                        </p>
+                    </div>
                 </div>
-            </div>
+            }
         }
 
     </div>
@@ -215,6 +221,7 @@ else
     private string? _pendingAction;
     private string? _error;
     private OrganisationProfileDto? _profile;
+    private bool _launchPromoEnabled = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -225,8 +232,18 @@ else
                 "/api/v1/organisations/me/profile", AethonApiClient.JsonOptions);
         }
         catch { }
+        try
+        {
+            var features = await client.GetFromJsonAsync<PublicFeaturesDto>(
+                "/api/v1/public/features", AethonApiClient.JsonOptions);
+            if (features is not null)
+                _launchPromoEnabled = features.LaunchPromotionEnabled;
+        }
+        catch { }
         _ready = true;
     }
+
+    private record PublicFeaturesDto(bool LaunchPromotionEnabled);
 
     private async Task StartCheckout(string tier, bool bundle)
     {

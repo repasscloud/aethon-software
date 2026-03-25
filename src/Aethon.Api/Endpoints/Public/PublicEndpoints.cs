@@ -1,4 +1,5 @@
 using Aethon.Api.Common;
+using Aethon.Application.Abstractions.Settings;
 using Aethon.Application.Applications.Commands.SubmitJobApplication;
 using Aethon.Application.Jobs.Commands.EmailJobApplication;
 using Aethon.Application.Jobs.Queries.GetPublicJobDetail;
@@ -21,6 +22,15 @@ public static class PublicEndpoints
         var group = app.MapGroup("/public")
             .AllowAnonymous()
             .WithTags("Public");
+
+        // GET /api/v1/public/features — publicly safe feature flag states
+        group.MapGet("/features", async ([FromServices] ISystemSettingsService settings) =>
+        {
+            var launchPromoEnabled = await settings.GetBoolAsync(
+                SystemSettingKeys.FeatureLaunchPromotionEnabled, defaultValue: true);
+
+            return Results.Ok(new { LaunchPromotionEnabled = launchPromoEnabled });
+        });
 
         // GET /api/v1/public/locations?q= — location search from the curated locations table
         group.MapGet("/locations", async (

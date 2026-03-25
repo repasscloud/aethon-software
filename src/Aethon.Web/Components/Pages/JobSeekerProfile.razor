@@ -14,6 +14,7 @@
 @inject AethonApiClient Api
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Configuration
 
 <PageTitle>Job seeker profile | Aethon</PageTitle>
 
@@ -660,11 +661,13 @@ else
                 return;
             }
 
-            // Navigate the browser to the API LinkedIn connect endpoint with the JWT
-            var apiBase = new Uri(NavigationManager.BaseUri).GetLeftPart(UriPartial.Authority);
-            // The API base URL — derive from the client's configured base address
+            // Navigate the browser to the API LinkedIn connect endpoint with the JWT.
+            // PublicApiBaseUrl is the externally-accessible API URL (e.g. https://dev-api.app.aethonsoftware.com).
+            // ApiBaseUrl is the internal server-to-server URL (e.g. http://api:8080) and must NOT be used here.
             var client = await Api.CreateAsync();
-            var apiBaseUrl = client.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:5100";
+            var apiBaseUrl = (Configuration["PublicApiBaseUrl"]
+                ?? client.BaseAddress?.ToString()
+                ?? "http://localhost:5100").TrimEnd('/');
             NavigationManager.NavigateTo($"{apiBaseUrl}/api/v1/auth/linkedin/connect?token={Uri.EscapeDataString(token)}", forceLoad: true);
         }
         catch

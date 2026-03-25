@@ -6,7 +6,8 @@
 .git
 .gitignore
 README.md
-_smtpapi-test/
+
+# files to ignore
 aethon-software-c36b8dfa3564.json
 *.txt
 *.md
@@ -17,3 +18,10 @@ aethon-software-c36b8dfa3564.json
 *.sh
 *.txt
 *.log
+
+# folders to ignore
+_img/
+_old-notes/
+.claude/
+.github/
+db/
