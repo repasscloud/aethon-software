@@ -1,0 +1,12 @@
+# Aethon — Caddy reverse proxy
+# Caddy automatically provisions and renews TLS certificates via Let's Encrypt.
+# HTTP → HTTPS redirect is handled automatically.
+# WebSocket upgrades (Blazor SignalR) are handled automatically.
+
+dev.app.aethonsoftware.com {
+    reverse_proxy web:8080
+}
+
+dev-api.app.aethonsoftware.com {
+    reverse_proxy api:8080
+}
