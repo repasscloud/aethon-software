@@ -26,6 +26,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=aethon;Username=aethon;Password=aethon"
       Auth__JwtKey: "${Auth__JwtKey}"
       Auth__Issuer: "${Auth__Issuer:-aethon-api}"
@@ -33,14 +35,16 @@ services:
       Email__MailerSendApiKey: "${Email__MailerSendApiKey:-}"
       Email__FromEmail: "${Email__FromEmail:-do-not-reply@repasscloud.com}"
       Email__FromName: "${Email__FromName:-Aethon}"
-      Email__WebBaseUrl: "${Email__WebBaseUrl:-http://localhost:5200}"
+      Email__WebBaseUrl: "${Email__WebBaseUrl:-https://dev.app.aethonsoftware.com}"
       Claude__ApiKey: "${Claude__ApiKey:-}"
       Stripe__SecretKey: "${Stripe__SecretKey:-}"
     volumes:
       - api_uploads:/app/uploads
       - dp_keys:/keys
-    ports:
-      - "5201:8080"
+    # No direct port binding — Caddy is the only public entry point.
+    # Uncomment the line below for local debugging without Caddy:
+    # ports:
+    #   - "5201:8080"
 
   web:
     build:
@@ -52,6 +56,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ApiBaseUrl: "http://api:8080"
       DataProtection__CertBase64: "${DataProtection__CertBase64:-}"
       DataProtection__KeysPath: /keys
@@ -59,10 +65,29 @@ services:
       GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
     volumes:
       - dp_keys:/keys
+    # No direct port binding — Caddy is the only public entry point.
+    # Uncomment the line below for local debugging without Caddy:
+    # ports:
+    #   - "5200:8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
     ports:
-      - "5200:8080"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   postgres_data:
   api_uploads:
   dp_keys:
+  caddy_data:
+  caddy_config:
