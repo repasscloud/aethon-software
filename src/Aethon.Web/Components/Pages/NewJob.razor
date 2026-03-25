@@ -411,14 +411,26 @@
                 <p class="text-secondary small mb-3">Embed a short video to showcase the role or your workplace. Only one video source can be used.</p>
                 <div class="row g-3 mb-4">
                     <div class="col-12 col-lg-6">
-                        <label class="form-label fw-semibold"><i class="bi bi-youtube me-1 text-danger"></i>YouTube video ID</label>
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-youtube me-1 text-danger"></i>YouTube video ID
+                            @if (_model.PostingTier == JobPostingTier.Standard)
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
+                        </label>
                         <InputText @bind-Value="_model.VideoYouTubeId" class="form-control rounded-4" placeholder="e.g. dQw4w9WgXcQ"
                                    disabled="@(!string.IsNullOrWhiteSpace(_model.VideoVimeoId))" />
                         <div class="form-text">The ID from the YouTube URL: youtube.com/watch?v=<strong>ID</strong></div>
                         <ValidationMessage For="@(() => _model.VideoYouTubeId)" />
                     </div>
                     <div class="col-12 col-lg-6">
-                        <label class="form-label fw-semibold"><i class="bi bi-camera-video me-1 text-info"></i>Vimeo video ID</label>
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-camera-video me-1 text-info"></i>Vimeo video ID
+                            @if (_model.PostingTier == JobPostingTier.Standard)
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
+                        </label>
                         <InputText @bind-Value="_model.VideoVimeoId" class="form-control rounded-4" placeholder="e.g. 123456789"
                                    disabled="@(!string.IsNullOrWhiteSpace(_model.VideoYouTubeId))" />
                         <div class="form-text">The numeric ID from the Vimeo URL: vimeo.com/<strong>ID</strong></div>
@@ -521,6 +533,10 @@
                             {
                                 <span class="badge bg-primary rounded-pill ms-2 small">Included with Premium</span>
                             }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
                         </label>
                         <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
                             <button type="button" class="btn btn-sm rounded-3 @(string.IsNullOrEmpty(_model.HighlightColour) ? "btn-secondary" : "btn-outline-secondary")"
@@ -556,7 +572,7 @@
                             {
                                 <InputCheckbox @bind-Value="_model.HasAiCandidateMatching" class="form-check-input" id="aiMatchCheck" />
                                 <label class="form-check-label" for="aiMatchCheck">
-                                    AI candidate matching <span class="badge bg-secondary rounded-pill ms-1 small">Add-on</span>
+                                    AI candidate matching <span class="badge bg-warning text-dark rounded-pill ms-1 small">Add-on +A$9</span>
                                 </label>
                             }
                         </div>
@@ -589,9 +605,16 @@
                 @* ── Publish cost summary ── *@
                 @if (_model.Status == JobStatus.Published)
                 {
-                    var hasCredits = _model.PostingTier == JobPostingTier.Premium ? _premiumCredits > 0 : _standardCredits > 0;
-                    var tierLabel = _model.PostingTier == JobPostingTier.Premium ? "Premium" : "Standard";
-                    <div class="alert @(hasCredits ? "alert-success" : "alert-warning") rounded-4 mb-3">
+                    var isPremium = _model.PostingTier == JobPostingTier.Premium;
+                    var hasCredits = isPremium ? _premiumCredits > 0 : _standardCredits > 0;
+                    var tierLabel = isPremium ? "Premium" : "Standard";
+                    var hasHighlight = !string.IsNullOrEmpty(_model.HighlightColour) && !isPremium;
+                    var hasVideo = (!string.IsNullOrWhiteSpace(_model.VideoYouTubeId) || !string.IsNullOrWhiteSpace(_model.VideoVimeoId)) && !isPremium;
+                    var hasAi = _model.HasAiCandidateMatching && !isPremium;
+                    var stickyHas = _stickyDuration == 1 ? _sticky24hCredits > 0 : _stickyDuration == 7 ? _sticky7dCredits > 0 : _sticky30dCredits > 0;
+                    var stickyPrice = _stickyDuration == 1 ? "A$9" : _stickyDuration == 7 ? "A$19" : "A$39";
+                    var anyCharge = !hasCredits || hasHighlight || hasVideo || hasAi || (_stickyDuration > 0 && !stickyHas);
+                    <div class="alert @(anyCharge ? "alert-warning" : "alert-success") rounded-4 mb-3">
                         <div class="fw-semibold mb-1"><i class="bi bi-credit-card me-2"></i>Publish cost</div>
                         @if (hasCredits)
                         {
@@ -599,15 +622,39 @@
                         }
                         else
                         {
-                            <div class="small">No <strong>@tierLabel</strong> credits available. Publishing will charge your saved payment method. <a href="/app/organisation/billing" class="alert-link">Buy credits</a></div>
+                            <div class="small">No <strong>@tierLabel</strong> credits — <strong>A$@(isPremium ? "69" : "29")</strong> will be charged to your card. <a href="/app/organisation/billing" class="alert-link">Buy credits</a></div>
+                        }
+                        @if (hasHighlight)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> highlight colour add-on.</div>
+                        }
+                        @if (hasVideo)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> video embed add-on.</div>
+                        }
+                        @if (hasAi)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> AI candidate matching add-on.</div>
                         }
                         @if (_stickyDuration > 0)
                         {
                             var stickyType = _stickyDuration == 1 ? "24h" : _stickyDuration == 7 ? "7d" : "30d";
-                            var stickyHas = _stickyDuration == 1 ? _sticky24hCredits > 0 : _stickyDuration == 7 ? _sticky7dCredits > 0 : _sticky30dCredits > 0;
-                            <div class="small mt-1">
-                                + 1× <strong>Sticky @stickyType</strong> credit @(stickyHas ? "will be consumed." : "— none available, will charge your card.")
-                            </div>
+                            @if (stickyHas)
+                            {
+                                <div class="small mt-1">+ 1× <strong>Sticky @stickyType</strong> credit will be consumed.</div>
+                            }
+                            else
+                            {
+                                <div class="small mt-1">+ <strong>@stickyPrice</strong> sticky @stickyType (no credits available).</div>
+                            }
+                        }
+                        @if (anyCharge && !hasCredits)
+                        {
+                            <div class="small text-muted mt-2">You will be redirected to Stripe to complete payment. Your card will be saved for future charges.</div>
+                        }
+                        else if (hasHighlight || hasVideo || hasAi || (_stickyDuration > 0 && !stickyHas))
+                        {
+                            <div class="small text-muted mt-2">Add-on charges will be collected via Stripe Checkout after publish.</div>
                         }
                     </div>
                 }
@@ -929,6 +976,28 @@
 
         _model.ScreeningQuestionsJson = System.Text.Json.JsonSerializer.Serialize(_screening);
 
+        // For Standard-tier publish: strip add-ons from create payload.
+        // They are sent to /billing/job-publish-checkout so they can be bundled
+        // into one Stripe Checkout session (or published free if credits cover everything).
+        string? pendingHighlightColour = null;
+        bool pendingAiMatching = false;
+        string? pendingYouTubeId = null;
+        string? pendingVimeoId = null;
+
+        if (_model.PostingTier == JobPostingTier.Standard && _model.Status == JobStatus.Published)
+        {
+            pendingHighlightColour = _model.HighlightColour;
+            pendingAiMatching      = _model.HasAiCandidateMatching;
+            pendingYouTubeId       = _model.VideoYouTubeId;
+            pendingVimeoId         = _model.VideoVimeoId;
+
+            _model.HighlightColour        = null;
+            _model.IsHighlighted          = false;
+            _model.HasAiCandidateMatching = false;
+            _model.VideoYouTubeId         = null;
+            _model.VideoVimeoId           = null;
+        }
+
         try
         {
             var client = await Api.CreateAsync();
@@ -946,12 +1015,60 @@
 
             if (_model.Status == JobStatus.Published)
             {
-                var publishResponse = await client.PostAsync($"/api/v1/jobs/{jobId}/publish", null);
-                if (!publishResponse.IsSuccessStatusCode)
+                // Use the new unified checkout endpoint — handles credit consumption,
+                // add-on line items, and Stripe Checkout redirect in one call.
+                var checkoutRequest = new JobPublishCheckoutRequestDto
                 {
-                    NavigationManager.NavigateTo($"/app/jobs/{jobId}", forceLoad: false);
+                    JobId           = jobId,
+                    AddHighlight    = !string.IsNullOrEmpty(pendingHighlightColour),
+                    HighlightColour = pendingHighlightColour,
+                    AddVideo        = !string.IsNullOrWhiteSpace(pendingYouTubeId) || !string.IsNullOrWhiteSpace(pendingVimeoId),
+                    VideoYouTubeId  = pendingYouTubeId,
+                    VideoVimeoId    = pendingVimeoId,
+                    AddAiMatching   = pendingAiMatching,
+                    StickyDuration  = _stickyDuration
+                };
+
+                var checkoutResp = await client.PostAsJsonAsync("/api/v1/billing/job-publish-checkout", checkoutRequest);
+
+                if (checkoutResp.IsSuccessStatusCode)
+                {
+                    var result = await checkoutResp.Content.ReadFromJsonAsync<JobPublishCheckoutResponseDto>(AethonApiClient.JsonOptions);
+
+                    if (result?.Published == true)
+                    {
+                        NavigationManager.NavigateTo($"/app/jobs/{jobId}", forceLoad: false);
+                        return;
+                    }
+
+                    if (!string.IsNullOrEmpty(result?.CheckoutUrl))
+                    {
+                        NavigationManager.NavigateTo(result.CheckoutUrl, forceLoad: true);
+                        return;
+                    }
+                }
+
+                var statusCode = (int)checkoutResp.StatusCode;
+                if (statusCode == 402)
+                {
+                    NavigationManager.NavigateTo("/app/organisation/billing?reason=no_payment_method", forceLoad: false);
                     return;
                 }
+
+                // Try to surface the actual error message from the API
+                try
+                {
+                    var errBody = await checkoutResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(AethonApiClient.JsonOptions);
+                    _pageError = errBody.TryGetProperty("message", out var msg) ? msg.GetString() : $"Checkout failed (HTTP {statusCode}).";
+                }
+                catch
+                {
+                    _pageError = $"Checkout failed (HTTP {statusCode}). Check the API logs for details.";
+                }
+
+                // Don't navigate away — keep the user on the form so they can see the error
+                _saving = false;
+                return;
             }
 
             NavigationManager.NavigateTo($"/app/jobs/{jobId}", forceLoad: false);

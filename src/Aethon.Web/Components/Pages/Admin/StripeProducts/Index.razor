@@ -39,6 +39,19 @@ else
             <div class="alert @(_globalSuccess ? "alert-success" : "alert-danger") rounded-4">@_globalMessage</div>
         }
 
+        @* ── API Keys ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">API Keys</h2>
+                <p class="text-secondary small mb-3">
+                    Secret key from <strong>Stripe Dashboard → Developers → API keys</strong>.
+                    Test keys start with <code>sk_test_</code> — live keys start with <code>sk_live_</code>.
+                    This is used for all Stripe API calls (checkout, customer creation, billing portal).
+                </p>
+                @RenderSettingRow("Stripe.SecretKey", "Secret API Key", isSecret: true, placeholder: "sk_test_… or sk_live_…")
+            </div>
+        </div>
+
         @* ── Webhook Secret ── *@
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
@@ -122,6 +135,44 @@ else
                 @RenderSettingRow("Stripe.Price.Addon.Highlight",   "Highlight colour")
                 @RenderSettingRow("Stripe.Price.Addon.Video",       "Video attachment")
                 @RenderSettingRow("Stripe.Price.Addon.AiMatching",  "AI candidate matching")
+            </div>
+        </div>
+
+        @* ── Display Prices ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Display Prices</h2>
+                <p class="text-secondary small mb-3">
+                    Plain numeric values shown in the UI as <code>A$xx</code>. No currency symbol — just the number.
+                    Update these whenever you change pricing. Used on the billing, verification, and job posting pages.
+                </p>
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Standard Job Credits</h3>
+                @RenderSettingRow("Display.Price.Job.Standard.1x",  "1 credit",   placeholder: "e.g. 19")
+                @RenderSettingRow("Display.Price.Job.Standard.5x",  "5 credits",  placeholder: "e.g. 85")
+                @RenderSettingRow("Display.Price.Job.Standard.10x", "10 credits", placeholder: "e.g. 159")
+                @RenderSettingRow("Display.Price.Job.Standard.20x", "20 credits", placeholder: "e.g. 299")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Premium Job Credits</h3>
+                @RenderSettingRow("Display.Price.Job.Premium.1x",  "1 credit",   placeholder: "e.g. 69")
+                @RenderSettingRow("Display.Price.Job.Premium.5x",  "5 credits",  placeholder: "e.g. 299")
+                @RenderSettingRow("Display.Price.Job.Premium.10x", "10 credits", placeholder: "e.g. 549")
+                @RenderSettingRow("Display.Price.Job.Premium.20x", "20 credits", placeholder: "e.g. 999")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Verification</h3>
+                @RenderSettingRow("Display.Price.Verification.Standard",            "Standard verification",   placeholder: "e.g. 49")
+                @RenderSettingRow("Display.Price.Verification.Enhanced",            "Enhanced verification",   placeholder: "e.g. 149")
+                @RenderSettingRow("Display.Price.Bundle.StandardVerificationPost",  "Standard bundle",         placeholder: "e.g. 68")
+                @RenderSettingRow("Display.Price.Bundle.EnhancedVerificationPost",  "Enhanced bundle",         placeholder: "e.g. 208")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Add-ons</h3>
+                @RenderSettingRow("Display.Price.Addon.Highlight",  "Highlight colour",      placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Addon.Video",      "Video attachment",      placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Addon.AiMatching", "AI candidate matching", placeholder: "e.g. 9")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Sticky Top — Verified</h3>
+                @RenderSettingRow("Display.Price.Sticky.Verified.24h", "24 hours", placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Sticky.Verified.7d",  "7 days",   placeholder: "e.g. 39")
+                @RenderSettingRow("Display.Price.Sticky.Verified.30d", "30 days",  placeholder: "e.g. 79")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Sticky Top — Unverified</h3>
+                @RenderSettingRow("Display.Price.Sticky.Unverified.24h", "24 hours", placeholder: "e.g. 15")
+                @RenderSettingRow("Display.Price.Sticky.Unverified.7d",  "7 days",   placeholder: "e.g. 49")
+                @RenderSettingRow("Display.Price.Sticky.Unverified.30d", "30 days",  placeholder: "e.g. 99")
             </div>
         </div>
 
@@ -214,11 +265,12 @@ else
         StateHasChanged();
     }
 
-    private RenderFragment RenderSettingRow(string key, string label, bool isSecret = false) => __builder =>
+    private RenderFragment RenderSettingRow(string key, string label, bool isSecret = false, string? placeholder = null) => __builder =>
     {
         var draft = _drafts.GetValueOrDefault(key, "");
         var isSaving = _saving.GetValueOrDefault(key, false);
         var state = _saveState.GetValueOrDefault(key, null);
+        var ph = placeholder ?? (isSecret ? "whsec_…" : "price_…");
 
         <div class="row align-items-center mb-2 g-2">
             <div class="col-12 col-md-3">
@@ -228,7 +280,7 @@ else
             <div class="col-12 col-md-7">
                 <input type="@(isSecret ? "password" : "text")"
                        class="form-control form-control-sm font-monospace"
-                       placeholder="@(isSecret ? "whsec_…" : "price_…")"
+                       placeholder="@ph"
                        value="@draft"
                        @oninput="e => _drafts[key] = e.Value?.ToString() ?? string.Empty"
                        autocomplete="off" />

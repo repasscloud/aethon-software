@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Aethon.Api.Auth;
 using Aethon.Application.Abstractions.Email;
+using Aethon.Application.Abstractions.Settings;
+using Microsoft.AspNetCore.Mvc;
 using Aethon.Data;
 using Aethon.Data.Entities;
 using Aethon.Data.Identity;
@@ -24,6 +26,7 @@ public static class AuthEndpoints
         group.MapPost("/register", async (
             UserManager<ApplicationUser> userManager,
             AethonDbContext db,
+            [FromServices] ISystemSettingsService settings,
             RegisterRequest request) =>
         {
             var now = DateTime.UtcNow;
@@ -144,19 +147,29 @@ public static class AuthEndpoints
                             .ExecuteUpdateAsync(s => s.SetProperty(o => o.PrimaryDomainId, domainId));
                     }
 
-                    // Grant 10 Standard Job Post launch promo credits (90-day expiry)
-                    db.OrganisationJobCredits.Add(new OrganisationJobCredit
+                    // Grant launch promo credits if the promotion is active (controlled via admin settings)
+                    var promoEnabled = await settings.GetBoolAsync(
+                        SystemSettingKeys.FeatureLaunchPromotionEnabled, defaultValue: true);
+                    if (promoEnabled)
                     {
-                        Id = Guid.NewGuid(),
-                        OrganisationId = orgId,
-                        CreditType = CreditType.JobPostingStandard,
-                        Source = CreditSource.LaunchPromotion,
-                        QuantityOriginal = 10,
-                        QuantityRemaining = 10,
-                        ExpiresAt = now.AddDays(90),
-                        CreatedUtc = now,
-                        CreatedByUserId = user.Id
-                    });
+                        var countStr = await settings.GetStringAsync(SystemSettingKeys.FeatureLaunchPromotionFreeJobPostCount);
+                        var daysStr  = await settings.GetStringAsync(SystemSettingKeys.FeatureLaunchPromotionExpiryDays);
+                        var promoQty  = int.TryParse(countStr, out var q) && q > 0 ? q : 10;
+                        var promoDays = int.TryParse(daysStr,  out var d) && d > 0 ? d : 90;
+
+                        db.OrganisationJobCredits.Add(new OrganisationJobCredit
+                        {
+                            Id                = Guid.NewGuid(),
+                            OrganisationId    = orgId,
+                            CreditType        = CreditType.JobPostingStandard,
+                            Source            = CreditSource.LaunchPromotion,
+                            QuantityOriginal  = promoQty,
+                            QuantityRemaining = promoQty,
+                            ExpiresAt         = now.AddDays(promoDays),
+                            CreatedUtc        = now,
+                            CreatedByUserId   = user.Id
+                        });
+                    }
                     await db.SaveChangesAsync();
                 }
 

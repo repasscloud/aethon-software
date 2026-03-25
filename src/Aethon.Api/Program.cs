@@ -10,6 +10,7 @@ using Aethon.Api.Infrastructure.Caching;
 using Aethon.Api.Infrastructure.Email;
 using Aethon.Api.Infrastructure.Files;
 using Aethon.Api.Infrastructure.ResumeAnalysis;
+using Aethon.Api.Infrastructure.Logging;
 using Aethon.Api.Infrastructure.Settings;
 using Aethon.Api.Infrastructure.Stripe;
 using Aethon.Api.Infrastructure.Syndication;
@@ -20,6 +21,7 @@ using Aethon.Application.Abstractions.Caching;
 using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Files;
 using Aethon.Application.Abstractions.ResumeAnalysis;
+using Aethon.Application.Abstractions.Logging;
 using Aethon.Application.Abstractions.Settings;
 using Aethon.Application.Abstractions.Syndication;
 using Aethon.Application.Abstractions.Time;
@@ -32,6 +34,16 @@ using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+
+// Load .env from the repository root (two levels up from the API project directory).
+// Environment variables set by the OS / CI always take precedence over the .env file.
+var envFile = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".env");
+if (!System.IO.File.Exists(envFile))
+    envFile = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (!System.IO.File.Exists(envFile))
+    envFile = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", ".env");
+if (System.IO.File.Exists(envFile))
+    DotNetEnv.Env.Load(envFile);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -80,10 +92,16 @@ services.AddHostedService<DomainVerificationWorker>();
 services.AddHostedService<JobExpiryWorker>();
 
 services.AddScoped<ISystemSettingsService, SystemSettingsService>();
+services.AddScoped<ISystemLogService, SystemLogService>();
 services.AddScoped<IGoogleIndexingService, GoogleIndexingService>();
 
 // Stripe
-StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
+var stripeKey = configuration["Stripe:SecretKey"];
+if (string.IsNullOrWhiteSpace(stripeKey))
+    Console.Error.WriteLine("[STARTUP] WARNING: Stripe:SecretKey is empty. Checkout will fail. Check .env file.");
+else
+    Console.WriteLine($"[STARTUP] Stripe key loaded: {stripeKey[..7]}...");
+StripeConfiguration.ApiKey = stripeKey;
 services.AddScoped<IOrganisationAutoVerifier, StubOrganisationAutoVerifier>();
 services.AddScoped<StripeWebhookProcessor>();
 services.AddScoped<StripeCheckoutService>();
@@ -175,6 +193,7 @@ using (var scope = app.Services.CreateScope())
         },
 
         // ── Stripe ──────────────────────────────────────────────────────────
+        new SystemSetting { Key = SystemSettingKeys.StripeSecretKey,                        Value = "", Description = "Stripe secret API key (sk_test_xxx or sk_live_xxx). Managed via admin UI.", UpdatedUtc = DateTime.UtcNow },
         new SystemSetting { Key = SystemSettingKeys.StripeWebhookSecret,                    Value = "", Description = "Stripe webhook signing secret (whsec_xxx). Managed via admin UI.", UpdatedUtc = DateTime.UtcNow },
 
         // Verification price IDs
@@ -211,6 +230,35 @@ using (var scope = app.Services.CreateScope())
         new SystemSetting { Key = SystemSettingKeys.StripePriceAddonHighlight,  Value = "", Description = "Stripe Price ID: Standard add-on — Highlight Colour (A$9).",       UpdatedUtc = DateTime.UtcNow },
         new SystemSetting { Key = SystemSettingKeys.StripePriceAddonVideo,      Value = "", Description = "Stripe Price ID: Standard add-on — Video Embed (A$9).",             UpdatedUtc = DateTime.UtcNow },
         new SystemSetting { Key = SystemSettingKeys.StripePriceAddonAiMatching, Value = "", Description = "Stripe Price ID: Standard add-on — AI Candidate Matching (A$9).",   UpdatedUtc = DateTime.UtcNow },
+
+        // ── Display Prices ──────────────────────────────────────────────────
+        // Plain number strings (no currency symbol). Shown as "A$xx" in the UI.
+        // Update via seed script or Admin → Stripe Products.
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobStandard1x,  Value = "19",  Description = "Display price: Standard job post — 1 credit.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobStandard5x,  Value = "",    Description = "Display price: Standard job post — 5 credits.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobStandard10x, Value = "",    Description = "Display price: Standard job post — 10 credits.", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobStandard20x, Value = "",    Description = "Display price: Standard job post — 20 credits.", UpdatedUtc = DateTime.UtcNow },
+
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobPremium1x,   Value = "69",  Description = "Display price: Premium job post — 1 credit.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobPremium5x,   Value = "",    Description = "Display price: Premium job post — 5 credits.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobPremium10x,  Value = "",    Description = "Display price: Premium job post — 10 credits.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceJobPremium20x,  Value = "",    Description = "Display price: Premium job post — 20 credits.",  UpdatedUtc = DateTime.UtcNow },
+
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceVerificationStandard,             Value = "49",  Description = "Display price: Standard Employer Verification.",          UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceVerificationEnhanced,             Value = "149", Description = "Display price: Enhanced Trusted Employer Verification.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceBundleStandardVerificationPost,   Value = "68",  Description = "Display price: Standard Verification + first post bundle.", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceBundleEnhancedVerificationPost,   Value = "208", Description = "Display price: Enhanced Verification + first post bundle.", UpdatedUtc = DateTime.UtcNow },
+
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceAddonHighlight,  Value = "9", Description = "Display price: Add-on — Highlight Colour.",        UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceAddonVideo,      Value = "9", Description = "Display price: Add-on — Video Embed.",             UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceAddonAiMatching, Value = "9", Description = "Display price: Add-on — AI Candidate Matching.",   UpdatedUtc = DateTime.UtcNow },
+
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyVerified24h,   Value = "", Description = "Display price: Sticky 24h — verified org.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyVerified7d,    Value = "", Description = "Display price: Sticky 7d — verified org.",    UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyVerified30d,   Value = "", Description = "Display price: Sticky 30d — verified org.",   UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified24h, Value = "", Description = "Display price: Sticky 24h — unverified org.", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified7d,  Value = "", Description = "Display price: Sticky 7d — unverified org.",  UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified30d, Value = "", Description = "Display price: Sticky 30d — unverified org.", UpdatedUtc = DateTime.UtcNow },
     };
 
     foreach (var setting in settingsToSeed)

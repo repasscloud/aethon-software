@@ -938,7 +938,7 @@ else
 
             _model.Title = job.Title;
             _model.Department = job.Department;
-            _model.LocationText = job.LocationText;
+            _model.LocationText = job.LocationText ?? "";
             _model.LocationCity = job.LocationCity;
             _model.LocationState = job.LocationState;
             _model.LocationCountry = job.LocationCountry;
@@ -969,7 +969,7 @@ else
 
             _model.ExternalApplicationUrl = job.ExternalApplicationUrl;
             _model.ApplicationEmail = job.ApplicationEmail;
-            _model.Summary = job.Summary;
+            _model.Summary = job.Summary ?? "";
             _model.HasCommission = job.HasCommission;
             _model.OteFrom = job.OteFrom;
             _model.OteTo = job.OteTo;

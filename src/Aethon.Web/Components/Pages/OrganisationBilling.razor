@@ -53,6 +53,17 @@ else
             </div>
         }
 
+        @if (Nav.Uri.Contains("reason=no_payment_method"))
+        {
+            <div class="alert alert-warning rounded-4 d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>
+                    Your job was saved as a <strong>draft</strong> because no payment method is on file.
+                    Purchase credits below or complete a verification to add a payment method, then publish your job from the drafts list.
+                </span>
+            </div>
+        }
+
         @* ── Verification status ── *@
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
@@ -184,7 +195,7 @@ else
                                     <span class="spinner-border spinner-border-sm d-block mx-auto mb-1"></span>
                                 }
                                 <div class="fw-bold">@pack.Label</div>
-                                <div class="small text-secondary">@pack.Description</div>
+                                <div class="small text-secondary">@DisplayPrice(pack.DisplayPriceKey)</div>
                             </button>
                         </div>
                     }
@@ -208,7 +219,7 @@ else
                                     <span class="spinner-border spinner-border-sm d-block mx-auto mb-1"></span>
                                 }
                                 <div class="fw-bold">@pack.Label</div>
-                                <div class="small text-secondary">@pack.Description</div>
+                                <div class="small text-secondary">@DisplayPrice(pack.DisplayPriceKey)</div>
                             </button>
                         </div>
                     }
@@ -228,23 +239,25 @@ else
     private OrganisationProfileDto? _profile;
     private List<CreditBalanceItemDto> _credits = [];
 
-    private record CreditPack(string PriceKey, string Label, string Description);
+    private record CreditPack(string PriceKey, string Label, string DisplayPriceKey);
 
     private static readonly List<CreditPack> _standardPacks =
     [
-        new("Stripe.Price.Job.Standard.1x",  "1 credit",  "A$29"),
-        new("Stripe.Price.Job.Standard.5x",  "5 credits", "Best value"),
-        new("Stripe.Price.Job.Standard.10x", "10 credits","Better value"),
-        new("Stripe.Price.Job.Standard.20x", "20 credits","Best value"),
+        new("Stripe.Price.Job.Standard.1x",  "1 credit",   "Display.Price.Job.Standard.1x"),
+        new("Stripe.Price.Job.Standard.5x",  "5 credits",  "Display.Price.Job.Standard.5x"),
+        new("Stripe.Price.Job.Standard.10x", "10 credits", "Display.Price.Job.Standard.10x"),
+        new("Stripe.Price.Job.Standard.20x", "20 credits", "Display.Price.Job.Standard.20x"),
     ];
 
     private static readonly List<CreditPack> _premiumPacks =
     [
-        new("Stripe.Price.Job.Premium.1x",  "1 credit",  "A$69"),
-        new("Stripe.Price.Job.Premium.5x",  "5 credits", "Best value"),
-        new("Stripe.Price.Job.Premium.10x", "10 credits","Better value"),
-        new("Stripe.Price.Job.Premium.20x", "20 credits","Best value"),
+        new("Stripe.Price.Job.Premium.1x",  "1 credit",   "Display.Price.Job.Premium.1x"),
+        new("Stripe.Price.Job.Premium.5x",  "5 credits",  "Display.Price.Job.Premium.5x"),
+        new("Stripe.Price.Job.Premium.10x", "10 credits", "Display.Price.Job.Premium.10x"),
+        new("Stripe.Price.Job.Premium.20x", "20 credits", "Display.Price.Job.Premium.20x"),
     ];
+
+    private Dictionary<string, string> _displayPrices = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -264,7 +277,21 @@ else
         }
         catch { }
 
+        try
+        {
+            _displayPrices = await client.GetFromJsonAsync<Dictionary<string, string>>(
+                "/api/v1/billing/display-prices", AethonApiClient.JsonOptions) ?? [];
+        }
+        catch { }
+
         _ready = true;
+    }
+
+    private string DisplayPrice(string key)
+    {
+        if (_displayPrices.TryGetValue(key, out var val) && !string.IsNullOrWhiteSpace(val))
+            return $"A${val}";
+        return "—";
     }
 
     private async Task BuyCredits(string priceKey)

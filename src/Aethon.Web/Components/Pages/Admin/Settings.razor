@@ -98,6 +98,98 @@ else
                     </div>
                 </div>
 
+                <!-- Billing & Promotions -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Billing &amp; Promotions</h5>
+                        <p class="text-secondary small mb-4">Control credit-granting promotions and verification perks. Changes take effect immediately — no deployment needed.</p>
+
+                        <!-- Verification upgrades promo credits -->
+                        <div class="mb-4 pb-4 border-bottom">
+                            <div class="d-flex align-items-start justify-content-between">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">Verification upgrades promo credits to Premium</div>
+                                    <div class="text-secondary small">
+                                        When enabled, any unused Standard launch-promo credits are automatically
+                                        converted to Premium credits when an organisation verifies. The credits
+                                        retain their original expiry date.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="verifUpgradeToggle"
+                                           checked="@_verifUpgradesPromo"
+                                           @onchange="ToggleVerifUpgradesPromo"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_verifUpgradeMsg))
+                            {
+                                <div class="alert @(_verifUpgradeSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_verifUpgradeMsg
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Launch promotion -->
+                        <div>
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">Launch promotion — free job post credits</div>
+                                    <div class="text-secondary small">
+                                        Grants Standard job post credits to every new Company or Recruiter that
+                                        registers. Turn this off between promotions without touching the code.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="launchPromoEnabledToggle"
+                                           checked="@_launchPromoEnabled"
+                                           @onchange="ToggleLaunchPromo"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (_launchPromoEnabled)
+                            {
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label fw-semibold small">Free credits per registration</label>
+                                        <input type="number" class="form-control form-control-sm rounded-3"
+                                               min="1" max="100"
+                                               @bind="_launchPromoCount"
+                                               disabled="@_saving" />
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label fw-semibold small">Credit expiry (days)</label>
+                                        <input type="number" class="form-control form-control-sm rounded-3"
+                                               min="1" max="365"
+                                               @bind="_launchPromoDays"
+                                               disabled="@_saving" />
+                                    </div>
+                                    <div class="col-12 col-md-4 d-flex align-items-end">
+                                        <button class="btn btn-sm btn-dark rounded-3 w-100" @onclick="SaveLaunchPromoSettings" disabled="@_saving">
+                                            @(_saving ? "Saving…" : "Save")
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text mt-1">
+                                    Example: 10 credits, 90 days → each new company gets 10 Standard posting credits expiring 90 days after registration.
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(_launchPromoMsg))
+                            {
+                                <div class="alert @(_launchPromoSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_launchPromoMsg
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Coming Soon platforms -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body p-4">
@@ -175,6 +267,17 @@ else
     private string? _saJsonMessage;
     private bool _saJsonSuccess;
 
+    // Billing & Promotions
+    private bool _verifUpgradesPromo = true;
+    private string? _verifUpgradeMsg;
+    private bool _verifUpgradeSuccess;
+
+    private bool _launchPromoEnabled = true;
+    private int _launchPromoCount = 10;
+    private int _launchPromoDays = 90;
+    private string? _launchPromoMsg;
+    private bool _launchPromoSuccess;
+
     private List<SyndicationRecordDto> _syndicationRecords = [];
 
     private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
@@ -201,6 +304,19 @@ else
                     var saJson = settings.FirstOrDefault(s => s.Key == "GoogleIndexing.ServiceAccountJson");
                     _serviceAccountJson = saJson?.Value ?? "";
                 }
+
+                // Billing & promotions
+                var verifUpgrade = settings.FirstOrDefault(s => s.Key == "Feature.VerificationUpgradesPromoCredits");
+                _verifUpgradesPromo = verifUpgrade is null || verifUpgrade.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                var promoEnabled = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.Enabled");
+                _launchPromoEnabled = promoEnabled is null || promoEnabled.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                var promoCount = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.FreeJobPostCount");
+                if (int.TryParse(promoCount?.Value, out var pc) && pc > 0) _launchPromoCount = pc;
+
+                var promoDays = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.ExpiryDays");
+                if (int.TryParse(promoDays?.Value, out var pd) && pd > 0) _launchPromoDays = pd;
             }
 
             var records = await client.GetFromJsonAsync<List<SyndicationRecordDto>>("/api/v1/admin/syndication-records");
@@ -264,6 +380,80 @@ else
         {
             _saving = false;
         }
+    }
+
+    private async Task ToggleVerifUpgradesPromo(ChangeEventArgs e)
+    {
+        _verifUpgradesPromo = (bool)(e.Value ?? false);
+        _verifUpgradeMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.VerificationUpgradesPromoCredits",
+                new { Value = _verifUpgradesPromo ? "true" : "false" });
+            _verifUpgradeSuccess = resp.IsSuccessStatusCode;
+            _verifUpgradeMsg = resp.IsSuccessStatusCode
+                ? $"Verification upgrade {(_verifUpgradesPromo ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _verifUpgradeSuccess = false;
+            _verifUpgradeMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task ToggleLaunchPromo(ChangeEventArgs e)
+    {
+        _launchPromoEnabled = (bool)(e.Value ?? false);
+        _launchPromoMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.Enabled",
+                new { Value = _launchPromoEnabled ? "true" : "false" });
+            _launchPromoSuccess = resp.IsSuccessStatusCode;
+            _launchPromoMsg = resp.IsSuccessStatusCode
+                ? $"Launch promotion {(_launchPromoEnabled ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _launchPromoSuccess = false;
+            _launchPromoMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveLaunchPromoSettings()
+    {
+        _launchPromoMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var r1 = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.FreeJobPostCount",
+                new { Value = _launchPromoCount.ToString() });
+            var r2 = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.ExpiryDays",
+                new { Value = _launchPromoDays.ToString() });
+            _launchPromoSuccess = r1.IsSuccessStatusCode && r2.IsSuccessStatusCode;
+            _launchPromoMsg = _launchPromoSuccess
+                ? $"Saved: {_launchPromoCount} credits, {_launchPromoDays}-day expiry."
+                : "Failed to save one or more settings.";
+        }
+        catch
+        {
+            _launchPromoSuccess = false;
+            _launchPromoMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
     }
 
     private record SettingDto(string Key, string Value, string? Description);

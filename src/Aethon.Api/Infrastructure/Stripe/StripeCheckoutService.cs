@@ -56,6 +56,24 @@ public sealed class StripeCheckoutService
         _config = config;
     }
 
+    // ─── API key helper ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds an <see cref="IStripeClient"/> keyed with the secret from the DB
+    /// (admin-configurable via Admin → Stripe Products), falling back to the value
+    /// from appsettings / environment variables when the DB row is empty.
+    /// Passing the client to each service constructor avoids the global
+    /// <see cref="StripeConfiguration.ApiKey"/> requirement.
+    /// </summary>
+    private async Task<IStripeClient> GetStripeClientAsync(CancellationToken ct)
+    {
+        var dbKey = await _settings.GetStringAsync(SystemSettingKeys.StripeSecretKey, ct);
+        var key   = !string.IsNullOrWhiteSpace(dbKey) ? dbKey : StripeConfiguration.ApiKey;
+        if (string.IsNullOrWhiteSpace(key))
+            throw new StripeException("Stripe API key is not configured. Set it in Admin → Stripe Products → Secret API Key.");
+        return new StripeClient(key);
+    }
+
     // ─── Verification checkout ────────────────────────────────────────────────
 
     public async Task<(string? Url, string? Error)> CreateVerificationCheckoutAsync(
@@ -72,7 +90,8 @@ public sealed class StripeCheckoutService
         if (string.IsNullOrEmpty(priceId))
             return (null, "Verification product not yet configured. Please contact support.");
 
-        var customerId = await EnsureStripeCustomerAsync(org, ct);
+        var stripeClient = await GetStripeClientAsync(ct);
+        var customerId = await EnsureStripeCustomerAsync(org, stripeClient, ct);
         var webBase = _config["Email:WebBaseUrl"]?.TrimEnd('/') ?? "http://localhost:5200";
 
         var bundlePriceKey = tier == "enhanced"
@@ -99,7 +118,7 @@ public sealed class StripeCheckoutService
             CancelUrl  = $"{webBase}/app/verification/cancelled"
         };
 
-        var service = new SessionService();
+        var service = new SessionService(stripeClient);
         var session = await service.CreateAsync(sessionOptions, cancellationToken: ct);
         return (session.Url, null);
     }
@@ -124,7 +143,8 @@ public sealed class StripeCheckoutService
             ? CreditType.JobPostingPremium
             : CreditType.JobPostingStandard;
 
-        var customerId = await EnsureStripeCustomerAsync(org, ct);
+        var stripeClient = await GetStripeClientAsync(ct);
+        var customerId = await EnsureStripeCustomerAsync(org, stripeClient, ct);
         var webBase = _config["Email:WebBaseUrl"]?.TrimEnd('/') ?? "http://localhost:5200";
 
         var sessionOptions = new SessionCreateOptions
@@ -149,7 +169,7 @@ public sealed class StripeCheckoutService
             CancelUrl  = $"{webBase}/app/verification/cancelled"
         };
 
-        var service = new SessionService();
+        var service = new SessionService(stripeClient);
         var session = await service.CreateAsync(sessionOptions, cancellationToken: ct);
         return (session.Url, null);
     }
@@ -169,7 +189,8 @@ public sealed class StripeCheckoutService
         if (string.IsNullOrEmpty(priceId))
             return (null, "Product not yet configured. Please contact support.");
 
-        var customerId = await EnsureStripeCustomerAsync(org, ct);
+        var stripeClient = await GetStripeClientAsync(ct);
+        var customerId = await EnsureStripeCustomerAsync(org, stripeClient, ct);
         var webBase = _config["Email:WebBaseUrl"]?.TrimEnd('/') ?? "http://localhost:5200";
 
         var sessionOptions = new SessionCreateOptions
@@ -194,9 +215,287 @@ public sealed class StripeCheckoutService
             CancelUrl  = $"{webBase}/app/organisation/billing"
         };
 
-        var service = new SessionService();
+        var service = new SessionService(stripeClient);
         var session = await service.CreateAsync(sessionOptions, cancellationToken: ct);
         return (session.Url, null);
+    }
+
+    // ─── Job publish checkout ─────────────────────────────────────────────────
+    // Single endpoint that handles:
+    //   • Consuming an existing posting credit (or adding it as a line item)
+    //   • Add-on line items (highlight, video, AI matching) for Standard jobs
+    //   • Sticky top line items or credit consumption
+    // If no Stripe charge is needed the job is published immediately and
+    // (Published=true, Url=null) is returned. Otherwise the job is set to OnHold,
+    // a Checkout Session is created, and the URL is returned to redirect the user.
+
+    public async Task<(bool Published, string? CheckoutUrl, string? Error)> CreateJobPublishCheckoutAsync(
+        Aethon.Shared.Billing.JobPublishCheckoutRequestDto request,
+        CancellationToken ct)
+    {
+        var (org, orgError) = await LoadOrgAsync(ct);
+        if (org is null) return (false, null, orgError);
+
+        var job = await _db.Jobs.FirstOrDefaultAsync(j => j.Id == request.JobId, ct);
+        if (job is null) return (false, null, "Job not found.");
+        if (job.OwnedByOrganisationId != org.Id)
+            return (false, null, "You do not have permission to publish this job.");
+        if (job.Status is not (Aethon.Shared.Enums.JobStatus.Draft
+                           or Aethon.Shared.Enums.JobStatus.Approved
+                           or Aethon.Shared.Enums.JobStatus.OnHold))
+            return (false, null, $"Cannot publish a job with status '{job.Status}'.");
+
+        var isPremium  = job.PostingTier == Aethon.Shared.Enums.JobPostingTier.Premium;
+        var isVerified = org.VerificationTier != Aethon.Shared.Enums.VerificationTier.None;
+        var now        = DateTime.UtcNow;
+
+        var lineItems = new List<SessionLineItemOptions>();
+        var meta      = new Dictionary<string, string>
+        {
+            ["organisation_id"] = org.Id.ToString(),
+            ["purchase_type"]   = "job_addons",
+            ["job_id"]          = job.Id.ToString()
+        };
+
+        if (!string.IsNullOrWhiteSpace(job.PoNumber))
+            meta["po_number"] = job.PoNumber;
+
+        // ── Base posting credit ───────────────────────────────────────────────
+        var creditType = isPremium
+            ? Aethon.Shared.Enums.CreditType.JobPostingPremium
+            : Aethon.Shared.Enums.CreditType.JobPostingStandard;
+
+        var postingCredit = await _db.OrganisationJobCredits
+            .Where(c =>
+                c.OrganisationId == org.Id &&
+                c.CreditType == creditType &&
+                c.QuantityRemaining > 0 &&
+                (c.ExpiresAt == null || c.ExpiresAt > now))
+            .OrderBy(c => c.ExpiresAt)
+            .FirstOrDefaultAsync(ct);
+
+        if (postingCredit is not null)
+        {
+            // Consume the credit immediately; if the user abandons checkout the credit
+            // is spent (acceptable MVP trade-off — no reservation mechanism needed).
+            postingCredit.QuantityRemaining--;
+            _db.CreditConsumptionLogs.Add(new Aethon.Data.Entities.CreditConsumptionLog
+            {
+                Id                      = Guid.NewGuid(),
+                OrganisationJobCreditId = postingCredit.Id,
+                OrganisationId          = org.Id,
+                JobId                   = job.Id,
+                ConsumedByUserId        = _currentUser.UserId,
+                QuantityConsumed        = 1,
+                ConsumedAt              = now,
+                CreatedUtc              = now,
+                CreatedByUserId         = _currentUser.UserId
+            });
+            await _db.SaveChangesAsync(ct);
+            meta["posting_credit_consumed"] = "true";
+            meta["posting_credit_id"]       = postingCredit.Id.ToString();
+        }
+        else
+        {
+            // No credit — add the 1× posting price as a Stripe line item
+            var priceKey = isPremium
+                ? SystemSettingKeys.StripePriceJobPremium1x
+                : SystemSettingKeys.StripePriceJobStandard1x;
+            var priceId = await _settings.GetStringAsync(priceKey, ct);
+            if (string.IsNullOrEmpty(priceId))
+                return (false, null, "Job posting product not yet configured. Please contact support.");
+            lineItems.Add(new SessionLineItemOptions { Price = priceId, Quantity = 1 });
+            meta["posting_credit_consumed"] = "false";
+        }
+
+        // ── Standard add-ons ─────────────────────────────────────────────────
+        if (!isPremium)
+        {
+            if (request.AddHighlight && !string.IsNullOrWhiteSpace(request.HighlightColour))
+            {
+                var pid = await _settings.GetStringAsync(SystemSettingKeys.StripePriceAddonHighlight, ct);
+                if (string.IsNullOrEmpty(pid))
+                    return (false, null, "Highlight colour product not yet configured. Please contact support.");
+                lineItems.Add(new SessionLineItemOptions { Price = pid, Quantity = 1 });
+                meta["add_highlight"]    = "true";
+                meta["highlight_colour"] = request.HighlightColour.Trim();
+            }
+
+            if (request.AddVideo &&
+                (!string.IsNullOrWhiteSpace(request.VideoYouTubeId) ||
+                 !string.IsNullOrWhiteSpace(request.VideoVimeoId)))
+            {
+                var pid = await _settings.GetStringAsync(SystemSettingKeys.StripePriceAddonVideo, ct);
+                if (string.IsNullOrEmpty(pid))
+                    return (false, null, "Video embed product not yet configured. Please contact support.");
+                lineItems.Add(new SessionLineItemOptions { Price = pid, Quantity = 1 });
+                meta["add_video"]          = "true";
+                meta["video_youtube_id"]   = request.VideoYouTubeId ?? "";
+                meta["video_vimeo_id"]     = request.VideoVimeoId ?? "";
+            }
+
+            if (request.AddAiMatching)
+            {
+                var pid = await _settings.GetStringAsync(SystemSettingKeys.StripePriceAddonAiMatching, ct);
+                if (string.IsNullOrEmpty(pid))
+                    return (false, null, "AI matching product not yet configured. Please contact support.");
+                lineItems.Add(new SessionLineItemOptions { Price = pid, Quantity = 1 });
+                meta["add_ai_matching"] = "true";
+            }
+        }
+        else
+        {
+            // Premium always includes all add-ons — apply directly, no charge
+            if (request.AddHighlight && !string.IsNullOrWhiteSpace(request.HighlightColour))
+            {
+                meta["add_highlight"]    = "true";
+                meta["highlight_colour"] = request.HighlightColour.Trim();
+            }
+            if (request.AddVideo)
+            {
+                meta["add_video"]        = "true";
+                meta["video_youtube_id"] = request.VideoYouTubeId ?? "";
+                meta["video_vimeo_id"]   = request.VideoVimeoId ?? "";
+            }
+            if (request.AddAiMatching)
+                meta["add_ai_matching"] = "true";
+        }
+
+        // ── Sticky ───────────────────────────────────────────────────────────
+        if (request.StickyDuration > 0)
+        {
+            meta["sticky_duration"] = request.StickyDuration.ToString();
+            var stickyType = request.StickyDuration switch
+            {
+                1  => Aethon.Shared.Enums.CreditType.StickyTop24h,
+                7  => Aethon.Shared.Enums.CreditType.StickyTop7d,
+                _  => Aethon.Shared.Enums.CreditType.StickyTop30d
+            };
+
+            var stickyCredit = await _db.OrganisationJobCredits
+                .Where(c =>
+                    c.OrganisationId == org.Id &&
+                    c.CreditType == stickyType &&
+                    c.QuantityRemaining > 0 &&
+                    (c.ExpiresAt == null || c.ExpiresAt > now))
+                .OrderBy(c => c.ExpiresAt)
+                .FirstOrDefaultAsync(ct);
+
+            if (stickyCredit is not null)
+            {
+                stickyCredit.QuantityRemaining--;
+                _db.CreditConsumptionLogs.Add(new Aethon.Data.Entities.CreditConsumptionLog
+                {
+                    Id                      = Guid.NewGuid(),
+                    OrganisationJobCreditId = stickyCredit.Id,
+                    OrganisationId          = org.Id,
+                    JobId                   = job.Id,
+                    ConsumedByUserId        = _currentUser.UserId,
+                    QuantityConsumed        = 1,
+                    ConsumedAt              = now,
+                    CreatedUtc              = now,
+                    CreatedByUserId         = _currentUser.UserId
+                });
+                await _db.SaveChangesAsync(ct);
+                meta["sticky_consumed_credit"] = "true";
+            }
+            else
+            {
+                var priceKey = (stickyType, isVerified) switch
+                {
+                    (Aethon.Shared.Enums.CreditType.StickyTop24h, true)  => SystemSettingKeys.StripePriceStickyVerified24h,
+                    (Aethon.Shared.Enums.CreditType.StickyTop7d,  true)  => SystemSettingKeys.StripePriceStickyVerified7d,
+                    (Aethon.Shared.Enums.CreditType.StickyTop30d, true)  => SystemSettingKeys.StripePriceStickyVerified30d,
+                    (Aethon.Shared.Enums.CreditType.StickyTop24h, false) => SystemSettingKeys.StripePriceStickyUnverified24h,
+                    (Aethon.Shared.Enums.CreditType.StickyTop7d,  false) => SystemSettingKeys.StripePriceStickyUnverified7d,
+                    _                                                      => SystemSettingKeys.StripePriceStickyUnverified30d
+                };
+                var pid = await _settings.GetStringAsync(priceKey, ct);
+                if (string.IsNullOrEmpty(pid))
+                    return (false, null, "Sticky top product not yet configured. Please contact support.");
+                lineItems.Add(new SessionLineItemOptions { Price = pid, Quantity = 1 });
+            }
+        }
+
+        // ── No Stripe charge needed — publish immediately ─────────────────────
+        if (lineItems.Count == 0)
+        {
+            ApplyAddOnsToJob(job, meta, request.StickyDuration, now);
+            job.Status       = Aethon.Shared.Enums.JobStatus.Published;
+            job.PublishedUtc ??= now;
+            job.UpdatedUtc   = now;
+            job.UpdatedByUserId = _currentUser.UserId;
+            // Enforce expiry cap server-side
+            var maxExpiry = isPremium ? now.AddDays(60) : now.AddDays(30);
+            if (!job.PostingExpiresUtc.HasValue || job.PostingExpiresUtc.Value > maxExpiry)
+                job.PostingExpiresUtc = maxExpiry;
+            await _db.SaveChangesAsync(ct);
+            return (true, null, null);
+        }
+
+        // ── Create Stripe Checkout Session ────────────────────────────────────
+        var stripeClient = await GetStripeClientAsync(ct);
+        var customerId   = await EnsureStripeCustomerAsync(org, stripeClient, ct);
+        var webBase      = _config["Email:WebBaseUrl"]?.TrimEnd('/') ?? "http://localhost:5200";
+
+        var description = string.IsNullOrWhiteSpace(job.PoNumber)
+            ? $"Job: {job.Title}"
+            : $"Job: {job.Title} | PO: {job.PoNumber}";
+
+        var sessionOptions = new SessionCreateOptions
+        {
+            Customer  = customerId,
+            Mode      = "payment",
+            LineItems = lineItems,
+            Metadata  = meta,
+            PaymentIntentData = new SessionPaymentIntentDataOptions
+            {
+                SetupFutureUsage = "off_session",
+                Description      = description,
+                Metadata         = new Dictionary<string, string>
+                {
+                    ["job_id"]      = job.Id.ToString(),
+                    ["po_number"]   = job.PoNumber ?? "",
+                    ["job_title"]   = job.Title
+                }
+            },
+            AllowPromotionCodes = true,
+            SuccessUrl = $"{webBase}/app/jobs/{job.Id}/checkout-success?session_id={{CHECKOUT_SESSION_ID}}",
+            CancelUrl  = $"{webBase}/app/jobs/{job.Id}"
+        };
+
+        // Set job on hold while awaiting Stripe confirmation
+        job.Status     = Aethon.Shared.Enums.JobStatus.OnHold;
+        job.UpdatedUtc = now;
+        await _db.SaveChangesAsync(ct);
+
+        var service = new SessionService(stripeClient);
+        var session = await service.CreateAsync(sessionOptions, cancellationToken: ct);
+        return (false, session.Url, null);
+    }
+
+    // Applies the add-on flags (stored in metadata dict) directly to the job entity.
+    // Called when no Stripe charge is needed (all costs covered by credits).
+    private static void ApplyAddOnsToJob(
+        Aethon.Data.Entities.Job job,
+        Dictionary<string, string> meta,
+        int stickyDuration,
+        DateTime now)
+    {
+        if (meta.TryGetValue("add_highlight", out var hl) && hl == "true")
+        {
+            job.IsHighlighted  = true;
+            job.HighlightColour = meta.TryGetValue("highlight_colour", out var c) ? c : null;
+        }
+        if (meta.TryGetValue("add_video", out var vid) && vid == "true")
+        {
+            job.VideoYouTubeId = meta.TryGetValue("video_youtube_id", out var yt) && !string.IsNullOrEmpty(yt) ? yt : null;
+            job.VideoVimeoId   = meta.TryGetValue("video_vimeo_id",   out var vm) && !string.IsNullOrEmpty(vm) ? vm : null;
+        }
+        if (meta.TryGetValue("add_ai_matching", out var ai) && ai == "true")
+            job.HasAiCandidateMatching = true;
+        if (stickyDuration > 0 && meta.TryGetValue("sticky_consumed_credit", out var sc) && sc == "true")
+            job.StickyUntilUtc = now.AddDays(stickyDuration);
     }
 
     // ─── Billing portal ───────────────────────────────────────────────────────
@@ -217,7 +516,8 @@ public sealed class StripeCheckoutService
             ReturnUrl = $"{webBase}/app/organisation/billing"
         };
 
-        var service = new global::Stripe.BillingPortal.SessionService();
+        var stripeClient = await GetStripeClientAsync(ct);
+        var service = new global::Stripe.BillingPortal.SessionService(stripeClient);
         var session = await service.CreateAsync(portalOptions, cancellationToken: ct);
         return (session.Url, null);
     }
@@ -242,12 +542,12 @@ public sealed class StripeCheckoutService
     }
 
     private async Task<string?> EnsureStripeCustomerAsync(
-        Aethon.Data.Entities.Organisation org, CancellationToken ct)
+        Aethon.Data.Entities.Organisation org, IStripeClient stripeClient, CancellationToken ct)
     {
         if (!string.IsNullOrEmpty(org.StripeCustomerId))
             return org.StripeCustomerId;
 
-        var customerService = new CustomerService();
+        var customerService = new CustomerService(stripeClient);
         var customer = await customerService.CreateAsync(new CustomerCreateOptions
         {
             Name     = org.Name,

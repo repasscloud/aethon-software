@@ -35,6 +35,7 @@ services:
       Email__FromName: "${Email__FromName:-Aethon}"
       Email__WebBaseUrl: "${Email__WebBaseUrl:-http://localhost:5200}"
       Claude__ApiKey: "${Claude__ApiKey:-}"
+      Stripe__SecretKey: "${Stripe__SecretKey:-}"
     volumes:
       - api_uploads:/app/uploads
       - dp_keys:/keys

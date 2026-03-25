@@ -51,6 +51,7 @@ public sealed class AethonDbContext
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<JobSyndicationRecord> JobSyndicationRecords => Set<JobSyndicationRecord>();
     public DbSet<Location> Locations => Set<Location>();
 

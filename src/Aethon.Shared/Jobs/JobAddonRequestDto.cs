@@ -20,4 +20,12 @@ public sealed class JobAddonRequestDto
 
     /// <summary>Sticky-top duration in days (1, 7, or 30). 0 = no sticky.</summary>
     public int StickyDuration { get; set; }
+
+    /// <summary>YouTube video ID to embed (Standard add-on, A$9). Mutually exclusive with VimeoId.</summary>
+    [MaxLength(20)]
+    public string? VideoYouTubeId { get; set; }
+
+    /// <summary>Vimeo video ID to embed (Standard add-on, A$9). Mutually exclusive with YouTubeId.</summary>
+    [MaxLength(20)]
+    public string? VideoVimeoId { get; set; }
 }

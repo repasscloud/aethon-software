@@ -1,4 +1,5 @@
 using Aethon.Api.Infrastructure.Stripe;
+using Aethon.Application.Abstractions.Logging;
 using Aethon.Application.Abstractions.Settings;
 using Aethon.Data;
 using Aethon.Data.Entities;
@@ -21,6 +22,7 @@ public static class StripeWebhookEndpoints
             HttpRequest request,
             IConfiguration configuration,
             ISystemSettingsService settings,
+            ISystemLogService systemLog,
             AethonDbContext db,
             StripeWebhookProcessor processor,
             ILoggerFactory loggerFactory,
@@ -62,8 +64,14 @@ public static class StripeWebhookEndpoints
             else
             {
                 // No webhook secret configured — parse without verification.
-                // This should only happen in early local dev before a secret is set.
-                logger.LogWarning("Stripe webhook secret not configured — processing without signature verification.");
+                logger.LogError("Stripe webhook secret not configured in DB or environment — processing without signature verification. Set Stripe.WebhookSecret in Admin → Stripe Products.");
+                await systemLog.LogAsync(
+                    SystemLogLevel.Error,
+                    "StripeWebhook",
+                    "Webhook secret not configured — signature verification skipped.",
+                    "Set Stripe.WebhookSecret via Admin → Stripe Products or the Stripe__WebhookSecret environment variable.",
+                    requestPath: request.Path,
+                    ct: ct);
                 try
                 {
                     stripeEvent = EventUtility.ParseEvent(payload, throwOnApiVersionMismatch: false);

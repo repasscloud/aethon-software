@@ -166,8 +166,10 @@ public static class JobEndpoints
             if (job is null)
                 return Results.NotFound(new { code = "jobs.not_found" });
 
-            if (job.Status is not (JobStatus.Published or JobStatus.OnHold))
-                return Results.BadRequest(new { code = "jobs.invalid_status", message = "Add-ons can only be applied to published or on-hold jobs." });
+            // Also allow Draft status so add-ons can be charged immediately after a new job is published
+            // (the frontend calls /addons right after /publish before the page navigates away).
+            if (job.Status is not (JobStatus.Published or JobStatus.OnHold or JobStatus.Draft))
+                return Results.BadRequest(new { code = "jobs.invalid_status", message = "Add-ons can only be applied to published, on-hold, or recently-created jobs." });
 
             var isPremium  = job.PostingTier == JobPostingTier.Premium;
             var isVerified = job.OwnedByOrganisation.IsVerified;
@@ -207,6 +209,28 @@ public static class JobEndpoints
                     job.HasAiCandidateMatching = true;
             }
 
+            // ── Video embed ───────────────────────────────────────────────────
+            var hasNewVideo = !string.IsNullOrWhiteSpace(request.VideoYouTubeId) ||
+                              !string.IsNullOrWhiteSpace(request.VideoVimeoId);
+            if (hasNewVideo && errors.Count == 0)
+            {
+                var alreadyHasVideo = !string.IsNullOrWhiteSpace(job.VideoYouTubeId) ||
+                                      !string.IsNullOrWhiteSpace(job.VideoVimeoId);
+                if (!alreadyHasVideo && !isPremium)
+                {
+                    var (ok, err) = await addonBilling.ChargeAddonAsync(
+                        orgId, SystemSettingKeys.StripePriceAddonVideo, "Video embed add-on", ct);
+                    if (!ok) errors.Add($"Video: {err}");
+                }
+
+                if (errors.Count == 0)
+                {
+                    // Only one source allowed; whichever is set wins, clearing the other
+                    job.VideoYouTubeId = string.IsNullOrWhiteSpace(request.VideoYouTubeId) ? null : request.VideoYouTubeId.Trim();
+                    job.VideoVimeoId   = string.IsNullOrWhiteSpace(request.VideoVimeoId)   ? null : request.VideoVimeoId.Trim();
+                }
+            }
+
             // ── Sticky top ────────────────────────────────────────────────────
             if (request.StickyDuration > 0 && errors.Count == 0)
             {
@@ -243,10 +267,12 @@ public static class JobEndpoints
 
             return Results.Ok(new
             {
-                isHighlighted         = job.IsHighlighted,
-                highlightColour       = job.HighlightColour,
+                isHighlighted          = job.IsHighlighted,
+                highlightColour        = job.HighlightColour,
                 hasAiCandidateMatching = job.HasAiCandidateMatching,
-                stickyUntilUtc        = job.StickyUntilUtc
+                stickyUntilUtc         = job.StickyUntilUtc,
+                videoYouTubeId         = job.VideoYouTubeId,
+                videoVimeoId           = job.VideoVimeoId
             });
         });
 

@@ -16,15 +16,18 @@ public sealed class StripeWebhookProcessor
 {
     private readonly AethonDbContext _db;
     private readonly IOrganisationAutoVerifier _autoVerifier;
+    private readonly ISystemSettingsService _settings;
     private readonly ILogger<StripeWebhookProcessor> _logger;
 
     public StripeWebhookProcessor(
         AethonDbContext db,
         IOrganisationAutoVerifier autoVerifier,
+        ISystemSettingsService settings,
         ILogger<StripeWebhookProcessor> logger)
     {
         _db = db;
         _autoVerifier = autoVerifier;
+        _settings = settings;
         _logger = logger;
     }
 
@@ -111,6 +114,10 @@ public sealed class StripeWebhookProcessor
 
             case "addon":
                 await HandleAddonAsync(org, dbEvent, metadata, ct);
+                break;
+
+            case "job_addons":
+                await HandleJobAddonsAsync(org, dbEvent, metadata, ct);
                 break;
 
             default:
@@ -308,10 +315,76 @@ public sealed class StripeWebhookProcessor
         await _db.SaveChangesAsync(ct);
     }
 
+    // ─── Job Add-ons + Publish (new Stripe Checkout flow) ────────────────────
+
+    private async Task HandleJobAddonsAsync(
+        Organisation org,
+        StripePaymentEvent dbEvent,
+        IDictionary<string, string> metadata,
+        CancellationToken ct)
+    {
+        metadata.TryGetValue("job_id", out var jobIdStr);
+
+        if (!Guid.TryParse(jobIdStr, out var jobId))
+        {
+            dbEvent.Status = StripeEventStatus.Failed;
+            dbEvent.InternalNotes = "job_addons: missing or invalid job_id in metadata.";
+            await _db.SaveChangesAsync(ct);
+            return;
+        }
+
+        var job = await _db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId, ct);
+        if (job is null)
+        {
+            dbEvent.Status = StripeEventStatus.Failed;
+            dbEvent.InternalNotes = $"job_addons: job {jobId} not found.";
+            await _db.SaveChangesAsync(ct);
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Apply add-ons from metadata flags
+        if (metadata.TryGetValue("add_highlight", out var addHighlight) && addHighlight == "true")
+        {
+            job.IsHighlighted = true;
+            if (metadata.TryGetValue("highlight_colour", out var colour) && !string.IsNullOrEmpty(colour))
+                job.HighlightColour = colour;
+        }
+
+        if (metadata.TryGetValue("add_video", out var addVideo) && addVideo == "true")
+        {
+            metadata.TryGetValue("video_youtube_id", out var ytId);
+            metadata.TryGetValue("video_vimeo_id", out var vimeoId);
+            if (!string.IsNullOrEmpty(ytId))  job.VideoYouTubeId = ytId;
+            if (!string.IsNullOrEmpty(vimeoId)) job.VideoVimeoId = vimeoId;
+        }
+
+        if (metadata.TryGetValue("add_ai_matching", out var addAi) && addAi == "true")
+            job.HasAiCandidateMatching = true;
+
+        if (metadata.TryGetValue("sticky_duration", out var stickyStr) && int.TryParse(stickyStr, out var stickyDays) && stickyDays > 0)
+            job.StickyUntilUtc = now.AddDays(stickyDays);
+
+        // Publish the job
+        job.Status = JobStatus.Published;
+        job.PublishedUtc ??= now;
+        job.UpdatedUtc = now;
+
+        dbEvent.Status = StripeEventStatus.Completed;
+        dbEvent.InternalNotes = $"job_addons: add-ons applied and job {jobId} published.";
+        await _db.SaveChangesAsync(ct);
+    }
+
     // ─── Credit conversion (Standard promo → Premium on verification) ─────────
 
     private async Task ConvertPromoCreditsToPremiumAsync(Guid organisationId, CancellationToken ct)
     {
+        // Respect the admin toggle — default ON if the setting doesn't exist yet
+        var shouldConvert = await _settings.GetBoolAsync(
+            SystemSettingKeys.FeatureVerificationUpgradesPromoCredits, defaultValue: true, ct: ct);
+        if (!shouldConvert) return;
+
         var now = DateTime.UtcNow;
 
         var promoCredits = await _db.OrganisationJobCredits

@@ -5,6 +5,7 @@ using Aethon.Data.Entities;
 using Aethon.Data.Identity;
 using Aethon.Shared.Enums;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Aethon.Api.Endpoints.Admin;
@@ -132,6 +133,7 @@ public static class AdminEndpoints
         group.MapPut("/organisations/{orgId:guid}/verification", async (
             HttpContext http,
             AethonDbContext db,
+            [FromServices] ISystemSettingsService settings,
             Guid orgId,
             SetVerificationTierRequest request,
             CancellationToken ct) =>
@@ -150,22 +152,28 @@ public static class AdminEndpoints
             org.UpdatedUtc = now;
 
             // Convert unused Standard promo credits → Premium when admin verifies the org
+            // (respects the Feature.VerificationUpgradesPromoCredits toggle)
             if (request.Tier != VerificationTier.None && wasUnverified)
             {
-                var promoCredits = await db.OrganisationJobCredits
-                    .Where(c =>
-                        c.OrganisationId == orgId &&
-                        c.CreditType == CreditType.JobPostingStandard &&
-                        c.Source == CreditSource.LaunchPromotion &&
-                        c.QuantityRemaining > 0 &&
-                        c.ConvertedAt == null &&
-                        (c.ExpiresAt == null || c.ExpiresAt > now))
-                    .ToListAsync(ct);
-
-                foreach (var credit in promoCredits)
+                var shouldConvert = await settings.GetBoolAsync(
+                    SystemSettingKeys.FeatureVerificationUpgradesPromoCredits, defaultValue: true, ct: ct);
+                if (shouldConvert)
                 {
-                    credit.CreditType = CreditType.JobPostingPremium;
-                    credit.ConvertedAt = now;
+                    var promoCredits = await db.OrganisationJobCredits
+                        .Where(c =>
+                            c.OrganisationId == orgId &&
+                            c.CreditType == CreditType.JobPostingStandard &&
+                            c.Source == CreditSource.LaunchPromotion &&
+                            c.QuantityRemaining > 0 &&
+                            c.ConvertedAt == null &&
+                            (c.ExpiresAt == null || c.ExpiresAt > now))
+                        .ToListAsync(ct);
+
+                    foreach (var credit in promoCredits)
+                    {
+                        credit.CreditType = CreditType.JobPostingPremium;
+                        credit.ConvertedAt = now;
+                    }
                 }
             }
 
@@ -690,6 +698,7 @@ public static class AdminEndpoints
         group.MapPost("/stripe-events/{eventId:guid}/approve-verification", async (
             HttpContext http,
             AethonDbContext db,
+            [FromServices] ISystemSettingsService settings,
             Guid eventId,
             CancellationToken ct) =>
         {
@@ -729,20 +738,25 @@ public static class AdminEndpoints
 
             if (wasUnverified)
             {
-                var promoCredits = await db.OrganisationJobCredits
-                    .Where(c =>
-                        c.OrganisationId == org.Id &&
-                        c.CreditType == CreditType.JobPostingStandard &&
-                        c.Source == CreditSource.LaunchPromotion &&
-                        c.QuantityRemaining > 0 &&
-                        c.ConvertedAt == null &&
-                        (c.ExpiresAt == null || c.ExpiresAt > now))
-                    .ToListAsync(ct);
-
-                foreach (var credit in promoCredits)
+                var shouldConvert = await settings.GetBoolAsync(
+                    SystemSettingKeys.FeatureVerificationUpgradesPromoCredits, defaultValue: true, ct: ct);
+                if (shouldConvert)
                 {
-                    credit.CreditType = CreditType.JobPostingPremium;
-                    credit.ConvertedAt = now;
+                    var promoCredits = await db.OrganisationJobCredits
+                        .Where(c =>
+                            c.OrganisationId == org.Id &&
+                            c.CreditType == CreditType.JobPostingStandard &&
+                            c.Source == CreditSource.LaunchPromotion &&
+                            c.QuantityRemaining > 0 &&
+                            c.ConvertedAt == null &&
+                            (c.ExpiresAt == null || c.ExpiresAt > now))
+                        .ToListAsync(ct);
+
+                    foreach (var credit in promoCredits)
+                    {
+                        credit.CreditType = CreditType.JobPostingPremium;
+                        credit.ConvertedAt = now;
+                    }
                 }
             }
 
@@ -865,6 +879,72 @@ public static class AdminEndpoints
             await settings.SetAsync(key, request.Value, updatedByUserId: userGuid, ct: ct);
 
             return Results.Ok(new { key, updated = true });
+        });
+
+        // ─── System Logs ─────────────────────────────────────────────────────────
+
+        // GET /api/v1/admin/logs
+        group.MapGet("/logs", async (
+            AethonDbContext db,
+            SystemLogLevel? level,
+            string? category,
+            string? search,
+            int page = 1,
+            int pageSize = 50,
+            CancellationToken ct = default) =>
+        {
+            pageSize = Math.Clamp(pageSize, 1, 200);
+            var query = db.SystemLogs.AsNoTracking().AsQueryable();
+
+            if (level.HasValue)
+                query = query.Where(l => l.Level == level.Value);
+
+            if (!string.IsNullOrWhiteSpace(category))
+                query = query.Where(l => l.Category == category);
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(l => l.Message.Contains(search) || (l.Details != null && l.Details.Contains(search)));
+
+            var total = await query.CountAsync(ct);
+            var items = await query
+                .OrderByDescending(l => l.TimestampUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(l => new
+                {
+                    l.Id,
+                    l.TimestampUtc,
+                    l.Level,
+                    l.Category,
+                    l.Message,
+                    l.Details,
+                    l.ExceptionType,
+                    l.ExceptionMessage,
+                    l.UserId,
+                    l.RequestPath
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { total, page, pageSize, items });
+        });
+
+        // DELETE /api/v1/admin/logs
+        // Purges logs older than N days (default 30). SuperAdmin only.
+        group.MapDelete("/logs", async (
+            AethonDbContext db,
+            HttpContext http,
+            int olderThanDays = 30,
+            CancellationToken ct = default) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin"))
+                return Results.Forbid();
+
+            var cutoff = DateTime.UtcNow.AddDays(-olderThanDays);
+            var deleted = await db.SystemLogs
+                .Where(l => l.TimestampUtc < cutoff)
+                .ExecuteDeleteAsync(ct);
+
+            return Results.Ok(new { deleted, cutoffDate = cutoff });
         });
 
         // ─── Locations ────────────────────────────────────────────────────────────
