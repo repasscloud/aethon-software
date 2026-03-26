@@ -1,0 +1,25 @@
+ Error chain:
+  SQL not run → DB empty → API fails → Web can't reach API → "Unable to reach authentication service"
+
+  How to fix — depends on how you're running it:
+
+  If using Docker Compose:
+  # Start services
+  docker compose -f compose.local.yaml up -d
+
+  # Run the init SQL against the postgres container
+  docker compose -f compose.local.yaml exec postgres psql -U aethon -d aethon -f /dev/stdin < db/sql/001_init_db.sql
+
+  If running locally (without Docker):
+  1. Make sure PostgreSQL is running locally
+  2. Create the aethon_dev database
+  3. Run the SQL script against it
+  4. Then start the API (Aethon.Api) — it listens on https://localhost:7201
+  5. Then start the Web (Aethon.Web) — it expects the API at that URL
+
+  Quick check — is the API actually running?
+  curl -s https://localhost:7201/health
+  # or
+  curl -sk https://localhost:7201/api/v1/auth/login
+
+  If the API isn't responding, that's your problem. Running the SQL init script should unblock it.
