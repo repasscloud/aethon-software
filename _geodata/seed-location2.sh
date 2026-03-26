@@ -17,8 +17,8 @@ set -euo pipefail
 #   LOGIN_EMAIL=aethon@localhost.com
 #   LOGIN_PASSWORD='Aethon@Admin2026!'
 
-AUTH_URL="${AUTH_URL:-http://localhost:5201/api/v1/auth/login}"
-BULK_URL="${BULK_URL:-http://localhost:5201/api/v1/admin/locations/bulk}"
+AUTH_URL="${AUTH_URL:-https://dev-api.app.aethonsoftware.com/api/v1/auth/login}"
+BULK_URL="${BULK_URL:-https://dev-api.app.aethonsoftware.com/api/v1/admin/locations/bulk}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-aethon@localhost.com}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-Aethon@Admin2026!}"
 

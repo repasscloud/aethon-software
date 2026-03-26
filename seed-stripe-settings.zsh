@@ -23,8 +23,8 @@ set -euo pipefail
 #   Stripe.Price.Sticky.Verified.24h=price_ghi
 #   Stripe.Price.Sticky.Verified.7d=price_jkl
 
-AUTH_URL="${AUTH_URL:-http://localhost:5201/api/v1/auth/login}"
-SETTINGS_BASE_URL="${SETTINGS_BASE_URL:-http://localhost:5201/api/v1/admin/settings}"
+AUTH_URL="${AUTH_URL:-https://dev-api.app.aethonsoftware.com/api/v1/auth/login}"
+SETTINGS_BASE_URL="${SETTINGS_BASE_URL:-https://dev-api.app.aethonsoftware.com/api/v1/admin/settings}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-aethon@localhost.com}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-Aethon@Admin2026!}"
 

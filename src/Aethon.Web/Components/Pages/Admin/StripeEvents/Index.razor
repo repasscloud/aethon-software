@@ -308,7 +308,9 @@ else
         try
         {
             var client = await Api.CreateAsync();
-            var url = $"/api/v1/admin/stripe-events?page={_page}&status={Uri.EscapeDataString(_statusFilter)}";
+            var url = string.IsNullOrEmpty(_statusFilter)
+                ? $"/api/v1/admin/stripe-events?page={_page}"
+                : $"/api/v1/admin/stripe-events?page={_page}&status={Uri.EscapeDataString(_statusFilter)}";
             var result = await client.GetFromJsonAsync<PagedResult<EventRow>>(url, AethonApiClient.JsonOptions);
             if (result is not null) { _events = result.Items; _total = result.Total; }
         }
