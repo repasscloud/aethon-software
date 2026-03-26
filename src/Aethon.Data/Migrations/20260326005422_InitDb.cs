@@ -105,6 +105,26 @@ namespace Aethon.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SystemLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TimestampUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Level = table.Column<int>(type: "integer", nullable: false),
+                    Category = table.Column<string>(type: "text", nullable: false),
+                    Message = table.Column<string>(type: "text", nullable: false),
+                    Details = table.Column<string>(type: "text", nullable: true),
+                    ExceptionType = table.Column<string>(type: "text", nullable: true),
+                    ExceptionMessage = table.Column<string>(type: "text", nullable: true),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    RequestPath = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SystemLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SystemSettings",
                 columns: table => new
                 {
@@ -2209,6 +2229,9 @@ namespace Aethon.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "ResumeAnalyses");
+
+            migrationBuilder.DropTable(
+                name: "SystemLogs");
 
             migrationBuilder.DropTable(
                 name: "SystemSettings");

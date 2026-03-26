@@ -46,8 +46,8 @@ services:
       - dp_keys:/keys
     # No direct port binding — Caddy is the only public entry point.
     # Uncomment the line below for local debugging without Caddy:
-    ports:
-      - "5201:8080"
+    # ports:
+    #   - "5201:8080"
 
   web:
     build:
