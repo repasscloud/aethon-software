@@ -1,0 +1,405 @@
+# Implementation Plan: Org Team Management, Member Profiles & Verification
+# Saved: 2026-03-27
+# ============================================================================
+
+
+## Overview
+
+Seven distinct work streams, ordered by dependency. Each builds on the last.
+
+
+## Stream 1 — Data Layer (migrations required)
+
+### 1a. New entity: OrganisationMemberProfile
+
+Stored in a new table OrganisationMemberProfiles. This holds the public-facing
+profile for an org team member — separate from their ApplicationUser identity
+and from JobSeekerProfile (which is job-seeker-specific).
+
+Fields:
+  Id                     Guid (PK)
+  UserId                 Guid (FK → ApplicationUser)
+  OrganisationId         Guid (FK → Organisation)
+  Slug                   string?          -- URL segment, unique per org
+  JobTitle               string?
+  Bio                    string?
+  ProfilePictureUrl      string?
+  PublicEmail            string?
+  PublicPhone            string?
+  LinkedInUrl            string?
+  IsPublicProfileEnabled bool (default false)
+  CreatedUtc             DateTime
+  UpdatedUtc             DateTime
+
+Unique index on (OrganisationId, Slug) — slugs are scoped per org.
+Foreign key to OrganisationMembership is implicit via (UserId, OrganisationId).
+Register DbSet<OrganisationMemberProfile> OrganisationMemberProfiles in AethonDbContext.
+
+
+### 1b. New entity: IdentityVerificationRequest
+
+Stored in IdentityVerificationRequests. Submitted by users requesting ID
+verification. Processed by a background worker and/or manually by org owner
+or admin.
+
+Fields:
+  Id                 Guid (PK)
+  UserId             Guid (FK → ApplicationUser)
+  FullName           string
+  EmailAddress       string            -- must match their EmailConfirmed address
+  PhoneNumber        string
+  AdditionalNotes    string?
+  RequestedUtc       DateTime
+  Status             enum: Pending | Approved | Denied
+  ReviewedByUserId   Guid? (FK → ApplicationUser)
+  ReviewedUtc        DateTime?
+  ReviewNotes        string?
+  ReviewerType       enum: System | OrgOwner | Admin   -- who approved/denied
+
+Unique partial index on (UserId, Status = Pending) — one pending request per user.
+Register DbSet<IdentityVerificationRequest> IdentityVerificationRequests in AethonDbContext.
+
+
+### 1c. EF Migration
+
+One migration covers both new tables. Run via:
+  dotnet ef migrations add OrganisationMemberProfilesAndVerificationRequests
+  dotnet ef database update
+
+
+## Stream 2 — API: Org Team Management (owner/admin)
+
+All endpoints under /api/v1/organisations/me/members/*
+Auth required. Caller must be Active member of the org.
+Add to OrganisationEndpoints.cs.
+
+GET /api/v1/organisations/me/members/{userId:guid}
+  - Requires: caller is Owner or Admin of the org
+  - Returns: full member detail — membership record + OrganisationMemberProfile
+    (if exists) + IsIdentityVerified from ApplicationUser
+  - Response shape:
+      {
+        "userId": "...",
+        "displayName": "...",
+        "email": "...",
+        "isOwner": false,
+        "companyRole": "HiringManager",
+        "recruiterRole": null,
+        "status": "Active",
+        "joinedUtc": "...",
+        "isIdentityVerified": true,
+        "profile": {
+          "slug": "...",
+          "jobTitle": "...",
+          "bio": "...",
+          "profilePictureUrl": "...",
+          "publicEmail": "...",
+          "publicPhone": "...",
+          "linkedInUrl": "...",
+          "isPublicProfileEnabled": false
+        }
+      }
+
+PUT /api/v1/organisations/me/members/{userId:guid}/role
+  - Requires: caller is Owner or Admin
+    (non-owner admin cannot change Owner's role)
+  - Body: { "companyRole": "HiringManager" } or { "recruiterRole": "Recruiter" }
+  - Validates: cannot demote/change an IsOwner=true member unless caller is also IsOwner
+  - Updates OrganisationMembership.CompanyRole / RecruiterRole
+
+PUT /api/v1/organisations/me/members/{userId:guid}/status
+  - Requires: caller is Owner or Admin
+  - Body: { "status": "Suspended" } — values: Active, Suspended, Revoked
+  - Cannot change owner's status
+
+POST /api/v1/organisations/me/members/{userId:guid}/verify-identity
+  - Requires: caller IsOwner = true
+  - Manually marks ApplicationUser.IsIdentityVerified = true, logs it with ReviewerType = OrgOwner
+  - Creates an IdentityVerificationRequest record with Status=Approved, ReviewerType=OrgOwner
+    (for audit trail)
+
+DELETE /api/v1/organisations/me/members/{userId:guid}
+  - Requires: caller is Owner or Admin
+  - Sets OrganisationMembership.Status = Revoked, LeftUtc = now
+  - Cannot remove the sole owner
+
+
+## Stream 3 — API: Org User Own Profile ("me")
+
+Endpoints for a logged-in org user to manage their own profile within the org.
+Add to OrganisationEndpoints.cs.
+
+GET /api/v1/organisations/me/my-profile
+  - Returns the caller's OrganisationMemberProfile for their active org
+  - Also returns ApplicationUser.DisplayName, Email, IsIdentityVerified, EmailConfirmed
+
+PUT /api/v1/organisations/me/my-profile
+  - Upserts OrganisationMemberProfile for (UserId, OrganisationId)
+  - Body fields: slug, jobTitle, bio, publicEmail, publicPhone, linkedInUrl,
+    isPublicProfileEnabled, profilePictureUrl
+  - Validates slug: lowercase alphanumeric + hyphens, unique per org, 3-60 chars
+  - isPublicProfileEnabled can only be true if org itself has IsPublicProfileEnabled = true
+    (server-enforced)
+
+PUT /api/v1/organisations/me/display-name
+  - Updates ApplicationUser.DisplayName — the "account-level" display name
+
+
+## Stream 4 — API: Identity Verification Request
+
+Add to a new IdentityEndpoints.cs (or extend OrganisationEndpoints.cs).
+
+POST /api/v1/identity/verification-request
+  - Auth required
+  - Gate: EmailConfirmed = true — return 403 with code "verification.email_not_confirmed" if not
+  - Gate: No existing Pending request — return 409 with code "verification.request_pending" if exists
+  - Gate: Not already verified — return 409 with code "verification.already_verified"
+  - Body: { "fullName": "...", "emailAddress": "...", "phoneNumber": "...", "additionalNotes": "..." }
+  - Creates IdentityVerificationRequest with Status = Pending
+
+GET /api/v1/identity/verification-request/mine
+  - Returns the caller's most recent verification request (status + submitted date)
+
+GET /api/v1/admin/verification-requests  (staff-only)
+  - Paginated list of all pending/recent verification requests
+  - Filter by status (Pending / Approved / Denied)
+
+POST /api/v1/admin/verification-requests/{id}/approve  (staff-only)
+  - Sets IdentityVerificationRequest.Status = Approved
+  - Sets ApplicationUser.IsIdentityVerified = true, IdentityVerifiedUtc = now
+  - Logs action to SystemLogs
+
+POST /api/v1/admin/verification-requests/{id}/deny  (staff-only)
+  - Sets IdentityVerificationRequest.Status = Denied
+  - Triggers email to user's registered address:
+    "Your identity verification request was not approved"
+
+POST /api/v1/admin/verification-requests/process  (staff-only, trigger endpoint)
+  - HTTP POST that triggers the background processing worker
+  - Currently: no automated approve/deny — awaits human review
+  - DENY path: set Status=Denied, send denial email, log to SystemLogs
+  - APPROVE path: set Status=Approved, set IsIdentityVerified=true, log to SystemLogs
+  - Future: plug in document/ID verification service here
+
+
+## Stream 5 — API: Public Team Directory
+
+Add to PublicEndpoints.cs.
+
+GET /api/v1/public/organisations/{slug}/team
+  - Only returns data if:
+      Organisation.IsPublicProfileEnabled = true
+      Member has OrganisationMemberProfile.IsPublicProfileEnabled = true
+  - Returns list of public member profiles:
+      [
+        {
+          "slug": "jane-smith",
+          "displayName": "Jane Smith",
+          "jobTitle": "Head of Talent",
+          "bio": "...",
+          "profilePictureUrl": "...",
+          "publicEmail": "...",
+          "isIdentityVerified": true
+        }
+      ]
+
+GET /api/v1/public/organisations/{slug}/team/{memberSlug}
+  - Same gate conditions as above
+  - Returns single member's full public profile
+
+UPDATE GET /api/v1/public/organisations/{slug}
+  - Add hasPublicTeam: bool to the response
+    (true when at least 1 member has IsPublicProfileEnabled = true)
+
+
+## Stream 6 — Frontend: Org Team Management
+
+### Update OrganisationTeam.razor
+  File: src/Aethon.Web/Components/Pages/OrganisationTeam.razor
+  - Each member row gets a "Manage →" link
+    → navigates to /app/organisation/team/{userId}
+  - Existing invite and accept-invite sections remain unchanged
+
+### New page: /app/organisation/team/{UserId:guid}
+  File: src/Aethon.Web/Components/Pages/OrganisationTeamMemberDetail.razor
+  - Loads via GET /api/v1/organisations/me/members/{userId}
+  - Displays: name, email, role badge, status, joined date, identity verification status
+  - Sections (owner/admin only):
+      Role management:
+        dropdown selector for CompanyRole/RecruiterRole → Save
+        → PUT .../role
+      Status management:
+        Suspend / Reactivate / Revoke buttons
+        → PUT .../status
+      Identity verification:
+        if !IsIdentityVerified → "Verify this member" button (Owner only)
+        → POST .../verify-identity
+      Member's profile:
+        read-only view of their OrganisationMemberProfile
+        (name, title, bio, public contact, etc.)
+  - Back link: ← Team
+
+### New page: /app/organisation/profile
+  File: src/Aethon.Web/Components/Pages/OrganisationMyProfile.razor
+  - "My profile" for the logged-in org user
+  - Sections:
+      Account info:
+        display name (editable) → PUT .../display-name
+        email (read-only)
+      Identity verification status:
+        If verified:       green badge, verified date
+        If pending:        "Request pending" info message
+        If unverified + email confirmed:
+                           "Request identity verification" button → modal with form
+        If unverified + email NOT confirmed:
+                           "You must confirm your email before requesting verification"
+      Team profile (what the public sees):
+        Job title, bio, public email, public phone, LinkedIn URL
+        Profile picture upload (field stored, upload UI deferred — see deferred list)
+        Slug input (auto-generated from display name, editable)
+        Toggle: "Show on organisation team page" → isPublicProfileEnabled
+        Preview link (if enabled): /organisations/{org-slug}/team/{slug}
+      Save button → PUT /api/v1/organisations/me/my-profile
+  - Add navigation link to "My Profile" in the org nav area
+
+### Verification Request Modal (inside OrganisationMyProfile.razor)
+  - Form fields:
+      Full name (pre-filled from DisplayName)
+      Email (pre-filled, read-only)
+      Phone number
+      Additional notes
+  - Submit → POST /api/v1/identity/verification-request
+  - Error states: email not confirmed, already pending, already verified
+  - Success: "Your request has been submitted. We will review it and notify you."
+
+
+## Stream 7 — Frontend: Public Team Directory
+
+### Update PublicOrganisation.razor
+  File: src/Aethon.Web/Components/Pages/PublicOrganisation.razor
+  - After "Open positions" section, add "Meet the team" section
+  - Only renders if hasPublicTeam = true in the org profile response
+  - Shows up to 6 members as cards (photo or initials avatar, name, title,
+    verified badge if IsIdentityVerified)
+  - "View all team members →" link → /organisations/{slug}/team
+
+### New page: /organisations/{slug}/team
+  File: src/Aethon.Web/Components/Pages/PublicOrganisationTeam.razor
+  - Lists all public team members
+  - Each card: profile photo or avatar, name, job title, identity-verified badge
+  - Click → /organisations/{slug}/team/{memberSlug}
+
+### New page: /organisations/{slug}/team/{MemberSlug}
+  File: src/Aethon.Web/Components/Pages/PublicOrganisationTeamMember.razor
+  - Individual team member public profile
+  - Header: photo, name, job title, identity verified badge, org name (links to org page)
+  - Bio section
+  - Contact: public email, public phone, LinkedIn link
+  - Breadcrumb: Org → Team → Member
+
+
+## Stream 8 — Background Worker: IdentityVerificationWorker
+
+  File: src/Aethon.Api/Infrastructure/Workers/IdentityVerificationWorker.cs
+  Pattern: follows existing JobExpiryWorker. Registered as IHostedService.
+
+  Trigger: POST /api/v1/admin/verification-requests/process
+           (also runs on its own schedule for auto-processing when logic is added)
+
+  Current logic (placeholder — full verification logic built later):
+    For each IdentityVerificationRequest where Status = Pending:
+      - No automated approve/deny yet — awaiting human review
+      - Just logs count of pending requests
+      - Future: plug in document/ID verification service here
+
+    DENY path (triggered by admin endpoint, not auto):
+      - Set Status = Denied
+      - Send email via existing email service:
+          To:      User.Email
+          Subject: "Your identity verification request"
+          Body:    "Unfortunately we were unable to verify your identity..."
+      - Log to SystemLogs
+
+    APPROVE path (triggered by admin endpoint, not auto):
+      - Set Status = Approved
+      - Set ApplicationUser.IsIdentityVerified = true
+      - Set ApplicationUser.IdentityVerifiedUtc = now
+      - Log to SystemLogs
+
+  Worker polls every 5 minutes, logs pending count. No automated decisions yet.
+
+
+## Stream 9 — Admin UI Additions
+
+### New page: /admin/verification-requests
+  File: src/Aethon.Web/Components/Pages/Admin/VerificationRequests/Index.razor
+  - Table: User name, email, phone, submitted date, status, actions
+  - Actions: "Approve" button, "Deny" button (denial notes modal)
+  - Filter by status: Pending / Approved / Denied
+  - Add link to this page in admin nav sidebar
+
+### Update Admin Users Detail (already exists)
+  File: src/Aethon.Web/Components/Pages/Admin/Users/Detail.razor
+  - Already shows IsIdentityVerified
+  - Add: show any IdentityVerificationRequest for this user, with its status
+
+
+## Dependency Order / Build Sequence
+
+  Stream 1 (Data)
+      ↓
+  Stream 2 (Org Team API)   Stream 3 (My Profile API)   Stream 4 (Verification API)   Stream 5 (Public API)
+      ↓                           ↓                             ↓                              ↓
+  Stream 6 (Org Frontend)                              Stream 7 (Public Frontend)
+      ↓
+  Stream 8 (Worker — placeholder)   Stream 9 (Admin UI)
+
+  Recommended build order:
+    1. Stream 1  — run migration first, everything depends on schema
+    2. Stream 2 + Stream 3  — in parallel (both are org-side API)
+    3. Stream 4  — verification API (can be done alongside Stream 2/3)
+    4. Stream 5  — public API (needs OrganisationMemberProfile data to exist)
+    5. Stream 6  — org frontend (needs Streams 2+3)
+    6. Stream 7  — public frontend (needs Stream 5)
+    7. Stream 8  — worker placeholder (needs Stream 4)
+    8. Stream 9  — admin UI (needs Stream 4)
+
+
+## What is NOT being built yet (explicitly deferred)
+
+  - Automated document/ID verification (third-party service integration)
+  - Photo upload for member profiles (Slug field + DB column added, upload UI deferred)
+  - Email confirmation flow for self-registered org users:
+      EmailConfirmed is already in the schema; admin-created users have it = true.
+      A proper email-confirm-on-registration flow for org users needs its own stream.
+  - Org owner transfer (transferring IsOwner flag to another member)
+
+
+## Files Affected (full list)
+
+  NEW FILES:
+    src/Aethon.Data/Entities/OrganisationMemberProfile.cs
+    src/Aethon.Data/Entities/IdentityVerificationRequest.cs
+    src/Aethon.Api/Infrastructure/Workers/IdentityVerificationWorker.cs
+    src/Aethon.Shared/Organisations/OrganisationMemberDetailDto.cs
+    src/Aethon.Shared/Organisations/OrganisationMemberProfileDto.cs
+    src/Aethon.Shared/Organisations/PublicTeamMemberDto.cs
+    src/Aethon.Shared/Verification/IdentityVerificationRequestDto.cs
+    src/Aethon.Web/Components/Pages/OrganisationTeamMemberDetail.razor
+    src/Aethon.Web/Components/Pages/OrganisationMyProfile.razor
+    src/Aethon.Web/Components/Pages/PublicOrganisationTeam.razor
+    src/Aethon.Web/Components/Pages/PublicOrganisationTeamMember.razor
+    src/Aethon.Web/Components/Pages/Admin/VerificationRequests/Index.razor
+
+  MODIFIED FILES:
+    src/Aethon.Data/AethonDbContext.cs                              (add 2 DbSets)
+    src/Aethon.Api/Endpoints/Organisations/OrganisationEndpoints.cs (add 5 endpoints)
+    src/Aethon.Api/Endpoints/Public/PublicEndpoints.cs              (add 2 endpoints, update org detail)
+    src/Aethon.Api/Endpoints/Admin/AdminEndpoints.cs                (add 3 endpoints)
+    src/Aethon.Web/Components/Pages/OrganisationTeam.razor          (add row click-through)
+    src/Aethon.Web/Components/Pages/PublicOrganisation.razor        (add team section)
+    src/Aethon.Web/Components/Pages/Admin/Users/Detail.razor        (add verification request display)
+
+  MIGRATION:
+    src/Aethon.Data/Migrations/
+      → OrganisationMemberProfilesAndVerificationRequests
