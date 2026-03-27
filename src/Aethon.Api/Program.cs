@@ -90,6 +90,7 @@ services.AddHttpClient();
 services.AddHostedService<WebhookDeliveryWorker>();
 services.AddHostedService<DomainVerificationWorker>();
 services.AddHostedService<JobExpiryWorker>();
+services.AddHostedService<IdentityVerificationWorker>();
 
 services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 services.AddScoped<ISystemLogService, SystemLogService>();

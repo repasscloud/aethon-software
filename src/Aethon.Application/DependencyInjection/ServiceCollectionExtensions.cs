@@ -58,6 +58,8 @@ using Aethon.Application.Organisations.Queries.GetOrganisationDomains;
 using Aethon.Application.Organisations.Queries.GetOrganisationMemberDetail;
 using Aethon.Application.Organisations.Queries.GetOrganisationMembers;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeam;
+using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeamMember;
 using Aethon.Application.Organisations.Services;
 using Aethon.Application.RecruiterCompanies.Commands.CreateRecruiterCompanyRequest;
 using Aethon.Application.RecruiterCompanies.Queries.GetRecruiterCompanies;
@@ -128,6 +130,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetMyClaimRequestsHandler>();
         services.AddScoped<CancelClaimRequestHandler>();
         services.AddScoped<GetPublicOrganisationProfileHandler>();
+        services.AddScoped<GetPublicOrganisationTeamHandler>();
+        services.AddScoped<GetPublicOrganisationTeamMemberHandler>();
 
         services.AddScoped<SubmitJobApplicationHandler>();
         services.AddScoped<GetApplicationByIdHandler>();

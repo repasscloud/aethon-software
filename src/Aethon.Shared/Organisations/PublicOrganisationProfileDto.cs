@@ -27,4 +27,5 @@ public sealed class PublicOrganisationProfileDto
     public string? TikTokHandle { get; set; }
     public string? InstagramHandle { get; set; }
     public string? YouTubeUrl { get; set; }
+    public bool HasPublicTeam { get; set; }
 }

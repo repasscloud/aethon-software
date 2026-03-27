@@ -7,6 +7,8 @@ using Aethon.Application.Jobs.Queries.GetPublicJobLocations;
 using Aethon.Application.Jobs.Queries.GetPublicJobs;
 using Aethon.Application.Candidates.Queries.GetPublicJobSeekerProfile;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
+using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeam;
+using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeamMember;
 using Aethon.Data;
 using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
@@ -88,6 +90,27 @@ public static class PublicEndpoints
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(slug, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/public/organisations/{slug}/team
+        group.MapGet("/organisations/{slug}/team", async (
+            [FromServices] GetPublicOrganisationTeamHandler handler,
+            string slug,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(slug, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/public/organisations/{slug}/team/{memberSlug}
+        group.MapGet("/organisations/{slug}/team/{memberSlug}", async (
+            [FromServices] GetPublicOrganisationTeamMemberHandler handler,
+            string slug,
+            string memberSlug,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(slug, memberSlug, ct);
             return result.ToMinimalApiResult();
         });
 

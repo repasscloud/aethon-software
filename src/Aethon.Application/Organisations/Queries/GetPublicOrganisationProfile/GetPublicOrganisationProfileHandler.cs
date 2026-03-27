@@ -32,6 +32,10 @@ public sealed class GetPublicOrganisationProfileHandler
                 "organisations.not_found",
                 "Organisation not found.");
 
+        var hasPublicTeam = await _db.Set<Data.Entities.OrganisationMemberProfile>()
+            .AsNoTracking()
+            .AnyAsync(p => p.OrganisationId == org.Id && p.IsPublicProfileEnabled && p.Slug != null, ct);
+
         return Result<PublicOrganisationProfileDto>.Success(new PublicOrganisationProfileDto
         {
             OrganisationId = org.Id,
@@ -56,7 +60,8 @@ public sealed class GetPublicOrganisationProfileHandler
             FacebookUrl = org.FacebookUrl,
             TikTokHandle = org.TikTokHandle,
             InstagramHandle = org.InstagramHandle,
-            YouTubeUrl = org.YouTubeUrl
+            YouTubeUrl = org.YouTubeUrl,
+            HasPublicTeam = hasPublicTeam
         });
     }
 }
