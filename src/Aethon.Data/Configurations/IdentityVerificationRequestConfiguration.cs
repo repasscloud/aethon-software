@@ -46,7 +46,7 @@ public sealed class IdentityVerificationRequestConfiguration : IEntityTypeConfig
         // One pending request per user at a time
         builder.HasIndex(x => new { x.UserId, x.Status })
             .IsUnique()
-            .HasFilter("[Status] = 1"); // 1 = Pending
+            .HasFilter("\"Status\" = 1"); // 1 = Pending
 
         // Fast lookup for admin queue
         builder.HasIndex(x => x.Status);

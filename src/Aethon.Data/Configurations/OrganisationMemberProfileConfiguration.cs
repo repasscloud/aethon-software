@@ -55,7 +55,7 @@ public sealed class OrganisationMemberProfileConfiguration : IEntityTypeConfigur
         // Slug unique within an org (filtered — null slugs don't conflict)
         builder.HasIndex(x => new { x.OrganisationId, x.Slug })
             .IsUnique()
-            .HasFilter("[Slug] IS NOT NULL");
+            .HasFilter("\"Slug\" IS NOT NULL");
 
         // Fast lookup for public team page
         builder.HasIndex(x => new { x.OrganisationId, x.IsPublicProfileEnabled });

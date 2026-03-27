@@ -199,7 +199,7 @@ namespace Aethon.Data.Migrations
 
                     b.HasIndex("UserId", "Status")
                         .IsUnique()
-                        .HasFilter("[Status] = 1");
+                        .HasFilter("\"Status\" = 1");
 
                     b.ToTable("IdentityVerificationRequests", (string)null);
                 });
@@ -2183,7 +2183,7 @@ namespace Aethon.Data.Migrations
 
                     b.HasIndex("OrganisationId", "Slug")
                         .IsUnique()
-                        .HasFilter("[Slug] IS NOT NULL");
+                        .HasFilter("\"Slug\" IS NOT NULL");
 
                     b.HasIndex("OrganisationId", "UserId")
                         .IsUnique();

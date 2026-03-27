@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260327095244_OrganisationMemberProfiles")]
-    partial class OrganisationMemberProfiles
+    [Migration("20260327101109_InitDb")]
+    partial class InitDb
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -202,7 +202,7 @@ namespace Aethon.Data.Migrations
 
                     b.HasIndex("UserId", "Status")
                         .IsUnique()
-                        .HasFilter("[Status] = 1");
+                        .HasFilter("\"Status\" = 1");
 
                     b.ToTable("IdentityVerificationRequests", (string)null);
                 });
@@ -2186,7 +2186,7 @@ namespace Aethon.Data.Migrations
 
                     b.HasIndex("OrganisationId", "Slug")
                         .IsUnique()
-                        .HasFilter("[Slug] IS NOT NULL");
+                        .HasFilter("\"Slug\" IS NOT NULL");
 
                     b.HasIndex("OrganisationId", "UserId")
                         .IsUnique();
