@@ -127,6 +127,10 @@ else
                                     <th>Role</th>
                                     <th>Status</th>
                                     <th>Joined</th>
+                                    @if (_response.CanInvite)
+                                    {
+                                        <th></th>
+                                    }
                                 </tr>
                             </thead>
                             <tbody>
@@ -144,6 +148,16 @@ else
                                         <td>@(member.CompanyRole ?? member.RecruiterRole ?? "-")</td>
                                         <td>@member.MembershipStatus</td>
                                         <td>@member.JoinedUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                        @if (_response.CanInvite)
+                                        {
+                                            <td>
+                                                <a href="/app/organisation/team/@member.UserId"
+                                                   class="btn btn-sm btn-outline-secondary rounded-pill"
+                                                   style="font-size:.75rem;padding:.2rem .7rem;">
+                                                    Manage →
+                                                </a>
+                                            </td>
+                                        }
                                     </tr>
                                 }
                             </tbody>

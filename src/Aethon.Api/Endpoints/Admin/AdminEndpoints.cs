@@ -667,6 +667,167 @@ public static class AdminEndpoints
             return Results.Ok(new { userId, mustEnableMfa = true });
         });
 
+        // ── Identity verification requests ────────────────────────────────────
+
+        // GET /api/v1/admin/verification-requests?status=&page= — all staff
+        group.MapGet("/verification-requests", async (
+            AethonDbContext db,
+            string? status,
+            int page = 1,
+            CancellationToken ct = default) =>
+        {
+            const int pageSize = 50;
+            var query = db.IdentityVerificationRequests.AsNoTracking().Include(r => r.User);
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<Aethon.Shared.Enums.VerificationRequestStatus>(status, ignoreCase: true, out var parsedStatus))
+            {
+                query = query.Where(r => r.Status == parsedStatus);
+            }
+
+            var total = await query.CountAsync(ct);
+            var items = await query
+                .OrderByDescending(r => r.CreatedUtc)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new
+                {
+                    r.Id,
+                    UserId = r.UserId,
+                    UserDisplayName = r.User.DisplayName,
+                    UserEmail = r.User.Email,
+                    r.FullName,
+                    r.EmailAddress,
+                    r.PhoneNumber,
+                    r.AdditionalNotes,
+                    Status = r.Status.ToString(),
+                    RequestedUtc = r.CreatedUtc,
+                    r.ReviewedUtc,
+                    r.ReviewNotes,
+                    ReviewerType = r.ReviewerType == null ? null : r.ReviewerType.ToString()
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { total, page, pageSize, items });
+        });
+
+        // POST /api/v1/admin/verification-requests/{id}/approve — all staff
+        group.MapPost("/verification-requests/{id:guid}/approve", async (
+            AethonDbContext db,
+            HttpContext ctx,
+            Guid id,
+            ReviewVerificationRequest? request,
+            CancellationToken ct) =>
+        {
+            var userIdStr = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdStr, out var reviewerId))
+                return Results.Unauthorized();
+
+            var vr = await db.IdentityVerificationRequests
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Id == id, ct);
+
+            if (vr is null)
+                return Results.NotFound(new { code = "verification.not_found", message = "Verification request not found." });
+
+            if (vr.Status != Aethon.Shared.Enums.VerificationRequestStatus.Pending)
+                return Results.BadRequest(new { code = "verification.not_pending", message = "Only pending requests can be approved." });
+
+            vr.Status = Aethon.Shared.Enums.VerificationRequestStatus.Approved;
+            vr.ReviewedByUserId = reviewerId;
+            vr.ReviewedUtc = DateTime.UtcNow;
+            vr.ReviewerType = Aethon.Shared.Enums.VerificationReviewerType.Admin;
+            vr.ReviewNotes = request?.Notes;
+
+            await db.Users
+                .Where(u => u.Id == vr.UserId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.IsIdentityVerified, true)
+                    .SetProperty(u => u.IdentityVerifiedUtc, DateTime.UtcNow)
+                    .SetProperty(u => u.IdentityVerificationNotes, $"Approved via admin verification request {id}"),
+                    ct);
+
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { id, approved = true });
+        });
+
+        // POST /api/v1/admin/verification-requests/{id}/deny — all staff
+        group.MapPost("/verification-requests/{id:guid}/deny", async (
+            AethonDbContext db,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailService emailService,
+            HttpContext ctx,
+            Guid id,
+            ReviewVerificationRequest? request,
+            CancellationToken ct) =>
+        {
+            var userIdStr = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(userIdStr, out var reviewerId))
+                return Results.Unauthorized();
+
+            var vr = await db.IdentityVerificationRequests
+                .Include(r => r.User)
+                .FirstOrDefaultAsync(r => r.Id == id, ct);
+
+            if (vr is null)
+                return Results.NotFound(new { code = "verification.not_found", message = "Verification request not found." });
+
+            if (vr.Status != Aethon.Shared.Enums.VerificationRequestStatus.Pending)
+                return Results.BadRequest(new { code = "verification.not_pending", message = "Only pending requests can be denied." });
+
+            vr.Status = Aethon.Shared.Enums.VerificationRequestStatus.Denied;
+            vr.ReviewedByUserId = reviewerId;
+            vr.ReviewedUtc = DateTime.UtcNow;
+            vr.ReviewerType = Aethon.Shared.Enums.VerificationReviewerType.Admin;
+            vr.ReviewNotes = request?.Notes;
+
+            await db.SaveChangesAsync(ct);
+
+            // Notify the user by email
+            if (!string.IsNullOrWhiteSpace(vr.User?.Email))
+            {
+                try
+                {
+                    await emailService.SendAsync(new Aethon.Application.Abstractions.Email.EmailMessage
+                    {
+                        ToEmail = vr.User.Email,
+                        ToName = vr.User.DisplayName,
+                        Subject = "Your identity verification request — update",
+                        TextBody = "Thank you for submitting an identity verification request on Aethon.\n\nUnfortunately, we were unable to verify your identity at this time. If you believe this is an error, please contact us.\n\nAethon Team",
+                        HtmlBody = """
+                            <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.6;">
+                            <h2>Identity verification update</h2>
+                            <p>Thank you for submitting an identity verification request on Aethon.</p>
+                            <p>Unfortunately, we were unable to verify your identity at this time. If you believe this is an error or would like to try again, please contact us.</p>
+                            <p style="color:#666;font-size:0.9em;">— The Aethon Team</p>
+                            </body></html>
+                            """
+                    }, ct);
+                }
+                catch { /* non-fatal — log would go here */ }
+            }
+
+            return Results.Ok(new { id, denied = true });
+        });
+
+        // POST /api/v1/admin/verification-requests/process — all staff (trigger)
+        // Placeholder: runs the verification worker logic inline.
+        // Currently just returns a count of pending requests.
+        // Future: plug automated verification logic in here.
+        group.MapPost("/verification-requests/process", async (
+            AethonDbContext db,
+            CancellationToken ct) =>
+        {
+            var pendingCount = await db.IdentityVerificationRequests
+                .CountAsync(r => r.Status == Aethon.Shared.Enums.VerificationRequestStatus.Pending, ct);
+
+            return Results.Ok(new
+            {
+                pendingCount,
+                message = $"{pendingCount} pending request(s) awaiting review. Automated processing not yet enabled."
+            });
+        });
+
         // GET /api/v1/admin/files?search=&page=
         group.MapGet("/files", async (
             AethonDbContext db,
@@ -1343,6 +1504,11 @@ public static class AdminEndpoints
     public sealed class RejectVerificationRequest
     {
         public string? Reason { get; set; }
+    }
+
+    public sealed class ReviewVerificationRequest
+    {
+        public string? Notes { get; set; }
     }
 
     public sealed class AdminGrantCreditRequest

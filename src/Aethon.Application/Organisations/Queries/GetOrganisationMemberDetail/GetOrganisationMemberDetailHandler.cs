@@ -58,6 +58,11 @@ public sealed class GetOrganisationMemberDetailHandler
             .Where(p => p.OrganisationId == orgId && p.UserId == targetUserId)
             .FirstOrDefaultAsync(ct);
 
+        var org = await _db.Organisations.AsNoTracking()
+            .Where(o => o.Id == orgId)
+            .Select(o => new { o.Type })
+            .FirstOrDefaultAsync(ct);
+
         return Result<OrganisationMemberDetailDto>.Success(new OrganisationMemberDetailDto
         {
             UserId = membership.UserId,
@@ -80,7 +85,10 @@ public sealed class GetOrganisationMemberDetailHandler
                 PublicPhone = profile.PublicPhone,
                 LinkedInUrl = profile.LinkedInUrl,
                 IsPublicProfileEnabled = profile.IsPublicProfileEnabled
-            }
+            },
+            ViewerIsOwner = myMembership.IsOwner,
+            ViewerCanManage = callerIsOwnerOrAdmin,
+            OrganisationType = org?.Type.ToString().ToLowerInvariant() ?? ""
         });
     }
 }

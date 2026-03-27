@@ -13,4 +13,9 @@ public sealed class OrganisationMemberDetailDto
     public bool IsIdentityVerified { get; set; }
     public bool EmailConfirmed { get; set; }
     public OrganisationMemberProfileDto? Profile { get; set; }
+
+    // Viewer context — describes what the caller is allowed to do
+    public bool ViewerIsOwner { get; set; }
+    public bool ViewerCanManage { get; set; }
+    public string OrganisationType { get; set; } = null!;
 }

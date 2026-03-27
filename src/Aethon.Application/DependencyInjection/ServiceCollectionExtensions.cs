@@ -75,6 +75,8 @@ using Aethon.Application.RecruiterJobs.Commands.SubmitRecruiterJobForApproval;
 using Aethon.Application.CompanyJobs.Queries.GetPendingJobApprovals;
 using Aethon.Application.CompanyJobs.Commands.ApproveRecruiterJob;
 using Aethon.Application.CompanyJobs.Commands.RejectRecruiterJob;
+using Aethon.Application.Verification.Commands.SubmitVerificationRequest;
+using Aethon.Application.Verification.Queries.GetMyVerificationRequest;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Aethon.Application.DependencyInjection;
@@ -172,6 +174,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GetPendingJobApprovalsHandler>();
         services.AddScoped<ApproveRecruiterJobHandler>();
         services.AddScoped<RejectRecruiterJobHandler>();
+
+        services.AddScoped<SubmitVerificationRequestHandler>();
+        services.AddScoped<GetMyVerificationRequestHandler>();
 
         return services;
     }
