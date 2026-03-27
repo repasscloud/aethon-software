@@ -403,3 +403,8 @@ UPDATE GET /api/v1/public/organisations/{slug}
   MIGRATION:
     src/Aethon.Data/Migrations/
       → OrganisationMemberProfilesAndVerificationRequests
+
+
+---
+
+Ready to start building? I'd suggest starting with Stream 1 (data) then Streams 2 + 3 in parallel, as everything else depends on them. Let me know and I'll begin implementation.
