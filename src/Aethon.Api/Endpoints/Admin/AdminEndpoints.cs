@@ -20,7 +20,7 @@ public static class AdminEndpoints
             .WithTags("Admin");
 
         // GET /api/v1/admin/stats
-        group.MapGet("/stats", async (AethonDbContext db, CancellationToken ct) =>
+        group.MapGet("/stats", async (AethonDbContext db, Aethon.Api.Infrastructure.Email.EmailOptionsResolver emailResolver, CancellationToken ct) =>
         {
             var orgCount   = await db.Organisations.CountAsync(ct);
             var jobCount   = await db.Jobs.CountAsync(ct);
@@ -30,6 +30,7 @@ public static class AdminEndpoints
                 .CountAsync(o => o.VerificationTier != VerificationTier.None, ct);
             var pendingStripeEvents = await db.StripePaymentEvents
                 .CountAsync(e => e.Status == StripeEventStatus.Pending, ct);
+            var emailConfigured = await emailResolver.IsConfiguredAsync(ct);
 
             return Results.Ok(new
             {
@@ -38,7 +39,8 @@ public static class AdminEndpoints
                 users = userCount,
                 files = fileCount,
                 verifiedOrganisations = verifiedCount,
-                pendingStripeEvents
+                pendingStripeEvents,
+                emailConfigured
             });
         });
 
@@ -502,7 +504,8 @@ public static class AdminEndpoints
             HttpContext http,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
-            IConfiguration config,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailTemplateService emailTemplates,
+            [FromServices] Aethon.Api.Infrastructure.Email.EmailOptionsResolver emailOptionsResolver,
             CreateStaffUserRequest request,
             CancellationToken ct) =>
         {
@@ -538,15 +541,23 @@ public static class AdminEndpoints
 
             await userManager.AddToRoleAsync(user, request.Role);
 
-            // Send invitation email if MailerSend is configured
-            var webBaseUrl = config["WebBaseUrl"] ?? "https://localhost";
+            // Send invitation email
+            var emailOpts = await emailOptionsResolver.ResolveAsync(ct);
+            var loginUrl = $"{emailOpts.WebBaseUrl}/login";
+            var (staffSubject, staffHtml) = await emailTemplates.RenderAsync("StaffWelcome", new()
+            {
+                ["DisplayName"] = request.DisplayName,
+                ["Email"]       = request.Email,
+                ["TempPassword"] = request.Password,
+                ["LoginUrl"]    = loginUrl
+            }, ct);
             await emailService.SendAsync(new EmailMessage
             {
-                ToEmail = request.Email,
-                ToName = request.DisplayName,
-                Subject = "Your Aethon staff account has been created",
-                TextBody = $"Hi {request.DisplayName},\n\nYour {request.Role} account has been created on the Aethon platform.\n\nLogin at {webBaseUrl}/login using:\nEmail: {request.Email}\nPassword: (the password set by your administrator)\n\nYou will be prompted to change your password on first login.\n\nAethon Team",
-                HtmlBody = $"<p>Hi {request.DisplayName},</p><p>Your <strong>{request.Role}</strong> account has been created on the Aethon platform.</p><p>Login at <a href=\"{webBaseUrl}/login\">{webBaseUrl}/login</a> using:<br/>Email: <strong>{request.Email}</strong><br/>Password: <em>(the password set by your administrator)</em></p><p>You will be prompted to set a new password on first login.</p><p>Aethon Team</p>"
+                ToEmail  = request.Email,
+                ToName   = request.DisplayName,
+                Subject  = staffSubject,
+                TextBody = $"Hi {request.DisplayName},\n\nYour {request.Role} account has been created.\n\nLogin at {loginUrl}\nEmail: {request.Email}\nTemp password: {request.Password}\n\nYou will be prompted to change your password on first login.",
+                HtmlBody = staffHtml
             }, ct);
 
             return Results.Ok(new { userId = user.Id, email = user.Email, role = request.Role });
@@ -757,6 +768,7 @@ public static class AdminEndpoints
         group.MapPost("/verification-requests/{id:guid}/deny", async (
             AethonDbContext db,
             [FromServices] Aethon.Application.Abstractions.Email.IEmailService emailService,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailTemplateService emailTemplates,
             HttpContext ctx,
             Guid id,
             ReviewVerificationRequest? request,
@@ -789,23 +801,22 @@ public static class AdminEndpoints
             {
                 try
                 {
+                    var rejectionReason = request?.Notes ?? "No specific reason provided.";
+                    var (rejSubject, rejHtml) = await emailTemplates.RenderAsync("IdentityRejection", new()
+                    {
+                        ["DisplayName"]     = vr.User.DisplayName ?? vr.User.Email,
+                        ["RejectionReason"] = System.Net.WebUtility.HtmlEncode(rejectionReason)
+                    }, ct);
                     await emailService.SendAsync(new Aethon.Application.Abstractions.Email.EmailMessage
                     {
-                        ToEmail = vr.User.Email,
-                        ToName = vr.User.DisplayName,
-                        Subject = "Your identity verification request — update",
-                        TextBody = "Thank you for submitting an identity verification request on Aethon.\n\nUnfortunately, we were unable to verify your identity at this time. If you believe this is an error, please contact us.\n\nAethon Team",
-                        HtmlBody = """
-                            <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;line-height:1.6;">
-                            <h2>Identity verification update</h2>
-                            <p>Thank you for submitting an identity verification request on Aethon.</p>
-                            <p>Unfortunately, we were unable to verify your identity at this time. If you believe this is an error or would like to try again, please contact us.</p>
-                            <p style="color:#666;font-size:0.9em;">— The Aethon Team</p>
-                            </body></html>
-                            """
+                        ToEmail  = vr.User.Email,
+                        ToName   = vr.User.DisplayName,
+                        Subject  = rejSubject,
+                        TextBody = $"Hi {vr.User.DisplayName},\n\nUnfortunately we were unable to verify your identity.\n\nReason: {rejectionReason}\n\nIf you believe this is an error, please contact support.",
+                        HtmlBody = rejHtml
                     }, ct);
                 }
-                catch { /* non-fatal — log would go here */ }
+                catch { /* non-fatal */ }
             }
 
             return Results.Ok(new { id, denied = true });
@@ -1066,8 +1077,10 @@ public static class AdminEndpoints
                 .Select(s => new
                 {
                     s.Key,
-                    // Mask the SA JSON for non-SuperAdmins
-                    Value = s.Key == SystemSettingKeys.GoogleIndexingServiceAccount && !isSuperAdmin
+                    // Mask secrets for non-SuperAdmins
+                    Value = !isSuperAdmin && (
+                                s.Key == SystemSettingKeys.GoogleIndexingServiceAccount ||
+                                s.Key == SystemSettingKeys.EmailMailerSendApiKey)
                         ? (string.IsNullOrEmpty(s.Value) ? "" : "••••••••")
                         : s.Value,
                     s.Description,
@@ -1087,8 +1100,9 @@ public static class AdminEndpoints
             HttpContext http,
             CancellationToken ct) =>
         {
-            // Only SuperAdmin can update the Service Account JSON
-            if (key == SystemSettingKeys.GoogleIndexingServiceAccount && !http.User.IsInRole("SuperAdmin"))
+            // Only SuperAdmin can update secrets
+            var secretKeys = new[] { SystemSettingKeys.GoogleIndexingServiceAccount, SystemSettingKeys.EmailMailerSendApiKey };
+            if (secretKeys.Contains(key) && !http.User.IsInRole("SuperAdmin"))
                 return Results.Forbid();
 
             var userId = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -1097,6 +1111,26 @@ public static class AdminEndpoints
             await settings.SetAsync(key, request.Value, updatedByUserId: userGuid, ct: ct);
 
             return Results.Ok(new { key, updated = true });
+        });
+
+        // DELETE /api/v1/admin/settings/{key} — SuperAdmin only
+        group.MapDelete("/settings/{key}", async (
+            string key,
+            AethonDbContext db,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin"))
+                return Results.Forbid();
+
+            var setting = await db.SystemSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
+            if (setting is null)
+                return Results.NotFound();
+
+            db.SystemSettings.Remove(setting);
+            await db.SaveChangesAsync(ct);
+
+            return Results.NoContent();
         });
 
         // ─── System Logs ─────────────────────────────────────────────────────────

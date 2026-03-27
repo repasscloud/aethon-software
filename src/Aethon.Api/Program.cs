@@ -79,7 +79,9 @@ services.AddScoped<IFileStorageService, LocalFileStorageService>();
 services.AddScoped<JwtTokenService>();
 
 services.Configure<EmailOptions>(configuration.GetSection("Email"));
+services.AddScoped<EmailOptionsResolver>();
 services.AddScoped<IEmailService, MailerSendEmailService>();
+services.AddScoped<IEmailTemplateService, EmailTemplateService>();
 services.AddScoped<IAppSettings, AppSettingsService>();
 
 services.Configure<ClaudeOptions>(configuration.GetSection("Claude"));

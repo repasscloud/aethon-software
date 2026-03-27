@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text;
 using Aethon.Api.Auth;
+using Microsoft.AspNetCore.WebUtilities;
 using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Settings;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +14,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 
 namespace Aethon.Api.Endpoints.Auth;
 
@@ -27,6 +28,9 @@ public static class AuthEndpoints
             UserManager<ApplicationUser> userManager,
             AethonDbContext db,
             [FromServices] ISystemSettingsService settings,
+            [FromServices] IEmailService emailService,
+            [FromServices] IEmailTemplateService emailTemplates,
+            [FromServices] Aethon.Api.Infrastructure.Email.EmailOptionsResolver emailOptionsResolver,
             RegisterRequest request) =>
         {
             var now = DateTime.UtcNow;
@@ -175,10 +179,35 @@ public static class AuthEndpoints
 
                 await transaction.CommitAsync();
 
+                // Send email verification link
+                try
+                {
+                    var verificationToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
+                    var encodedToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(
+                        System.Text.Encoding.UTF8.GetBytes(verificationToken));
+                    var emailOpts = await emailOptionsResolver.ResolveAsync();
+                    var verificationUrl = $"{emailOpts.WebBaseUrl}/verify-email?userId={user.Id}&token={Uri.EscapeDataString(encodedToken)}";
+
+                    var (verifySubject, verifyHtml) = await emailTemplates.RenderAsync("Verification", new()
+                    {
+                        ["DisplayName"]    = System.Net.WebUtility.HtmlEncode(displayName),
+                        ["VerificationUrl"] = verificationUrl
+                    });
+                    await emailService.SendAsync(new EmailMessage
+                    {
+                        ToEmail  = user.Email!,
+                        ToName   = displayName,
+                        Subject  = verifySubject,
+                        HtmlBody = verifyHtml,
+                        TextBody = $"Hi {displayName},\n\nPlease verify your email address by visiting:\n{verificationUrl}\n\nThis link expires in 24 hours."
+                    });
+                }
+                catch { /* non-fatal — user can request resend */ }
+
                 return Results.Ok(new RegisterResultDto
                 {
                     Succeeded = true,
-                    RequiresEmailConfirmation = false,
+                    RequiresEmailConfirmation = true,
                     Email = request.Email,
                     DisplayName = displayName,
                     RegistrationType = normalizedType
@@ -202,6 +231,15 @@ public static class AuthEndpoints
             if (user is null || !await userManager.CheckPasswordAsync(user, request.Password))
             {
                 return Results.BadRequest(new { code = "auth.invalid_credentials", message = "Invalid email or password." });
+            }
+
+            if (!user.EmailConfirmed)
+            {
+                return Results.Ok(new LoginResponse
+                {
+                    RequiresEmailVerification = true,
+                    Email = user.Email!
+                });
             }
 
             var roles = await userManager.GetRolesAsync(user);
@@ -527,7 +565,8 @@ public static class AuthEndpoints
         group.MapPost("/forgot-password", async (
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
-            IConfiguration config,
+            [FromServices] IEmailTemplateService emailTemplates,
+            [FromServices] Aethon.Api.Infrastructure.Email.EmailOptionsResolver emailOptionsResolver,
             ForgotPasswordRequest request) =>
         {
             // Always return Ok — never reveal whether the email exists
@@ -536,28 +575,27 @@ public static class AuthEndpoints
                 return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
 
             var token = await userManager.GeneratePasswordResetTokenAsync(user);
-            var webBaseUrl = config["WebBaseUrl"] ?? "http://localhost:5200";
-            var resetUrl = $"{webBaseUrl}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
+            var emailOpts = await emailOptionsResolver.ResolveAsync();
+            var resetUrl = $"{emailOpts.WebBaseUrl}/reset-password?email={Uri.EscapeDataString(user.Email!)}&token={Uri.EscapeDataString(token)}";
 
-            var requiresMfa = user.TwoFactorEnabled;
+            var mfaWarning = user.TwoFactorEnabled
+                ? "<p><strong>Your account has two-factor authentication enabled.</strong> You will need your authenticator app to complete the reset.</p>"
+                : "";
 
-            var htmlBody = $"""
-                <p>Hi {System.Net.WebUtility.HtmlEncode(user.DisplayName)},</p>
-                <p>We received a request to reset your Aethon password.</p>
-                {(requiresMfa ? "<p><strong>Your account has two-factor authentication enabled.</strong> You will need your authenticator app to complete the reset.</p>" : "")}
-                <p><a href="{resetUrl}" style="background:#111827;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Reset my password</a></p>
-                <p>This link expires in 24 hours. If you did not request this, you can ignore this email.</p>
-                """;
-
-            var textBody = $"Reset your Aethon password:\n{resetUrl}\n\nThis link expires in 24 hours.";
+            var (pwSubject, pwHtml) = await emailTemplates.RenderAsync("PasswordReset", new()
+            {
+                ["DisplayName"] = System.Net.WebUtility.HtmlEncode(user.DisplayName),
+                ["ResetUrl"]    = resetUrl,
+                ["MfaWarning"]  = mfaWarning
+            });
 
             await emailService.SendAsync(new EmailMessage
             {
-                ToEmail = user.Email!,
-                ToName = user.DisplayName,
-                Subject = "Reset your Aethon password",
-                HtmlBody = htmlBody,
-                TextBody = textBody
+                ToEmail  = user.Email!,
+                ToName   = user.DisplayName,
+                Subject  = pwSubject,
+                HtmlBody = pwHtml,
+                TextBody = $"Reset your Aethon password:\n{resetUrl}\n\nThis link expires in 24 hours."
             });
 
             return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
@@ -645,6 +683,7 @@ public static class AuthEndpoints
         group.MapPost("/reset-password", async (
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
+            [FromServices] IEmailTemplateService emailTemplates,
             AethonDbContext db,
             ResetPasswordRequest request,
             CancellationToken ct) =>
@@ -680,20 +719,96 @@ public static class AuthEndpoints
                     .ExecuteUpdateAsync(s => s.SetProperty(u => u.MustChangePassword, false), ct);
 
             // Send confirmation email
+            var (confirmSubject, confirmHtml) = await emailTemplates.RenderAsync("PasswordResetConfirm", new()
+            {
+                ["DisplayName"] = System.Net.WebUtility.HtmlEncode(user.DisplayName)
+            }, ct);
             await emailService.SendAsync(new EmailMessage
             {
-                ToEmail = user.Email!,
-                ToName = user.DisplayName,
-                Subject = "Your Aethon password has been reset",
-                HtmlBody = $"""
-                    <p>Hi {System.Net.WebUtility.HtmlEncode(user.DisplayName)},</p>
-                    <p>Your Aethon password was successfully reset.</p>
-                    <p>If you did not make this change, please contact support immediately.</p>
-                    """,
+                ToEmail  = user.Email!,
+                ToName   = user.DisplayName,
+                Subject  = confirmSubject,
+                HtmlBody = confirmHtml,
                 TextBody = $"Hi {user.DisplayName},\n\nYour Aethon password was successfully reset.\n\nIf you did not make this change, please contact support immediately."
             });
 
             return Results.Ok(new { message = "Password reset successfully." });
+        });
+
+        // POST /auth/verify-email — confirms a user's email via token from the verification link
+        group.MapPost("/verify-email", async (
+            UserManager<ApplicationUser> userManager,
+            VerifyEmailRequest request,
+            CancellationToken ct) =>
+        {
+            if (!Guid.TryParse(request.UserId, out var userId))
+                return Results.BadRequest(new { code = "auth.invalid_token", message = "Invalid verification link." });
+
+            var user = await userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+                return Results.BadRequest(new { code = "auth.invalid_token", message = "Invalid verification link." });
+
+            if (user.EmailConfirmed)
+                return Results.Ok(new { succeeded = true, alreadyConfirmed = true });
+
+            string decodedToken;
+            try
+            {
+                decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(request.Token));
+            }
+            catch
+            {
+                return Results.BadRequest(new { code = "auth.invalid_token", message = "Invalid verification link." });
+            }
+
+            var result = await userManager.ConfirmEmailAsync(user, decodedToken);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToArray();
+                return Results.BadRequest(new { code = "auth.invalid_token", message = "This verification link is invalid or has expired.", errors });
+            }
+
+            return Results.Ok(new { succeeded = true });
+        });
+
+        // POST /auth/resend-verification — resends the verification email
+        group.MapPost("/resend-verification", async (
+            UserManager<ApplicationUser> userManager,
+            IEmailService emailService,
+            [FromServices] IEmailTemplateService emailTemplates,
+            [FromServices] Aethon.Api.Infrastructure.Email.EmailOptionsResolver emailOptionsResolver,
+            ResendVerificationRequest request,
+            CancellationToken ct) =>
+        {
+            // Always return Ok to prevent email enumeration
+            var user = await userManager.FindByEmailAsync(request.Email);
+            if (user is null || user.EmailConfirmed)
+                return Results.Ok(new { message = "If that email is registered and unverified, a new link has been sent." });
+
+            try
+            {
+                var verificationToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
+                var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(verificationToken));
+                var emailOpts = await emailOptionsResolver.ResolveAsync(ct);
+                var verificationUrl = $"{emailOpts.WebBaseUrl}/verify-email?userId={user.Id}&token={Uri.EscapeDataString(encodedToken)}";
+
+                var (verifySubject, verifyHtml) = await emailTemplates.RenderAsync("Verification", new()
+                {
+                    ["DisplayName"]     = System.Net.WebUtility.HtmlEncode(user.DisplayName),
+                    ["VerificationUrl"] = verificationUrl
+                }, ct);
+                await emailService.SendAsync(new EmailMessage
+                {
+                    ToEmail  = user.Email!,
+                    ToName   = user.DisplayName,
+                    Subject  = verifySubject,
+                    HtmlBody = verifyHtml,
+                    TextBody = $"Hi {user.DisplayName},\n\nPlease verify your email address by visiting:\n{verificationUrl}\n\nThis link expires in 24 hours."
+                }, ct);
+            }
+            catch { /* non-fatal */ }
+
+            return Results.Ok(new { message = "If that email is registered and unverified, a new link has been sent." });
         });
     }
 
@@ -726,6 +841,7 @@ public static class AuthEndpoints
         public bool MustChangePassword { get; set; }
         public bool MustEnableMfa { get; set; }
         public bool RequiresTwoFactor { get; set; }
+        public bool RequiresEmailVerification { get; set; }
         public string? TwoFactorTicket { get; set; }
         public string? OrganisationId { get; set; }
         public string? OrganisationName { get; set; }
@@ -763,5 +879,16 @@ public static class AuthEndpoints
         public string Token { get; set; } = string.Empty;
         public string NewPassword { get; set; } = string.Empty;
         public string? TotpCode { get; set; }
+    }
+
+    public sealed class VerifyEmailRequest
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string Token { get; set; } = string.Empty;
+    }
+
+    public sealed class ResendVerificationRequest
+    {
+        public string Email { get; set; } = string.Empty;
     }
 }

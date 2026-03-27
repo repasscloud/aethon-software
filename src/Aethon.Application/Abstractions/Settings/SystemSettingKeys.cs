@@ -87,6 +87,35 @@ public static class SystemSettingKeys
     public const string DisplayPriceStickyUnverified7d           = "Display.Price.Sticky.Unverified.7d";
     public const string DisplayPriceStickyUnverified30d          = "Display.Price.Sticky.Unverified.30d";
 
+    // ─── Email ────────────────────────────────────────────────────────────────
+    // Resolution order: DB (here) → ENV VAR / appsettings.json → misconfigured.
+    // If both DB and ENV are null/empty the admin dashboard will show a warning.
+
+    public const string EmailMailerSendApiKey = "Email__MailerSendApiKey";
+    public const string EmailFromEmail        = "Email__FromEmail";
+    public const string EmailFromName         = "Email__FromName";
+    public const string EmailWebBaseUrl       = "Email__WebBaseUrl";
+
+    // ─── Email Templates ──────────────────────────────────────────────────────
+    // System templates (non-deletable). Each has a Subject and Html key.
+    // Custom templates follow the same pattern with an admin-chosen name slug.
+    // Variable substitution uses {{VarName}} tokens.
+
+    public const string EmailTemplateVerificationSubject         = "EmailTemplate__Verification__Subject";
+    public const string EmailTemplateVerificationHtml            = "EmailTemplate__Verification__Html";
+
+    public const string EmailTemplatePasswordResetSubject        = "EmailTemplate__PasswordReset__Subject";
+    public const string EmailTemplatePasswordResetHtml           = "EmailTemplate__PasswordReset__Html";
+
+    public const string EmailTemplatePasswordResetConfirmSubject = "EmailTemplate__PasswordResetConfirm__Subject";
+    public const string EmailTemplatePasswordResetConfirmHtml    = "EmailTemplate__PasswordResetConfirm__Html";
+
+    public const string EmailTemplateStaffWelcomeSubject         = "EmailTemplate__StaffWelcome__Subject";
+    public const string EmailTemplateStaffWelcomeHtml            = "EmailTemplate__StaffWelcome__Html";
+
+    public const string EmailTemplateIdentityRejectionSubject    = "EmailTemplate__IdentityRejection__Subject";
+    public const string EmailTemplateIdentityRejectionHtml       = "EmailTemplate__IdentityRejection__Html";
+
     // ─── Feature Flags ────────────────────────────────────────────────────────
     // These control marketing promotions and billing behaviour. All toggled via
     // /admin/settings so no deployment is required to run or stop a promotion.

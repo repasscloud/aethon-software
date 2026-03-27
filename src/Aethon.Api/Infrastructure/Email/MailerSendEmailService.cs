@@ -2,7 +2,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Aethon.Application.Abstractions.Email;
-using Microsoft.Extensions.Options;
 
 namespace Aethon.Api.Infrastructure.Email;
 
@@ -14,22 +13,24 @@ public sealed class MailerSendEmailService : IEmailService
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly EmailOptions _options;
+    private readonly EmailOptionsResolver _resolver;
     private readonly ILogger<MailerSendEmailService> _logger;
 
     public MailerSendEmailService(
         IHttpClientFactory httpClientFactory,
-        IOptions<EmailOptions> options,
+        EmailOptionsResolver resolver,
         ILogger<MailerSendEmailService> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
+        _resolver = resolver;
         _logger = logger;
     }
 
     public async Task SendAsync(EmailMessage message, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.MailerSendApiKey))
+        var options = await _resolver.ResolveAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(options.MailerSendApiKey))
         {
             _logger.LogWarning("Email not sent — MailerSendApiKey is not configured. To: {To}, Subject: {Subject}",
                 message.ToEmail, message.Subject);
@@ -51,7 +52,7 @@ public sealed class MailerSendEmailService : IEmailService
 
         var payload = new
         {
-            from = new { email = _options.FromEmail, name = _options.FromName },
+            from = new { email = options.FromEmail, name = options.FromName },
             to = new[] { new { email = message.ToEmail, name = message.ToName } },
             reply_to = replyTo,
             subject = message.Subject,
@@ -65,7 +66,7 @@ public sealed class MailerSendEmailService : IEmailService
 
         using var client = _httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", _options.MailerSendApiKey);
+            new AuthenticationHeaderValue("Bearer", options.MailerSendApiKey);
 
         try
         {

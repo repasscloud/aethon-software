@@ -124,6 +124,13 @@ app.MapPost("/account/login", async (
             + (!string.IsNullOrWhiteSpace(returnPath) ? "&returnPath=" + Uri.EscapeDataString(returnPath) : ""));
     }
 
+    // Email not yet verified — redirect to check-email page
+    if (loginResult.RequiresEmailVerification)
+    {
+        return Results.LocalRedirect("/register/check-email?email=" + Uri.EscapeDataString(loginResult.Email)
+            + "&unverified=1");
+    }
+
     if (string.IsNullOrEmpty(loginResult.Token))
     {
         return Results.LocalRedirect("/login?error=" + Uri.EscapeDataString("Authentication failed."));
@@ -297,6 +304,7 @@ internal sealed class LoginResult
     public string? RecruiterRole { get; set; }
     public bool IsOrganisationOwner { get; set; }
     public bool RequiresTwoFactor { get; set; }
+    public bool RequiresEmailVerification { get; set; }
     public string? TwoFactorTicket { get; set; }
     public bool MustChangePassword { get; set; }
     public bool MustEnableMfa { get; set; }
