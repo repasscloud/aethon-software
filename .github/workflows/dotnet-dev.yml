@@ -1,4 +1,4 @@
-name: .NET
+name: dev Build and PR
 
 on:
   push:
@@ -8,16 +8,47 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.0.x
+
     - name: Restore dependencies
       run: dotnet restore
+
     - name: Build
       run: dotnet build --no-restore
+
+  create-pr:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create PR and merge to main
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        EXISTING_PR=$(gh pr list --base main --head dev --json number --jq '.[0].number')
+        if [ -z "$EXISTING_PR" ]; then
+          gh pr create \
+            --base main \
+            --head dev \
+            --title "Merge dev into main" \
+            --body "Automated PR from dev build passing."
+          PR_NUMBER=$(gh pr list --base main --head dev --json number --jq '.[0].number')
+        else
+          PR_NUMBER=$EXISTING_PR
+        fi
+        gh pr merge "$PR_NUMBER" --squash --admin
