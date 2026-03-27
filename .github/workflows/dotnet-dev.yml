@@ -1,4 +1,4 @@
-name: dev Build and PR
+name: dev Build, PR and Deploy
 
 on:
   push:
