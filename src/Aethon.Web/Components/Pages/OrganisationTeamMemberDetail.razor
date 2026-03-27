@@ -281,9 +281,9 @@ else
         try
         {
             var client = await Api.CreateAsync();
-            var body = _member!.OrganisationType == "company"
-                ? new { companyRole = _selectedCompanyRole, recruiterRole = (string?)null }
-                : new { companyRole = (string?)null, recruiterRole = _selectedRecruiterRole };
+            string? companyRole = _member!.OrganisationType == "company" ? _selectedCompanyRole : null;
+            string? recruiterRole = _member.OrganisationType == "company" ? null : _selectedRecruiterRole;
+            var body = new { companyRole, recruiterRole };
             var resp = await client.PutAsJsonAsync($"/api/v1/organisations/me/members/{UserId}/role", body);
             if (resp.IsSuccessStatusCode) { _successMsg = "Role updated."; await LoadAsync(); }
             else _pageError = "Could not update role.";

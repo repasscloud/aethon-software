@@ -677,7 +677,8 @@ public static class AdminEndpoints
             CancellationToken ct = default) =>
         {
             const int pageSize = 50;
-            var query = db.IdentityVerificationRequests.AsNoTracking().Include(r => r.User);
+            IQueryable<Aethon.Data.Entities.IdentityVerificationRequest> query =
+                db.IdentityVerificationRequests.AsNoTracking().Include(r => r.User);
 
             if (!string.IsNullOrWhiteSpace(status) &&
                 Enum.TryParse<Aethon.Shared.Enums.VerificationRequestStatus>(status, ignoreCase: true, out var parsedStatus))
