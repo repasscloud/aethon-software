@@ -52,3 +52,18 @@ jobs:
           PR_NUMBER=$EXISTING_PR
         fi
         gh pr merge "$PR_NUMBER" --squash --admin
+
+  deploy-to-dev:
+    needs: create-pr
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Deploy via SSH
+      run: |
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
+        chmod 600 private_key
+        ssh -i private_key \
+          -o StrictHostKeyChecking=no \
+          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+          "bash ${{ secrets.DEPLOY_SCRIPT_PATH }}"
+        rm -f private_key
