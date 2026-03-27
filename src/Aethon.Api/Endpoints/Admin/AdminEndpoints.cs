@@ -350,6 +350,62 @@ public static class AdminEndpoints
             return Results.Ok(new { total, page, pageSize, items = jobs });
         });
 
+        // GET /api/v1/admin/jobs/{jobId}
+        group.MapGet("/jobs/{jobId:guid}", async (
+            AethonDbContext db,
+            Guid jobId,
+            CancellationToken ct) =>
+        {
+            var job = await db.Jobs
+                .AsNoTracking()
+                .Where(j => j.Id == jobId)
+                .Select(j => new
+                {
+                    j.Id,
+                    j.Title,
+                    j.Status,
+                    j.Visibility,
+                    j.Category,
+                    j.Department,
+                    j.ReferenceCode,
+                    j.ExternalReference,
+                    j.LocationText,
+                    j.LocationCity,
+                    j.LocationState,
+                    j.LocationCountry,
+                    j.WorkplaceType,
+                    j.EmploymentType,
+                    j.Description,
+                    j.Summary,
+                    j.Requirements,
+                    j.Benefits,
+                    j.SalaryFrom,
+                    j.SalaryTo,
+                    j.SalaryCurrency,
+                    j.ExternalApplicationUrl,
+                    j.ApplicationEmail,
+                    j.PostingTier,
+                    j.PostingExpiresUtc,
+                    j.ApplyByUtc,
+                    j.PublishedUtc,
+                    j.ClosedUtc,
+                    j.CreatedUtc,
+                    j.IsHighlighted,
+                    j.IncludeCompanyLogo,
+                    j.StatusReason,
+                    OrganisationId = j.OwnedByOrganisationId,
+                    OrganisationName = j.OwnedByOrganisation.Name,
+                    OrganisationSlug = j.OwnedByOrganisation.Slug,
+                    ApplicationCount = j.Applications.Count
+                })
+                .FirstOrDefaultAsync(ct);
+
+            if (job is null)
+                return Results.NotFound(new { code = "job.not_found", message = "Job not found." });
+
+            return Results.Ok(job);
+        });
+
         // GET /api/v1/admin/users?search=&page=
         group.MapGet("/users", async (
             AethonDbContext db,

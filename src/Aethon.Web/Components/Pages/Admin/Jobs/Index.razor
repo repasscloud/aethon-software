@@ -58,13 +58,14 @@ else
                                     <th>Status</th>
                                     <th>Category</th>
                                     <th>Apps</th>
-                                    <th class="pe-4">Created</th>
+                                    <th>Created</th>
+                                    <th class="pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @if (_jobs.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="ps-4 text-secondary py-4">No jobs found.</td></tr>
+                                    <tr><td colspan="7" class="ps-4 text-secondary py-4">No jobs found.</td></tr>
                                 }
                                 @foreach (var j in _jobs)
                                 {
@@ -79,7 +80,23 @@ else
                                         <td><span class="badge @JobStatusBadge(j.Status) rounded-pill small">@j.Status</span></td>
                                         <td class="small text-secondary">@j.Category</td>
                                         <td>@j.ApplicationCount</td>
-                                        <td class="pe-4 text-secondary small">@j.CreatedUtc?.ToString("dd MMM yyyy")</td>
+                                        <td class="text-secondary small">@j.CreatedUtc?.ToString("dd MMM yyyy")</td>
+                                        <td class="pe-4">
+                                            <div class="d-flex gap-1">
+                                                <a href="/jobs/@j.Id" target="_blank"
+                                                   class="btn btn-outline-success rounded-pill"
+                                                   style="font-size:.75rem;padding:.2rem .6rem;"
+                                                   title="View public job page">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                                <a href="/admin/jobs/@j.Id"
+                                                   class="btn btn-outline-secondary rounded-pill"
+                                                   style="font-size:.75rem;padding:.2rem .6rem;"
+                                                   title="View job details">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </div>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>

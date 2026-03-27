@@ -107,7 +107,40 @@ else
                             <dt class="col-5 text-secondary">Public phone</dt>
                             <dd class="col-7">@(_org.PublicContactPhone ?? "—")</dd>
                             <dt class="col-5 text-secondary">Public profile</dt>
-                            <dd class="col-7">@(_org.IsPublicProfileEnabled ? "Enabled" : "Disabled")</dd>
+                            <dd class="col-7">
+                                @if (_org.IsPublicProfileEnabled && !string.IsNullOrEmpty(_org.Slug))
+                                {
+                                    <a href="/organisations/@_org.Slug" target="_blank" class="badge bg-success text-decoration-none rounded-pill">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>Enabled — view profile
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary rounded-pill">Disabled</span>
+                                }
+                            </dd>
+                            <dt class="col-5 text-secondary">Equal Opportunity</dt>
+                            <dd class="col-7">
+                                @if (_org.IsEqualOpportunityEmployer)
+                                {
+                                    <span class="badge bg-success rounded-pill"><i class="bi bi-check-circle me-1"></i>EOE</span>
+                                }
+                                else
+                                {
+                                    <span class="text-secondary">No</span>
+                                }
+                            </dd>
+                            <dt class="col-5 text-secondary">Accessible Workplace</dt>
+                            <dd class="col-7">
+                                @if (_org.IsAccessibleWorkplace)
+                                {
+                                    <span class="badge bg-info text-dark rounded-pill"><i class="bi bi-check-circle me-1"></i>Yes</span>
+                                }
+                                else
+                                {
+                                    <span class="text-secondary">No</span>
+                                }
+                            </dd>
                             <dt class="col-5 text-secondary">Jobs</dt>
                             <dd class="col-7">@_org.JobCount</dd>
                             <dt class="col-5 text-secondary">Members</dt>
@@ -127,10 +160,6 @@ else
                             <dd class="col-7">@(_org.PrimaryContactEmail ?? "—")</dd>
                             <dt class="col-5 text-secondary">Phone</dt>
                             <dd class="col-7">@(_org.PrimaryContactPhone ?? "—")</dd>
-                            <dt class="col-5 text-secondary">EOE</dt>
-                            <dd class="col-7">@(_org.IsEqualOpportunityEmployer ? "Yes" : "No")</dd>
-                            <dt class="col-5 text-secondary">Accessible</dt>
-                            <dd class="col-7">@(_org.IsAccessibleWorkplace ? "Yes" : "No")</dd>
                         </dl>
                     </div>
                 </div>
