@@ -86,6 +86,22 @@ else
             </div>
         </div>
 
+        @if (!_stats.EmailConfigured)
+        {
+            <div class="card border-warning shadow-sm rounded-4">
+                <div class="card-body p-4 d-flex align-items-center gap-3">
+                    <span class="fs-3">⚠️</span>
+                    <div>
+                        <div class="fw-bold text-warning">Email is not configured</div>
+                        <div class="small text-secondary">
+                            MailerSendApiKey or FromEmail is missing. Transactional emails (verification, password reset) will not be sent.
+                            Configure email settings in <a href="/admin/settings">Admin → Settings</a>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
     </div>
 }
 
@@ -119,7 +135,8 @@ else
                 Users = json.GetProperty("users").GetInt32(),
                 Files = json.GetProperty("files").GetInt32(),
                 VerifiedOrganisations = json.GetProperty("verifiedOrganisations").GetInt32(),
-                PendingStripeEvents = json.TryGetProperty("pendingStripeEvents", out var pse) ? pse.GetInt32() : 0
+                PendingStripeEvents = json.TryGetProperty("pendingStripeEvents", out var pse) ? pse.GetInt32() : 0,
+            EmailConfigured = !json.TryGetProperty("emailConfigured", out var ec) || ec.GetBoolean()
             };
         }
         catch { }
@@ -135,5 +152,6 @@ else
         public int Files { get; set; }
         public int VerifiedOrganisations { get; set; }
         public int PendingStripeEvents { get; set; }
+        public bool EmailConfigured { get; set; } = true;
     }
 }

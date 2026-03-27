@@ -301,7 +301,7 @@
             if (response.IsSuccessStatusCode)
             {
                 var email = Uri.EscapeDataString(Model.Email);
-                NavigationManager.NavigateTo($"/login?registered=1&email={email}", forceLoad: true);
+                NavigationManager.NavigateTo($"/register/check-email?email={email}", forceLoad: true);
                 return;
             }
 

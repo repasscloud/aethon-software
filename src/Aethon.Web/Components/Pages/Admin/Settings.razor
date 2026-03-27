@@ -190,6 +190,136 @@ else
                     </div>
                 </div>
 
+                <!-- Email -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Email</h5>
+                        <p class="text-secondary small mb-4">
+                            Transactional email configuration (MailerSend). Resolution order: DB (here) → environment variable → misconfigured.
+                            If both are empty, the admin dashboard will show a warning.
+                        </p>
+
+                        @if (_isSuperAdmin)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">MailerSend API Key</label>
+                                <div class="text-secondary small mb-1">Bearer token from your MailerSend account. <strong>SuperAdmin only.</strong></div>
+                                <input type="password" class="form-control form-control-sm font-monospace rounded-3"
+                                       placeholder="mlsn.…"
+                                       @bind="_emailApiKey"
+                                       autocomplete="off" />
+                            </div>
+                        }
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">From Email</label>
+                            <input type="email" class="form-control form-control-sm rounded-3"
+                                   placeholder="do-not-reply@example.com"
+                                   @bind="_emailFromEmail" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">From Name</label>
+                            <input type="text" class="form-control form-control-sm rounded-3"
+                                   placeholder="Aethon Software"
+                                   @bind="_emailFromName" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">Web Base URL</label>
+                            <div class="text-secondary small mb-1">Used to build links inside emails (e.g. verification link).</div>
+                            <input type="url" class="form-control form-control-sm rounded-3"
+                                   placeholder="https://app.example.com"
+                                   @bind="_emailWebBaseUrl" />
+                        </div>
+
+                        <button class="btn btn-sm btn-dark rounded-3" @onclick="SaveEmailSettings" disabled="@_saving">
+                            @(_saving ? "Saving…" : "Save Email Settings")
+                        </button>
+                        @if (!string.IsNullOrEmpty(_emailMsg))
+                        {
+                            <div class="alert @(_emailSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                @_emailMsg
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Email Templates -->
+                @if (_isSuperAdmin)
+                {
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Email Templates</h5>
+                            <p class="text-secondary small mb-1">
+                                Override the built-in email templates. Leave blank to use the system default.
+                                Templates are identified by a slug name (e.g. <code>Verification</code>, <code>PasswordReset</code>).
+                                Use <code>&#123;&#123;VarName&#125;&#125;</code> tokens for dynamic values.
+                            </p>
+                            <p class="text-secondary small mb-4">
+                                <strong>System template variable reference:</strong><br />
+                                <code>Verification</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;VerificationUrl&#125;&#125;</code><br />
+                                <code>PasswordReset</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;ResetUrl&#125;&#125;</code>, <code>&#123;&#123;MfaWarning&#125;&#125;</code><br />
+                                <code>PasswordResetConfirm</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code><br />
+                                <code>StaffWelcome</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;Email&#125;&#125;</code>, <code>&#123;&#123;TempPassword&#125;&#125;</code>, <code>&#123;&#123;LoginUrl&#125;&#125;</code><br />
+                                <code>IdentityRejection</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;RejectionReason&#125;&#125;</code>
+                            </p>
+
+                            @foreach (var tmpl in _emailTemplates)
+                            {
+                                <div class="border rounded-3 p-3 mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="fw-semibold">@tmpl.Name</div>
+                                        <button class="btn btn-sm btn-outline-danger rounded-3"
+                                                @onclick="@(() => DeleteTemplate(tmpl.Name))">
+                                            Delete
+                                        </button>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold mb-1">Subject</label>
+                                        <input type="text" class="form-control form-control-sm rounded-3"
+                                               placeholder="(uses system default if blank)"
+                                               value="@tmpl.Subject"
+                                               @oninput="e => tmpl.Subject = e.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold mb-1">HTML Body</label>
+                                        <textarea class="form-control form-control-sm font-monospace rounded-3"
+                                                  rows="6"
+                                                  placeholder="(uses system default if blank)"
+                                                  @bind="tmpl.Html"></textarea>
+                                    </div>
+                                    <button class="btn btn-sm btn-dark rounded-3" @onclick="@(() => SaveTemplate(tmpl))">
+                                        Save Template
+                                    </button>
+                                    @if (!string.IsNullOrEmpty(tmpl.Message))
+                                    {
+                                        <span class="ms-2 small @(tmpl.SavedOk ? "text-success" : "text-danger")">@tmpl.Message</span>
+                                    }
+                                </div>
+                            }
+
+                            <div class="border rounded-3 p-3 mt-2">
+                                <div class="fw-semibold mb-2">Add New Template</div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold mb-1">Template Name (slug, no spaces)</label>
+                                        <input type="text" class="form-control form-control-sm rounded-3"
+                                               placeholder="e.g. WelcomeCampaign"
+                                               @bind="_newTemplateName" />
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <button class="btn btn-sm btn-primary rounded-3 w-100" @onclick="AddNewTemplate">
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_newTemplateMsg))
+                                {
+                                    <div class="small text-danger mt-1">@_newTemplateMsg</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
                 <!-- Coming Soon platforms -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body p-4">
@@ -282,6 +412,28 @@ else
 
     private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
 
+    // Email settings
+    private string _emailApiKey = "";
+    private string _emailFromEmail = "";
+    private string _emailFromName = "";
+    private string _emailWebBaseUrl = "";
+    private string? _emailMsg;
+    private bool _emailSuccess;
+
+    // Email templates
+    private List<EmailTemplateModel> _emailTemplates = [];
+    private string _newTemplateName = "";
+    private string? _newTemplateMsg;
+
+    private sealed class EmailTemplateModel
+    {
+        public string Name { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string Html { get; set; } = "";
+        public string? Message { get; set; }
+        public bool SavedOk { get; set; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthProvider.GetAuthenticationStateAsync();
@@ -317,6 +469,35 @@ else
 
                 var promoDays = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.ExpiryDays");
                 if (int.TryParse(promoDays?.Value, out var pd) && pd > 0) _launchPromoDays = pd;
+
+                // Email settings
+                if (_isSuperAdmin)
+                    _emailApiKey = settings.FirstOrDefault(s => s.Key == "Email__MailerSendApiKey")?.Value ?? "";
+                _emailFromEmail  = settings.FirstOrDefault(s => s.Key == "Email__FromEmail")?.Value ?? "";
+                _emailFromName   = settings.FirstOrDefault(s => s.Key == "Email__FromName")?.Value ?? "";
+                _emailWebBaseUrl = settings.FirstOrDefault(s => s.Key == "Email__WebBaseUrl")?.Value ?? "";
+
+                // Email templates — group by name slug from keys like EmailTemplate__{Name}__{Subject|Html}
+                if (_isSuperAdmin)
+                {
+                    var templateGroups = settings
+                        .Where(s => s.Key.StartsWith("EmailTemplate__"))
+                        .GroupBy(s =>
+                        {
+                            var parts = s.Key.Split("__");
+                            return parts.Length >= 2 ? parts[1] : s.Key;
+                        });
+
+                    foreach (var grp in templateGroups)
+                    {
+                        _emailTemplates.Add(new EmailTemplateModel
+                        {
+                            Name    = grp.Key,
+                            Subject = grp.FirstOrDefault(s => s.Key.EndsWith("__Subject"))?.Value ?? "",
+                            Html    = grp.FirstOrDefault(s => s.Key.EndsWith("__Html"))?.Value ?? ""
+                        });
+                    }
+                }
             }
 
             var records = await client.GetFromJsonAsync<List<SyndicationRecordDto>>("/api/v1/admin/syndication-records");
@@ -454,6 +635,94 @@ else
             _launchPromoMsg = "Unable to reach settings service.";
         }
         finally { _saving = false; }
+    }
+
+    private async Task SaveEmailSettings()
+    {
+        _emailMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var tasks = new List<Task<HttpResponseMessage>>();
+            if (_isSuperAdmin)
+                tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__MailerSendApiKey", new { Value = _emailApiKey }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__FromEmail",  new { Value = _emailFromEmail }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__FromName",   new { Value = _emailFromName }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__WebBaseUrl", new { Value = _emailWebBaseUrl }));
+
+            var results = await Task.WhenAll(tasks);
+            _emailSuccess = results.All(r => r.IsSuccessStatusCode);
+            _emailMsg = _emailSuccess ? "Email settings saved." : "One or more settings failed to save.";
+        }
+        catch
+        {
+            _emailSuccess = false;
+            _emailMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveTemplate(EmailTemplateModel tmpl)
+    {
+        tmpl.Message = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var r1 = await client.PutAsJsonAsync(
+                $"/api/v1/admin/settings/EmailTemplate__{tmpl.Name}__Subject",
+                new { Value = tmpl.Subject });
+            var r2 = await client.PutAsJsonAsync(
+                $"/api/v1/admin/settings/EmailTemplate__{tmpl.Name}__Html",
+                new { Value = tmpl.Html });
+
+            tmpl.SavedOk = r1.IsSuccessStatusCode && r2.IsSuccessStatusCode;
+            tmpl.Message = tmpl.SavedOk ? "Saved." : "Failed to save.";
+        }
+        catch
+        {
+            tmpl.SavedOk = false;
+            tmpl.Message = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task DeleteTemplate(string name)
+    {
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            await client.DeleteAsync($"/api/v1/admin/settings/EmailTemplate__{name}__Subject");
+            await client.DeleteAsync($"/api/v1/admin/settings/EmailTemplate__{name}__Html");
+            _emailTemplates.RemoveAll(t => t.Name == name);
+        }
+        catch { /* ignore */ }
+        finally { _saving = false; }
+    }
+
+    private void AddNewTemplate()
+    {
+        _newTemplateMsg = null;
+        var name = _newTemplateName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _newTemplateMsg = "Template name is required.";
+            return;
+        }
+        if (name.Contains(' ') || name.Contains("__"))
+        {
+            _newTemplateMsg = "Name must not contain spaces or double underscores.";
+            return;
+        }
+        if (_emailTemplates.Any(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            _newTemplateMsg = "A template with that name already exists.";
+            return;
+        }
+        _emailTemplates.Add(new EmailTemplateModel { Name = name });
+        _newTemplateName = "";
     }
 
     private record SettingDto(string Key, string Value, string? Description);
