@@ -39,6 +39,7 @@ public sealed class AethonDbContext
     public DbSet<OrganisationDomain> OrganisationDomains => Set<OrganisationDomain>();
     public DbSet<OrganisationInvitation> OrganisationInvitations => Set<OrganisationInvitation>();
     public DbSet<OrganisationMembership> OrganisationMemberships => Set<OrganisationMembership>();
+    public DbSet<OrganisationMemberProfile> OrganisationMemberProfiles => Set<OrganisationMemberProfile>();
     public DbSet<OrganisationRecruitmentPartnership> OrganisationRecruitmentPartnerships => Set<OrganisationRecruitmentPartnership>();
 
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
@@ -49,6 +50,8 @@ public sealed class AethonDbContext
     public DbSet<JobApplicationAttachment> JobApplicationAttachments => Set<JobApplicationAttachment>();
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<IdentityVerificationRequest> IdentityVerificationRequests => Set<IdentityVerificationRequest>();
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
