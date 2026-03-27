@@ -7,12 +7,20 @@ using Aethon.Application.Organisations.Commands.CancelClaimRequest;
 using Aethon.Application.Organisations.Commands.ConfirmDomainVerification;
 using Aethon.Application.Organisations.Commands.CreateOrganisationInvite;
 using Aethon.Application.Organisations.Commands.RegenerateDomainVerificationToken;
+using Aethon.Application.Organisations.Commands.RemoveOrganisationMember;
 using Aethon.Application.Organisations.Commands.SubmitOrganisationClaim;
+using Aethon.Application.Organisations.Commands.UpdateMemberRole;
+using Aethon.Application.Organisations.Commands.UpdateMemberStatus;
+using Aethon.Application.Organisations.Commands.UpdateMyDisplayName;
 using Aethon.Application.Organisations.Commands.UpdateMyOrganisationProfile;
+using Aethon.Application.Organisations.Commands.UpsertMyMemberProfile;
+using Aethon.Application.Organisations.Commands.VerifyMemberIdentity;
 using Aethon.Application.Organisations.Queries.GetClaimableOrganisations;
 using Aethon.Application.Organisations.Queries.GetMyClaimRequests;
+using Aethon.Application.Organisations.Queries.GetMyMemberProfile;
 using Aethon.Application.Organisations.Queries.GetMyOrganisationProfile;
 using Aethon.Application.Organisations.Queries.GetOrganisationDomains;
+using Aethon.Application.Organisations.Queries.GetOrganisationMemberDetail;
 using Aethon.Application.Organisations.Queries.GetOrganisationMembers;
 using Aethon.Shared.Organisations;
 using Microsoft.AspNetCore.Mvc;
@@ -56,6 +64,87 @@ public static class OrganisationEndpoints
             CancellationToken ct) =>
         {
             var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/me/members/{userId}
+        group.MapGet("/me/members/{userId:guid}", async (
+            [FromServices] GetOrganisationMemberDetailHandler handler,
+            Guid userId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(userId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // PUT /api/v1/organisations/me/members/{userId}/role
+        group.MapPut("/me/members/{userId:guid}/role", async (
+            [FromServices] UpdateMemberRoleHandler handler,
+            Guid userId,
+            UpdateMemberRoleRequestDto request,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(userId, request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // PUT /api/v1/organisations/me/members/{userId}/status
+        group.MapPut("/me/members/{userId:guid}/status", async (
+            [FromServices] UpdateMemberStatusHandler handler,
+            Guid userId,
+            UpdateMemberStatusRequestDto request,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(userId, request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // POST /api/v1/organisations/me/members/{userId}/verify-identity
+        group.MapPost("/me/members/{userId:guid}/verify-identity", async (
+            [FromServices] VerifyMemberIdentityHandler handler,
+            Guid userId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(userId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // DELETE /api/v1/organisations/me/members/{userId}
+        group.MapDelete("/me/members/{userId:guid}", async (
+            [FromServices] RemoveOrganisationMemberHandler handler,
+            Guid userId,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(userId, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // GET /api/v1/organisations/me/my-profile
+        group.MapGet("/me/my-profile", async (
+            [FromServices] GetMyMemberProfileHandler handler,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // PUT /api/v1/organisations/me/my-profile
+        group.MapPut("/me/my-profile", async (
+            [FromServices] UpsertMyMemberProfileHandler handler,
+            UpsertMyMemberProfileRequestDto request,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(request, ct);
+            return result.ToMinimalApiResult();
+        });
+
+        // PUT /api/v1/organisations/me/display-name
+        group.MapPut("/me/display-name", async (
+            [FromServices] UpdateMyDisplayNameHandler handler,
+            UpdateDisplayNameRequestDto request,
+            CancellationToken ct) =>
+        {
+            var result = await handler.HandleAsync(request, ct);
             return result.ToMinimalApiResult();
         });
 
