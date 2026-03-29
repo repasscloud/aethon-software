@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260327152843_InitDb")]
+    [Migration("20260329140737_InitDb")]
     partial class InitDb
     {
         /// <inheritdoc />
@@ -300,6 +300,12 @@ namespace Aethon.Data.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsImmediateStart")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSchoolLeaverTargeted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSuitableForSchoolLeavers")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Keywords")
@@ -1143,9 +1149,21 @@ namespace Aethon.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<DateTime?>("AgeConfirmedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AgeGroup")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AvailabilityText")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
+
+                    b.Property<int?>("BirthMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("BirthYear")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
@@ -1156,9 +1174,6 @@ namespace Aethon.Data.Migrations
                     b.Property<string>("CurrentLocation")
                         .HasMaxLength(250)
                         .HasColumnType("character varying(250)");
-
-                    b.Property<DateOnly?>("DateOfBirth")
-                        .HasColumnType("date");
 
                     b.Property<int?>("DesiredSalaryCurrency")
                         .HasColumnType("integer");
@@ -1786,6 +1801,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<DateTime?>("VerificationPaidAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VerificationPendingTier")
+                        .HasColumnType("integer");
 
                     b.Property<string>("VerificationStripeEventId")
                         .HasMaxLength(255)
@@ -2748,6 +2766,9 @@ namespace Aethon.Data.Migrations
 
                     b.Property<bool>("IsPhoneNumberVerified")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastLoginUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
