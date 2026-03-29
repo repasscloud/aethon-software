@@ -279,6 +279,95 @@ app.MapPost("/account/verify-2fa", async (
     return Results.LocalRedirect(redirect);
 }).DisableAntiforgery();
 
+// GET /sitemap.xml — dynamically generated sitemap from live database data via the API.
+// Enhanced-verified organisations and their jobs are prioritised; capped at 50,000 URLs.
+app.MapGet("/sitemap.xml", async (HttpContext ctx, IHttpClientFactory factory, IConfiguration config, CancellationToken ct) =>
+{
+    var siteBase = (config["SiteBaseUrl"] ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}").TrimEnd('/');
+    var client = factory.CreateClient("AethonApiDirect");
+
+    SitemapData? data = null;
+    try
+    {
+        var resp = await client.GetAsync("/api/v1/public/sitemap", ct);
+        if (resp.IsSuccessStatusCode)
+            data = await resp.Content.ReadFromJsonAsync<SitemapData>(cancellationToken: ct);
+    }
+    catch { /* API unreachable — fall back to static-only sitemap */ }
+
+    static string XmlEsc(string s) => s
+        .Replace("&", "&amp;")
+        .Replace("<", "&lt;")
+        .Replace(">", "&gt;")
+        .Replace("\"", "&quot;")
+        .Replace("'", "&apos;");
+
+    static string BuildJobSlug(string title, Guid id)
+    {
+        var clean = System.Text.RegularExpressions.Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9\s_]", "");
+        var slug  = System.Text.RegularExpressions.Regex.Replace(clean.Trim(), @"\s+", "-");
+        return $"{slug}-{id}";
+    }
+
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+
+    void AddUrl(string loc, string? lastmod, string changefreq, string priority)
+    {
+        sb.AppendLine("  <url>");
+        sb.AppendLine($"    <loc>{XmlEsc(loc)}</loc>");
+        if (lastmod is not null)
+            sb.AppendLine($"    <lastmod>{lastmod}</lastmod>");
+        sb.AppendLine($"    <changefreq>{changefreq}</changefreq>");
+        sb.AppendLine($"    <priority>{priority}</priority>");
+        sb.AppendLine("  </url>");
+    }
+
+    // ── Static pages ──────────────────────────────────────────────────────────
+    AddUrl($"{siteBase}/",                                  null, "daily",   "1.0");
+    AddUrl($"{siteBase}/jobs",                              null, "hourly",  "0.9");
+    AddUrl($"{siteBase}/info/equal-opportunity-employer",  null, "monthly", "0.5");
+    AddUrl($"{siteBase}/info/accessible-workplace",        null, "monthly", "0.5");
+    AddUrl($"{siteBase}/info/enhanced-verification",       null, "monthly", "0.5");
+    AddUrl($"{siteBase}/info/standard-verification",       null, "monthly", "0.5");
+    AddUrl($"{siteBase}/info/privacy",                     null, "monthly", "0.4");
+
+    if (data is not null)
+    {
+        // ── Organisation pages (enhanced → standard → unverified) ────────────
+        foreach (var org in data.Orgs)
+        {
+            if (string.IsNullOrWhiteSpace(org.Slug)) continue;
+            var (freq, pri) = org.Tier switch
+            {
+                2 => ("weekly", "0.9"),  // EnhancedTrusted
+                1 => ("weekly", "0.7"),  // StandardEmployer
+                _ => ("monthly", "0.5")  // None
+            };
+            AddUrl($"{siteBase}/organisations/{XmlEsc(org.Slug)}", org.LastMod, freq, pri);
+        }
+
+        // ── Job pages (enhanced-org jobs → standard-org jobs → unverified) ───
+        foreach (var job in data.Jobs)
+        {
+            if (string.IsNullOrWhiteSpace(job.OrgSlug) || string.IsNullOrWhiteSpace(job.Title)) continue;
+            var jobSlug = BuildJobSlug(job.Title, job.Id);
+            var (freq, pri) = job.OrgTier switch
+            {
+                2 => ("daily", "0.8"),   // job from EnhancedTrusted org
+                1 => ("daily", "0.6"),   // job from StandardEmployer org
+                _ => ("weekly", "0.4")   // job from unverified org
+            };
+            AddUrl($"{siteBase}/jobs/{XmlEsc(job.OrgSlug)}/{XmlEsc(jobSlug)}", job.LastMod, freq, pri);
+        }
+    }
+
+    sb.Append("</urlset>");
+
+    return Results.Content(sb.ToString(), "application/xml; charset=utf-8");
+});
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
@@ -286,6 +375,28 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+internal sealed class SitemapData
+{
+    public List<SitemapOrg> Orgs { get; set; } = [];
+    public List<SitemapJob> Jobs { get; set; } = [];
+}
+
+internal sealed class SitemapOrg
+{
+    public string? Slug    { get; set; }
+    public int     Tier    { get; set; }
+    public string? LastMod { get; set; }
+}
+
+internal sealed class SitemapJob
+{
+    public Guid    Id      { get; set; }
+    public string? Title   { get; set; }
+    public string? OrgSlug { get; set; }
+    public int     OrgTier { get; set; }
+    public string? LastMod { get; set; }
+}
 
 internal sealed class LoginResult
 {

@@ -10,6 +10,7 @@ using Aethon.Application.Organisations.Queries.GetPublicOrganisationProfile;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeam;
 using Aethon.Application.Organisations.Queries.GetPublicOrganisationTeamMember;
 using Aethon.Data;
+using Aethon.Data.Entities;
 using Aethon.Shared.Enums;
 using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
@@ -231,5 +232,54 @@ public static class PublicEndpoints
             var result = await handler.HandleAsync(command, ct);
             return result.ToMinimalApiResult();
         }).RequireAuthorization();
+
+        // GET /api/v1/public/sitemap — structured data for sitemap.xml generation (consumed by Web layer)
+        // Returns enhanced-verified orgs and their jobs first, then standard, then unverified.
+        // Each side is capped at ~25k so the combined total stays within the 50k sitemap limit.
+        group.MapGet("/sitemap", async (AethonDbContext db, CancellationToken ct) =>
+        {
+            var utcNow = DateTime.UtcNow;
+            const int maxEach = 24_975;
+
+            var orgs = await db.Set<Organisation>()
+                .AsNoTracking()
+                .Where(o => o.IsPublicProfileEnabled
+                         && o.Status == OrganisationStatus.Active
+                         && o.Slug != null)
+                .OrderByDescending(o => (int)o.VerificationTier)
+                .ThenByDescending(o => o.UpdatedUtc ?? o.CreatedUtc)
+                .Take(maxEach)
+                .Select(o => new
+                {
+                    o.Slug,
+                    Tier = (int)o.VerificationTier,
+                    LastMod = (o.UpdatedUtc ?? o.CreatedUtc).ToString("yyyy-MM-dd")
+                })
+                .ToListAsync(ct);
+
+            var jobs = await db.Jobs
+                .AsNoTracking()
+                .Where(j => j.Status == JobStatus.Published
+                         && j.Visibility == JobVisibility.Public
+                         && (j.PostingExpiresUtc == null || j.PostingExpiresUtc > utcNow)
+                         && !j.IsSchoolLeaverTargeted
+                         && j.OwnedByOrganisation.IsPublicProfileEnabled
+                         && j.OwnedByOrganisation.Status == OrganisationStatus.Active
+                         && j.OwnedByOrganisation.Slug != null)
+                .OrderByDescending(j => (int)j.OwnedByOrganisation.VerificationTier)
+                .ThenByDescending(j => j.PublishedUtc)
+                .Take(maxEach)
+                .Select(j => new
+                {
+                    j.Id,
+                    j.Title,
+                    OrgSlug = j.OwnedByOrganisation.Slug,
+                    OrgTier = (int)j.OwnedByOrganisation.VerificationTier,
+                    LastMod = (j.UpdatedUtc ?? j.PublishedUtc ?? j.CreatedUtc).ToString("yyyy-MM-dd")
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { Orgs = orgs, Jobs = jobs });
+        });
     }
 }
