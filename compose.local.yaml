@@ -62,6 +62,7 @@ services:
       DataProtection__KeysPath: /keys
       DataProtection__ApplicationName: Aethon
       GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-http://localhost:5200}"
     volumes:
       - dp_keys:/keys
     ports:

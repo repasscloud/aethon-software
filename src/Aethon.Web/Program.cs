@@ -279,92 +279,182 @@ app.MapPost("/account/verify-2fa", async (
     return Results.LocalRedirect(redirect);
 }).DisableAntiforgery();
 
-// GET /sitemap.xml — dynamically generated sitemap from live database data via the API.
-// Enhanced-verified organisations and their jobs are prioritised; capped at 50,000 URLs.
+// ── Sitemap shared helpers ────────────────────────────────────────────────────
+static string SitemapXmlEsc(string s) => s
+    .Replace("&", "&amp;")
+    .Replace("<", "&lt;")
+    .Replace(">", "&gt;")
+    .Replace("\"", "&quot;")
+    .Replace("'", "&apos;");
+
+static string SitemapJobSlug(string title, Guid id)
+{
+    var clean = System.Text.RegularExpressions.Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9\s_]", "");
+    var slug  = System.Text.RegularExpressions.Regex.Replace(clean.Trim(), @"\s+", "-");
+    return $"{slug}-{id}";
+}
+
+static string GetSiteBase(HttpContext ctx, IConfiguration cfg)
+    => (cfg["SiteBaseUrl"] ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}").TrimEnd('/');
+
+// GET /sitemap.xml — sitemap index referencing all child sitemaps.
+// The number of jobs-N.xml entries is determined by live record counts from the API.
 app.MapGet("/sitemap.xml", async (HttpContext ctx, IHttpClientFactory factory, IConfiguration config, CancellationToken ct) =>
 {
-    var siteBase = (config["SiteBaseUrl"] ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}").TrimEnd('/');
-    var client = factory.CreateClient("AethonApiDirect");
+    var siteBase = GetSiteBase(ctx, config);
+    var today    = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    var client   = factory.CreateClient("AethonApiDirect");
 
-    SitemapData? data = null;
+    var jobTotalPages = 1;
     try
     {
-        var resp = await client.GetAsync("/api/v1/public/sitemap", ct);
+        var resp = await client.GetAsync("/api/v1/public/sitemap/stats", ct);
         if (resp.IsSuccessStatusCode)
-            data = await resp.Content.ReadFromJsonAsync<SitemapData>(cancellationToken: ct);
+        {
+            var stats = await resp.Content.ReadFromJsonAsync<SitemapStats>(cancellationToken: ct);
+            if (stats is not null) jobTotalPages = Math.Max(1, stats.JobTotalPages);
+        }
     }
-    catch { /* API unreachable — fall back to static-only sitemap */ }
+    catch { /* API unreachable — emit index with 1 job page */ }
 
-    static string XmlEsc(string s) => s
-        .Replace("&", "&amp;")
-        .Replace("<", "&lt;")
-        .Replace(">", "&gt;")
-        .Replace("\"", "&quot;")
-        .Replace("'", "&apos;");
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    sb.AppendLine("<sitemapindex xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
 
-    static string BuildJobSlug(string title, Guid id)
+    void AddEntry(string loc)
     {
-        var clean = System.Text.RegularExpressions.Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9\s_]", "");
-        var slug  = System.Text.RegularExpressions.Regex.Replace(clean.Trim(), @"\s+", "-");
-        return $"{slug}-{id}";
+        sb.AppendLine("  <sitemap>");
+        sb.AppendLine($"    <loc>{SitemapXmlEsc(loc)}</loc>");
+        sb.AppendLine($"    <lastmod>{today}</lastmod>");
+        sb.AppendLine("  </sitemap>");
     }
 
+    AddEntry($"{siteBase}/sitemaps/static.xml");
+    AddEntry($"{siteBase}/sitemaps/organisations.xml");
+    for (var i = 1; i <= jobTotalPages; i++)
+        AddEntry($"{siteBase}/sitemaps/jobs-{i}.xml");
+
+    sb.Append("</sitemapindex>");
+    return Results.Content(sb.ToString(), "application/xml; charset=utf-8");
+});
+
+// GET /sitemaps/static.xml — home page, job search page, and all /info/* pages.
+app.MapGet("/sitemaps/static.xml", (HttpContext ctx, IConfiguration config) =>
+{
+    var siteBase = GetSiteBase(ctx, config);
     var sb = new System.Text.StringBuilder();
     sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
 
-    void AddUrl(string loc, string? lastmod, string changefreq, string priority)
+    void AddUrl(string loc, string changefreq, string priority)
     {
         sb.AppendLine("  <url>");
-        sb.AppendLine($"    <loc>{XmlEsc(loc)}</loc>");
-        if (lastmod is not null)
-            sb.AppendLine($"    <lastmod>{lastmod}</lastmod>");
+        sb.AppendLine($"    <loc>{SitemapXmlEsc(loc)}</loc>");
         sb.AppendLine($"    <changefreq>{changefreq}</changefreq>");
         sb.AppendLine($"    <priority>{priority}</priority>");
         sb.AppendLine("  </url>");
     }
 
-    // ── Static pages ──────────────────────────────────────────────────────────
-    AddUrl($"{siteBase}/",                                  null, "daily",   "1.0");
-    AddUrl($"{siteBase}/jobs",                              null, "hourly",  "0.9");
-    AddUrl($"{siteBase}/info/equal-opportunity-employer",  null, "monthly", "0.5");
-    AddUrl($"{siteBase}/info/accessible-workplace",        null, "monthly", "0.5");
-    AddUrl($"{siteBase}/info/enhanced-verification",       null, "monthly", "0.5");
-    AddUrl($"{siteBase}/info/standard-verification",       null, "monthly", "0.5");
-    AddUrl($"{siteBase}/info/privacy",                     null, "monthly", "0.4");
+    AddUrl($"{siteBase}/",                                "daily",   "1.0");
+    AddUrl($"{siteBase}/jobs",                            "hourly",  "0.9");
+    AddUrl($"{siteBase}/info/equal-opportunity-employer", "monthly", "0.5");
+    AddUrl($"{siteBase}/info/accessible-workplace",       "monthly", "0.5");
+    AddUrl($"{siteBase}/info/enhanced-verification",      "monthly", "0.5");
+    AddUrl($"{siteBase}/info/standard-verification",      "monthly", "0.5");
+    AddUrl($"{siteBase}/info/privacy",                    "monthly", "0.4");
 
-    if (data is not null)
+    sb.Append("</urlset>");
+    return Results.Content(sb.ToString(), "application/xml; charset=utf-8");
+});
+
+// GET /sitemaps/organisations.xml — all public organisation profile pages, enhanced-verified first.
+app.MapGet("/sitemaps/organisations.xml", async (HttpContext ctx, IHttpClientFactory factory, IConfiguration config, CancellationToken ct) =>
+{
+    var siteBase = GetSiteBase(ctx, config);
+    var client   = factory.CreateClient("AethonApiDirect");
+
+    List<SitemapOrgItem> orgs = [];
+    try
     {
-        // ── Organisation pages (enhanced → standard → unverified) ────────────
-        foreach (var org in data.Orgs)
-        {
-            if (string.IsNullOrWhiteSpace(org.Slug)) continue;
-            var (freq, pri) = org.Tier switch
-            {
-                2 => ("weekly", "0.9"),  // EnhancedTrusted
-                1 => ("weekly", "0.7"),  // StandardEmployer
-                _ => ("monthly", "0.5")  // None
-            };
-            AddUrl($"{siteBase}/organisations/{XmlEsc(org.Slug)}", org.LastMod, freq, pri);
-        }
+        var resp = await client.GetAsync("/api/v1/public/sitemap/orgs", ct);
+        if (resp.IsSuccessStatusCode)
+            orgs = await resp.Content.ReadFromJsonAsync<List<SitemapOrgItem>>(cancellationToken: ct) ?? [];
+    }
+    catch { /* API unreachable — emit empty sitemap */ }
 
-        // ── Job pages (enhanced-org jobs → standard-org jobs → unverified) ───
-        foreach (var job in data.Jobs)
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+
+    foreach (var org in orgs)
+    {
+        if (string.IsNullOrWhiteSpace(org.Slug)) continue;
+        var (freq, pri) = org.Tier switch
+        {
+            2 => ("weekly",  "0.9"),
+            1 => ("weekly",  "0.7"),
+            _ => ("monthly", "0.5")
+        };
+        sb.AppendLine("  <url>");
+        sb.AppendLine($"    <loc>{SitemapXmlEsc($"{siteBase}/organisations/{org.Slug}")}</loc>");
+        if (org.LastMod is not null) sb.AppendLine($"    <lastmod>{org.LastMod}</lastmod>");
+        sb.AppendLine($"    <changefreq>{freq}</changefreq>");
+        sb.AppendLine($"    <priority>{pri}</priority>");
+        sb.AppendLine("  </url>");
+    }
+
+    sb.Append("</urlset>");
+    return Results.Content(sb.ToString(), "application/xml; charset=utf-8");
+});
+
+// GET /sitemaps/jobs-{page}.xml — paginated job pages, 50,000 URLs per file.
+// Enhanced-verified employer jobs appear first.
+app.MapGet("/sitemaps/jobs-{page}.xml", async (HttpContext ctx, IHttpClientFactory factory, IConfiguration config, string page, CancellationToken ct) =>
+{
+    if (!int.TryParse(page, out var pageNum) || pageNum < 1)
+        return Results.NotFound();
+
+    var siteBase = GetSiteBase(ctx, config);
+    var client   = factory.CreateClient("AethonApiDirect");
+
+    SitemapJobsPage? jobPage = null;
+    try
+    {
+        var resp = await client.GetAsync($"/api/v1/public/sitemap/jobs?page={pageNum}", ct);
+        if (resp.IsSuccessStatusCode)
+            jobPage = await resp.Content.ReadFromJsonAsync<SitemapJobsPage>(cancellationToken: ct);
+    }
+    catch { /* API unreachable — emit empty sitemap */ }
+
+    if (jobPage is not null && pageNum > jobPage.TotalPages)
+        return Results.NotFound();
+
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    sb.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+
+    if (jobPage is not null)
+    {
+        foreach (var job in jobPage.Items)
         {
             if (string.IsNullOrWhiteSpace(job.OrgSlug) || string.IsNullOrWhiteSpace(job.Title)) continue;
-            var jobSlug = BuildJobSlug(job.Title, job.Id);
+            var slug = SitemapJobSlug(job.Title, job.Id);
             var (freq, pri) = job.OrgTier switch
             {
-                2 => ("daily", "0.8"),   // job from EnhancedTrusted org
-                1 => ("daily", "0.6"),   // job from StandardEmployer org
-                _ => ("weekly", "0.4")   // job from unverified org
+                2 => ("daily",  "0.8"),
+                1 => ("daily",  "0.6"),
+                _ => ("weekly", "0.4")
             };
-            AddUrl($"{siteBase}/jobs/{XmlEsc(job.OrgSlug)}/{XmlEsc(jobSlug)}", job.LastMod, freq, pri);
+            sb.AppendLine("  <url>");
+            sb.AppendLine($"    <loc>{SitemapXmlEsc($"{siteBase}/jobs/{job.OrgSlug}/{slug}")}</loc>");
+            if (job.LastMod is not null) sb.AppendLine($"    <lastmod>{job.LastMod}</lastmod>");
+            sb.AppendLine($"    <changefreq>{freq}</changefreq>");
+            sb.AppendLine($"    <priority>{pri}</priority>");
+            sb.AppendLine("  </url>");
         }
     }
 
     sb.Append("</urlset>");
-
     return Results.Content(sb.ToString(), "application/xml; charset=utf-8");
 });
 
@@ -376,26 +466,36 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
-internal sealed class SitemapData
+internal sealed class SitemapStats
 {
-    public List<SitemapOrg> Orgs { get; set; } = [];
-    public List<SitemapJob> Jobs { get; set; } = [];
+    public int OrgCount      { get; set; }
+    public int JobCount      { get; set; }
+    public int JobPageSize   { get; set; }
+    public int JobTotalPages { get; set; }
 }
 
-internal sealed class SitemapOrg
+internal sealed class SitemapOrgItem
 {
     public string? Slug    { get; set; }
     public int     Tier    { get; set; }
     public string? LastMod { get; set; }
 }
 
-internal sealed class SitemapJob
+internal sealed class SitemapJobItem
 {
     public Guid    Id      { get; set; }
     public string? Title   { get; set; }
     public string? OrgSlug { get; set; }
     public int     OrgTier { get; set; }
     public string? LastMod { get; set; }
+}
+
+internal sealed class SitemapJobsPage
+{
+    public int                   Page       { get; set; }
+    public int                   TotalPages { get; set; }
+    public int                   TotalCount { get; set; }
+    public List<SitemapJobItem>  Items      { get; set; } = [];
 }
 
 internal sealed class LoginResult

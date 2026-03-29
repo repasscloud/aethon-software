@@ -73,6 +73,7 @@ services:
       DataProtection__KeysPath: /keys
       DataProtection__ApplicationName: Aethon
       GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-}"
     volumes:
       - dp_keys:/keys
     # No direct port binding — Caddy is the only public entry point.

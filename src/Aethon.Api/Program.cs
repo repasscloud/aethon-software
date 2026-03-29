@@ -286,6 +286,9 @@ using (var scope = app.Services.CreateScope())
         new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified24h, Value = "", Description = "Display price: Sticky 24h — unverified org.", UpdatedUtc = DateTime.UtcNow },
         new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified7d,  Value = "", Description = "Display price: Sticky 7d — unverified org.",  UpdatedUtc = DateTime.UtcNow },
         new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified30d, Value = "", Description = "Display price: Sticky 30d — unverified org.", UpdatedUtc = DateTime.UtcNow },
+
+        // ── Site ──────────────────────────────────────────────────────────────
+        new SystemSetting { Key = SystemSettingKeys.SiteBaseUrl, Value = "", Description = "Canonical public base URL of the web frontend (e.g. https://app.aethonsoftware.com). Used for sitemap generation and absolute URL construction.", UpdatedUtc = DateTime.UtcNow },
     };
 
     foreach (var setting in settingsToSeed)

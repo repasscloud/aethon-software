@@ -233,14 +233,41 @@ public static class PublicEndpoints
             return result.ToMinimalApiResult();
         }).RequireAuthorization();
 
-        // GET /api/v1/public/sitemap — structured data for sitemap.xml generation (consumed by Web layer)
-        // Returns enhanced-verified orgs and their jobs first, then standard, then unverified.
-        // Each side is capped at ~25k so the combined total stays within the 50k sitemap limit.
-        group.MapGet("/sitemap", async (AethonDbContext db, CancellationToken ct) =>
+        // GET /api/v1/public/sitemap/stats — counts used by the Web layer to build the sitemap index.
+        group.MapGet("/sitemap/stats", async (AethonDbContext db, CancellationToken ct) =>
         {
+            const int pageSize = 50_000;
             var utcNow = DateTime.UtcNow;
-            const int maxEach = 24_975;
 
+            var orgCount = await db.Set<Organisation>()
+                .AsNoTracking()
+                .CountAsync(o => o.IsPublicProfileEnabled
+                              && o.Status == OrganisationStatus.Active
+                              && o.Slug != null, ct);
+
+            var jobCount = await db.Jobs
+                .AsNoTracking()
+                .CountAsync(j => j.Status == JobStatus.Published
+                              && j.Visibility == JobVisibility.Public
+                              && (j.PostingExpiresUtc == null || j.PostingExpiresUtc > utcNow)
+                              && !j.IsSchoolLeaverTargeted
+                              && j.OwnedByOrganisation.IsPublicProfileEnabled
+                              && j.OwnedByOrganisation.Status == OrganisationStatus.Active
+                              && j.OwnedByOrganisation.Slug != null, ct);
+
+            return Results.Ok(new
+            {
+                OrgCount      = orgCount,
+                JobCount      = jobCount,
+                JobPageSize   = pageSize,
+                JobTotalPages = Math.Max(1, (int)Math.Ceiling((double)jobCount / pageSize))
+            });
+        });
+
+        // GET /api/v1/public/sitemap/orgs — all public org slugs for /sitemaps/organisations.xml.
+        // Enhanced-verified orgs are ordered first; no pagination needed (orgs grow slowly).
+        group.MapGet("/sitemap/orgs", async (AethonDbContext db, CancellationToken ct) =>
+        {
             var orgs = await db.Set<Organisation>()
                 .AsNoTracking()
                 .Where(o => o.IsPublicProfileEnabled
@@ -248,16 +275,26 @@ public static class PublicEndpoints
                          && o.Slug != null)
                 .OrderByDescending(o => (int)o.VerificationTier)
                 .ThenByDescending(o => o.UpdatedUtc ?? o.CreatedUtc)
-                .Take(maxEach)
                 .Select(o => new
                 {
                     o.Slug,
-                    Tier = (int)o.VerificationTier,
+                    Tier    = (int)o.VerificationTier,
                     LastMod = (o.UpdatedUtc ?? o.CreatedUtc).ToString("yyyy-MM-dd")
                 })
                 .ToListAsync(ct);
 
-            var jobs = await db.Jobs
+            return Results.Ok(orgs);
+        });
+
+        // GET /api/v1/public/sitemap/jobs?page=1 — paginated jobs for /sitemaps/jobs-N.xml.
+        // 50,000 URLs per page; enhanced-verified employer jobs appear first.
+        group.MapGet("/sitemap/jobs", async (AethonDbContext db, int page, CancellationToken ct) =>
+        {
+            const int pageSize = 50_000;
+            var utcNow = DateTime.UtcNow;
+            page = Math.Max(1, page);
+
+            var baseQuery = db.Jobs
                 .AsNoTracking()
                 .Where(j => j.Status == JobStatus.Published
                          && j.Visibility == JobVisibility.Public
@@ -267,8 +304,14 @@ public static class PublicEndpoints
                          && j.OwnedByOrganisation.Status == OrganisationStatus.Active
                          && j.OwnedByOrganisation.Slug != null)
                 .OrderByDescending(j => (int)j.OwnedByOrganisation.VerificationTier)
-                .ThenByDescending(j => j.PublishedUtc)
-                .Take(maxEach)
+                .ThenByDescending(j => j.PublishedUtc);
+
+            var totalCount = await baseQuery.CountAsync(ct);
+            var totalPages = Math.Max(1, (int)Math.Ceiling((double)totalCount / pageSize));
+
+            var items = await baseQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(j => new
                 {
                     j.Id,
@@ -279,7 +322,7 @@ public static class PublicEndpoints
                 })
                 .ToListAsync(ct);
 
-            return Results.Ok(new { Orgs = orgs, Jobs = jobs });
+            return Results.Ok(new { Page = page, TotalPages = totalPages, TotalCount = totalCount, Items = items });
         });
     }
 }

@@ -135,4 +135,12 @@ public static class SystemSettingKeys
 
     /// <summary>Number of days before launch promo credits expire. Default 90.</summary>
     public const string FeatureLaunchPromotionExpiryDays        = "Feature.LaunchPromotion.ExpiryDays";
+
+    // ─── Site ─────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Canonical public base URL of the web frontend (e.g. https://app.aethonsoftware.com).
+    /// Used for sitemap generation and any server-side absolute URL construction.
+    /// Overridden at runtime by the SiteBaseUrl environment variable / appsettings entry.
+    /// </summary>
+    public const string SiteBaseUrl = "Site.BaseUrl";
 }

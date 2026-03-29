@@ -31,6 +31,39 @@ else
             }
             else
             {
+                <!-- Site Configuration -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Site Configuration</h5>
+                        <p class="text-secondary small mb-4">
+                            Core public-facing settings. The Site Base URL is used for sitemap generation and
+                            any server-side absolute URL construction. Set the same value in your
+                            <code>SiteBaseUrl</code> environment variable and here.
+                        </p>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">Site Base URL</label>
+                            <div class="text-secondary small mb-1">
+                                Canonical public URL of the web frontend (no trailing slash).
+                                Example: <code>https://app.aethonsoftware.com</code>
+                            </div>
+                            <input type="url" class="form-control form-control-sm rounded-3"
+                                   placeholder="https://app.example.com"
+                                   @bind="_siteBaseUrl" />
+                        </div>
+
+                        <button class="btn btn-sm btn-dark rounded-3" @onclick="SaveSiteSettings" disabled="@_saving">
+                            @(_saving ? "Saving…" : "Save Site Settings")
+                        </button>
+                        @if (!string.IsNullOrEmpty(_siteMsg))
+                        {
+                            <div class="alert @(_siteSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                @_siteMsg
+                            </div>
+                        }
+                    </div>
+                </div>
+
                 <!-- Google Job Indexing -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body p-4">
@@ -420,6 +453,11 @@ else
 
     private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
 
+    // Site settings
+    private string _siteBaseUrl = "";
+    private string? _siteMsg;
+    private bool _siteSuccess;
+
     // Email settings
     private string _emailApiKey = "";
     private string _emailFromEmail = "";
@@ -478,6 +516,9 @@ else
 
                 var promoDays = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.ExpiryDays");
                 if (int.TryParse(promoDays?.Value, out var pd) && pd > 0) _launchPromoDays = pd;
+
+                // Site settings
+                _siteBaseUrl = settings.FirstOrDefault(s => s.Key == "Site.BaseUrl")?.Value ?? "";
 
                 // Email settings
                 if (_isSuperAdmin)
@@ -643,6 +684,26 @@ else
         {
             _launchPromoSuccess = false;
             _launchPromoMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveSiteSettings()
+    {
+        _siteMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync("/api/v1/admin/settings/Site.BaseUrl",
+                new { Value = _siteBaseUrl.TrimEnd('/') });
+            _siteSuccess = resp.IsSuccessStatusCode;
+            _siteMsg = resp.IsSuccessStatusCode ? "Site settings saved." : "Failed to save site settings.";
+        }
+        catch
+        {
+            _siteSuccess = false;
+            _siteMsg = "Unable to reach settings service.";
         }
         finally { _saving = false; }
     }
