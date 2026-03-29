@@ -1,0 +1,47 @@
+@page "/register/confirmed"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@inject NavigationManager NavigationManager
+
+<PageTitle>Email confirmation | Aethon</PageTitle>
+
+<div class="container-fluid login-shell login-page-wrap py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-lg-7 col-xl-6">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="card-body p-4 p-lg-5 text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle @(IsSuccess ? "bg-dark text-white" : "bg-danger text-white") mb-4"
+                         style="width: 72px; height: 72px; font-size: 1.5rem; font-weight: 700;">
+                        A
+                    </div>
+
+                    <h1 class="h2 fw-bold mb-3">@(IsSuccess ? "Email confirmed" : "Confirmation failed")</h1>
+                    <p class="text-secondary fs-5 mb-4">@Message</p>
+
+                    <div class="d-grid gap-3 d-sm-flex justify-content-center">
+                        <a class="btn btn-dark rounded-4 px-4 py-3" href="/login">Go to sign in</a>
+                        <a class="btn btn-outline-dark rounded-4 px-4 py-3" href="/register">Back to register</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool IsSuccess;
+    private string Message = "The confirmation link is invalid or has expired.";
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("status", out var status) &&
+            string.Equals(status.ToString(), "success", StringComparison.OrdinalIgnoreCase))
+        {
+            IsSuccess = true;
+            Message = "Your email address has been confirmed. You can now sign in.";
+        }
+    }
+}

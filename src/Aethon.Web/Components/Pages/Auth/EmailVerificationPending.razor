@@ -1,0 +1,120 @@
+@page "/register/check-email"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Check your email | Aethon</PageTitle>
+
+<div class="container-fluid login-shell py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+            <div class="card border-0 shadow-lg rounded-4">
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
+                             style="width:64px;height:64px;font-size:1.4rem;font-weight:700;">
+                            A
+                        </div>
+                        <h2 class="h4 fw-bold mb-1">Check your email</h2>
+                        @if (_isUnverifiedLogin)
+                        {
+                            <p class="text-secondary small mb-0">You need to verify your email address before signing in.</p>
+                        }
+                        else
+                        {
+                            <p class="text-secondary small mb-0">We've sent a verification link to your email address.</p>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_email))
+                    {
+                        <div class="alert alert-light border rounded-3 mb-4 text-center">
+                            <i class="bi bi-envelope me-2"></i><strong>@_email</strong>
+                        </div>
+                    }
+
+                    <p class="text-secondary small text-center mb-4">
+                        Click the link in the email to verify your account.
+                        If you don't see it, check your spam or junk folder.
+                        You can also copy and paste the link directly into your browser.
+                    </p>
+
+                    @if (!string.IsNullOrEmpty(_message))
+                    {
+                        <div class="alert @(_messageIsError ? "alert-danger" : "alert-success") rounded-3 mb-3">@_message</div>
+                    }
+
+                    <div class="d-grid mb-3">
+                        <button class="btn btn-dark btn-lg rounded-4" style="min-height:52px;"
+                                @onclick="ResendEmail" disabled="@(_resending || _resent)">
+                            @if (_resending)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Sending…</span>
+                            }
+                            else if (_resent)
+                            {
+                                <span>Email sent</span>
+                            }
+                            else
+                            {
+                                <span>Resend verification email</span>
+                            }
+                        </button>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="/login" class="small text-secondary text-decoration-none">Back to sign in</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _email = "";
+    private bool _isUnverifiedLogin;
+    private bool _resending;
+    private bool _resent;
+    private string? _message;
+    private bool _messageIsError;
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("email", out var e)) _email = e.ToString();
+        _isUnverifiedLogin = query.ContainsKey("unverified");
+    }
+
+    private async Task ResendEmail()
+    {
+        if (string.IsNullOrWhiteSpace(_email)) return;
+
+        _resending = true;
+        _message = null;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApiDirect");
+            var response = await client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { email = _email });
+            _resent = response.IsSuccessStatusCode;
+            _message = response.IsSuccessStatusCode
+                ? "Verification email sent. Please check your inbox."
+                : "Unable to send email. Please try again later.";
+            _messageIsError = !response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            _message = "Unable to reach the service. Please try again later.";
+            _messageIsError = true;
+        }
+        finally
+        {
+            _resending = false;
+        }
+    }
+}

@@ -1,0 +1,269 @@
+@page "/admin/logs"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Aethon.Shared.Enums
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+
+<PageTitle>System Logs | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex align-items-center justify-content-between gap-3">
+                <div>
+                    <h1 class="h4 fw-bold mb-0">System Logs</h1>
+                    <p class="text-secondary small mb-0 mt-1">Errors, warnings, and operational events written by the application.</p>
+                </div>
+                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="PurgeOldLogs">
+                    <i class="bi bi-trash me-1"></i> Purge &gt;30 days
+                </button>
+            </div>
+        </div>
+
+        @* Filters *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Level</label>
+                        <select class="form-select form-select-sm rounded-3" @bind="_filterLevel">
+                            <option value="">All levels</option>
+                            <option value="0">Debug</option>
+                            <option value="1">Info</option>
+                            <option value="2">Warning</option>
+                            <option value="3">Error</option>
+                            <option value="4">Critical</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Category</label>
+                        <input class="form-control form-control-sm rounded-3" placeholder="e.g. StripeWebhook" @bind="_filterCategory" />
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Search message / details</label>
+                        <input class="form-control form-control-sm rounded-3" placeholder="keyword…" @bind="_filterSearch" />
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button class="btn btn-sm btn-primary rounded-3 w-100" @onclick="LoadAsync">
+                            <i class="bi bi-search me-1"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4 text-center text-secondary">Loading…</div>
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <div class="alert alert-danger rounded-4">@_error</div>
+        }
+        else if (_logs.Count == 0)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4 text-secondary">No log entries found.</div>
+            </div>
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:160px">Timestamp (UTC)</th>
+                                    <th style="width:90px">Level</th>
+                                    <th style="width:140px">Category</th>
+                                    <th>Message</th>
+                                    <th style="width:36px"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var log in _logs)
+                                {
+                                    var hasDetails = !string.IsNullOrEmpty(log.Details) || !string.IsNullOrEmpty(log.ExceptionType);
+                                    <tr>
+                                        <td class="text-secondary small font-monospace">@log.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td>
+                                            <span class="badge rounded-pill @LevelClass(log.Level)">@log.Level</span>
+                                        </td>
+                                        <td class="small font-monospace text-secondary">@log.Category</td>
+                                        <td class="small">
+                                            <div>@log.Message</div>
+                                            @if (_expanded.Contains(log.Id))
+                                            {
+                                                @if (!string.IsNullOrEmpty(log.Details))
+                                                {
+                                                    <pre class="mt-2 p-2 bg-light rounded small" style="white-space:pre-wrap;font-size:.75rem;">@log.Details</pre>
+                                                }
+                                                @if (!string.IsNullOrEmpty(log.ExceptionType))
+                                                {
+                                                    <div class="mt-1 text-danger small">
+                                                        <strong>@log.ExceptionType:</strong> @log.ExceptionMessage
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(log.RequestPath))
+                                                {
+                                                    <div class="mt-1 text-secondary small font-monospace">Path: @log.RequestPath</div>
+                                                }
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (hasDetails)
+                                            {
+                                                <button class="btn btn-sm btn-link p-0 text-secondary" @onclick="() => ToggleExpand(log.Id)">
+                                                    <i class="bi @(_expanded.Contains(log.Id) ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @* Pagination *@
+            @if (_totalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">@_total entries</span>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary rounded-3" disabled="@(_page <= 1)" @onclick="PrevPage">← Prev</button>
+                        <span class="btn btn-sm disabled rounded-3">@_page / @_totalPages</span>
+                        <button class="btn btn-sm btn-outline-secondary rounded-3" disabled="@(_page >= _totalPages)" @onclick="NextPage">Next →</button>
+                    </div>
+                </div>
+            }
+        }
+
+    </div>
+}
+
+@code {
+    private bool _isStaff;
+    private bool _loading = true;
+    private string? _error;
+
+    private string _filterLevel    = "";
+    private string _filterCategory = "";
+    private string _filterSearch   = "";
+
+    private List<LogEntryDto> _logs = [];
+    private HashSet<Guid> _expanded = [];
+    private int _total;
+    private int _page = 1;
+    private const int PageSize = 50;
+    private int _totalPages => (int)Math.Ceiling(_total / (double)PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isAdmin      = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin),      "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport    = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport),    "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = isSuperAdmin || isAdmin || isSupport;
+
+        if (_isStaff) await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error   = null;
+        _expanded.Clear();
+
+        try
+        {
+            var qs = $"?page={_page}&pageSize={PageSize}";
+            if (!string.IsNullOrEmpty(_filterLevel))    qs += $"&level={_filterLevel}";
+            if (!string.IsNullOrEmpty(_filterCategory)) qs += $"&category={Uri.EscapeDataString(_filterCategory)}";
+            if (!string.IsNullOrEmpty(_filterSearch))   qs += $"&search={Uri.EscapeDataString(_filterSearch)}";
+
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<LogPageDto>($"/api/v1/admin/logs{qs}", AethonApiClient.JsonOptions);
+            if (result is not null)
+            {
+                _logs  = result.Items;
+                _total = result.Total;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load logs: {ex.Message}";
+        }
+
+        _loading = false;
+    }
+
+    private async Task PrevPage() { _page--; await LoadAsync(); }
+    private async Task NextPage() { _page++; await LoadAsync(); }
+
+    private void ToggleExpand(Guid id)
+    {
+        if (!_expanded.Add(id)) _expanded.Remove(id);
+    }
+
+    private async Task PurgeOldLogs()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.DeleteAsync("/api/v1/admin/logs?olderThanDays=30");
+            if (resp.IsSuccessStatusCode) await LoadAsync();
+        }
+        catch { }
+    }
+
+    private static string LevelClass(SystemLogLevel level) => level switch
+    {
+        SystemLogLevel.Debug    => "bg-secondary",
+        SystemLogLevel.Info     => "bg-info text-dark",
+        SystemLogLevel.Warning  => "bg-warning text-dark",
+        SystemLogLevel.Error    => "bg-danger",
+        SystemLogLevel.Critical => "bg-dark",
+        _                       => "bg-secondary"
+    };
+
+    private sealed class LogPageDto
+    {
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public List<LogEntryDto> Items { get; set; } = [];
+    }
+
+    private sealed class LogEntryDto
+    {
+        public Guid Id { get; set; }
+        public DateTime TimestampUtc { get; set; }
+        public SystemLogLevel Level { get; set; }
+        public string Category { get; set; } = "";
+        public string Message { get; set; } = "";
+        public string? Details { get; set; }
+        public string? ExceptionType { get; set; }
+        public string? ExceptionMessage { get; set; }
+        public Guid? UserId { get; set; }
+        public string? RequestPath { get; set; }
+    }
+}

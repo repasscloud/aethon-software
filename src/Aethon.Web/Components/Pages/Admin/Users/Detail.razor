@@ -1,0 +1,470 @@
+@page "/admin/users/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+
+<PageTitle>@(_user?.DisplayName ?? "User") | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else if (!_ready)
+{
+    <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+}
+else if (_user is null)
+{
+    <div class="alert alert-danger rounded-4">User not found.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <a href="/admin/users" class="text-secondary small text-decoration-none">← All users</a>
+                <div class="d-flex align-items-start gap-3 flex-wrap mt-2">
+                    <div class="flex-grow-1">
+                        <h1 class="h3 fw-bold mb-1">@_user.DisplayName</h1>
+                        <div class="text-secondary">@_user.Email</div>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <span class="badge bg-secondary rounded-pill">@_user.UserType</span>
+                            @if (_user.IsEnabled)
+                            {
+                                <span class="badge bg-success rounded-pill">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger rounded-pill">Disabled</span>
+                            }
+                            @if (_user.IsIdentityVerified)
+                            {
+                                <span class="badge bg-primary rounded-pill"><i class="bi bi-patch-check-fill me-1"></i>Identity verified</span>
+                            }
+                            @foreach (var role in _user.Roles)
+                            {
+                                <span class="badge bg-dark rounded-pill">@role</span>
+                            }
+                        </div>
+                    </div>
+                    @if (_isSuperAdmin || _isAdmin)
+                    {
+                        <div class="d-flex gap-2 flex-wrap">
+                            @if (_user.IsEnabled)
+                            {
+                                <button class="btn btn-sm btn-outline-danger rounded-pill" @onclick="() => SetStatus(false)" disabled="@_saving">
+                                    @(_saving ? "…" : "Disable account")
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-outline-success rounded-pill" @onclick="() => SetStatus(true)" disabled="@_saving">
+                                    @(_saving ? "…" : "Enable account")
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+                @if (!string.IsNullOrEmpty(_statusMessage))
+                {
+                    <div class="alert @(_statusSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mt-3 mb-0">@_statusMessage</div>
+                }
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Account details</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">User ID</dt>
+                            <dd class="col-7 text-truncate"><code class="small">@_user.Id</code></dd>
+                            <dt class="col-5 text-secondary">Email confirmed</dt>
+                            <dd class="col-7">@(_user.EmailConfirmed ? "Yes" : "No")</dd>
+                            <dt class="col-5 text-secondary">Phone confirmed</dt>
+                            <dd class="col-7">@(_user.PhoneNumberConfirmed ? "Yes" : "No")</dd>
+                            <dt class="col-5 text-secondary">Lockout ends</dt>
+                            <dd class="col-7">@(_user.LockoutEnd.HasValue ? _user.LockoutEnd.Value.ToString("dd MMM yyyy HH:mm") + " UTC" : "—")</dd>
+                            <dt class="col-5 text-secondary">Failed logins</dt>
+                            <dd class="col-7">@_user.AccessFailedCount</dd>
+                            @if (_user.IsIdentityVerified && _user.IdentityVerifiedUtc.HasValue)
+                            {
+                                <dt class="col-5 text-secondary">ID verified</dt>
+                                <dd class="col-7">@_user.IdentityVerifiedUtc.Value.ToString("dd MMM yyyy")</dd>
+                            }
+                            @if (!string.IsNullOrEmpty(_user.IdentityVerificationNotes))
+                            {
+                                <dt class="col-5 text-secondary">ID notes</dt>
+                                <dd class="col-7">@_user.IdentityVerificationNotes</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            @if (_user.Memberships.Count > 0)
+            {
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h2 class="h5 fw-bold mb-3">Organisation memberships</h2>
+                            @foreach (var m in _user.Memberships)
+                            {
+                                <div class="border rounded-3 p-3 mb-2">
+                                    <div class="fw-semibold small">@m.OrganisationName</div>
+                                    <div class="d-flex gap-2 flex-wrap mt-1">
+                                        <span class="badge bg-secondary rounded-pill" style="font-size:.7rem;">@m.OrganisationType</span>
+                                        <span class="badge @(m.Status == "Active" ? "bg-success" : "bg-danger") rounded-pill" style="font-size:.7rem;">@m.Status</span>
+                                        @if (m.IsOwner) { <span class="badge bg-dark rounded-pill" style="font-size:.7rem;">Owner</span> }
+                                        @if (!string.IsNullOrEmpty(m.CompanyRole)) { <span class="badge bg-secondary rounded-pill" style="font-size:.7rem;">@m.CompanyRole</span> }
+                                        @if (!string.IsNullOrEmpty(m.RecruiterRole)) { <span class="badge bg-secondary rounded-pill" style="font-size:.7rem;">@m.RecruiterRole</span> }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Actions panel — available to all staff -->
+        <div class="row g-3">
+            <!-- Reset password -->
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Reset password</h2>
+                        @if (!string.IsNullOrEmpty(_resetPwdMessage))
+                        {
+                            <div class="alert @(_resetPwdSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3 small">@_resetPwdMessage</div>
+                        }
+                        <input class="form-control form-control-sm mb-2" type="password" placeholder="New password"
+                               @bind="_newPassword" />
+                        <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="ResetPassword" disabled="@_resetPwdSaving">
+                            @(_resetPwdSaving ? "Saving…" : "Set password")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verify email -->
+            @if (!_user.EmailConfirmed)
+            {
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h2 class="h5 fw-bold mb-3">Verify email</h2>
+                            @if (!string.IsNullOrEmpty(_verifyEmailMessage))
+                            {
+                                <div class="alert @(_verifyEmailSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3 small">@_verifyEmailMessage</div>
+                            }
+                            <p class="text-secondary small">Mark the user's email address as confirmed without sending a verification link.</p>
+                            <button class="btn btn-sm btn-outline-success rounded-pill" @onclick="VerifyEmail" disabled="@_verifyEmailSaving">
+                                @(_verifyEmailSaving ? "Confirming…" : "Mark email confirmed")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Verify identity -->
+            @if (!_user.IsIdentityVerified)
+            {
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100">
+                        <div class="card-body p-4">
+                            <h2 class="h5 fw-bold mb-3">Verify identity</h2>
+                            @if (!string.IsNullOrEmpty(_verifyIdMessage))
+                            {
+                                <div class="alert @(_verifyIdSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3 small">@_verifyIdMessage</div>
+                            }
+                            <textarea class="form-control form-control-sm mb-2" rows="2" placeholder="Notes (optional)"
+                                      @bind="_verifyIdNotes"></textarea>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill" @onclick="VerifyIdentity" disabled="@_verifyIdSaving">
+                                @(_verifyIdSaving ? "Saving…" : "Mark identity verified")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Force password change -->
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Force password change</h2>
+                        @if (!string.IsNullOrEmpty(_forcePasswordMessage))
+                        {
+                            <div class="alert @(_forcePasswordSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3 small">@_forcePasswordMessage</div>
+                        }
+                        <p class="text-secondary small">Require this user to set a new password on their next login.</p>
+                        <button class="btn btn-sm btn-outline-warning rounded-pill" @onclick="ForcePasswordChange" disabled="@_forcePasswordSaving">
+                            @(_forcePasswordSaving ? "Saving…" : "Force password change")
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Force MFA setup -->
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Force MFA setup</h2>
+                        @if (!string.IsNullOrEmpty(_forceMfaMessage))
+                        {
+                            <div class="alert @(_forceMfaSuccess ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3 small">@_forceMfaMessage</div>
+                        }
+                        <p class="text-secondary small">Require this user to enable two-factor authentication on their next login.</p>
+                        <button class="btn btn-sm btn-outline-warning rounded-pill" @onclick="ForceMfaSetup" disabled="@_forceMfaSaving">
+                            @(_forceMfaSaving ? "Saving…" : "Force MFA setup")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border rounded-4 p-4">
+                    <h2 class="h5 fw-bold mb-3">Send Aethon Mail</h2>
+                    <p class="text-secondary small">Compose and send a custom email to this user using the Aethon branded template.</p>
+                    <a href="/admin/compose-email?userId=@_user.Id" class="btn btn-sm btn-outline-primary rounded-pill">
+                        <i class="bi bi-envelope-paper me-1"></i> Send Aethon Mail
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isSuperAdmin;
+    private bool _isAdmin;
+    private bool _isStaff;
+    private bool _ready;
+    private bool _saving;
+    private string? _statusMessage;
+    private bool _statusSuccess;
+    private UserDetail? _user;
+
+    private string _newPassword = "";
+    private bool _resetPwdSaving;
+    private string? _resetPwdMessage;
+    private bool _resetPwdSuccess;
+
+    private bool _verifyEmailSaving;
+    private string? _verifyEmailMessage;
+    private bool _verifyEmailSuccess;
+
+    private string _verifyIdNotes = "";
+    private bool _verifyIdSaving;
+    private string? _verifyIdMessage;
+    private bool _verifyIdSuccess;
+
+    private bool _forcePasswordSaving;
+    private string? _forcePasswordMessage;
+    private bool _forcePasswordSuccess;
+
+    private bool _forceMfaSaving;
+    private string? _forceMfaMessage;
+    private bool _forceMfaSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        _isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = _isSuperAdmin || _isAdmin || isSupport;
+
+        if (_isStaff)
+        {
+            try
+            {
+                var client = await Api.CreateAsync();
+                _user = await client.GetFromJsonAsync<UserDetail>($"/api/v1/admin/users/{Id}", AethonApiClient.JsonOptions);
+            }
+            catch { }
+        }
+
+        _ready = true;
+    }
+
+    private async Task SetStatus(bool enabled)
+    {
+        _saving = true;
+        _statusMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                $"/api/v1/admin/users/{Id}/status",
+                new { isEnabled = enabled },
+                AethonApiClient.JsonOptions);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _statusSuccess = true;
+                _statusMessage = enabled ? "Account enabled." : "Account disabled.";
+                if (_user is not null)
+                    _user = _user with { IsEnabled = enabled };
+            }
+            else
+            {
+                _statusSuccess = false;
+                _statusMessage = "Failed to update account status.";
+            }
+        }
+        catch
+        {
+            _statusSuccess = false;
+            _statusMessage = "An error occurred.";
+        }
+        _saving = false;
+    }
+
+    private async Task ResetPassword()
+    {
+        if (string.IsNullOrWhiteSpace(_newPassword)) return;
+        _resetPwdSaving = true;
+        _resetPwdMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync(
+                $"/api/v1/admin/users/{Id}/reset-password",
+                new { newPassword = _newPassword },
+                AethonApiClient.JsonOptions);
+            if (resp.IsSuccessStatusCode)
+            {
+                _resetPwdSuccess = true;
+                _resetPwdMessage = "Password reset successfully.";
+                _newPassword = "";
+            }
+            else
+            {
+                _resetPwdSuccess = false;
+                _resetPwdMessage = "Failed to reset password.";
+            }
+        }
+        catch
+        {
+            _resetPwdSuccess = false;
+            _resetPwdMessage = "An error occurred.";
+        }
+        _resetPwdSaving = false;
+    }
+
+    private async Task VerifyEmail()
+    {
+        _verifyEmailSaving = true;
+        _verifyEmailMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsync($"/api/v1/admin/users/{Id}/verify-email", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                _verifyEmailSuccess = true;
+                _verifyEmailMessage = "Email marked as confirmed.";
+                if (_user is not null)
+                    _user = _user with { EmailConfirmed = true };
+            }
+            else
+            {
+                _verifyEmailSuccess = false;
+                _verifyEmailMessage = "Failed to confirm email.";
+            }
+        }
+        catch
+        {
+            _verifyEmailSuccess = false;
+            _verifyEmailMessage = "An error occurred.";
+        }
+        _verifyEmailSaving = false;
+    }
+
+    private async Task VerifyIdentity()
+    {
+        _verifyIdSaving = true;
+        _verifyIdMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync(
+                $"/api/v1/admin/users/{Id}/verify-identity",
+                new { notes = string.IsNullOrWhiteSpace(_verifyIdNotes) ? (string?)null : _verifyIdNotes },
+                AethonApiClient.JsonOptions);
+            if (resp.IsSuccessStatusCode)
+            {
+                _verifyIdSuccess = true;
+                _verifyIdMessage = "Identity marked as verified.";
+                if (_user is not null)
+                    _user = _user with { IsIdentityVerified = true, IdentityVerifiedUtc = DateTime.UtcNow };
+            }
+            else
+            {
+                _verifyIdSuccess = false;
+                _verifyIdMessage = "Failed to verify identity.";
+            }
+        }
+        catch
+        {
+            _verifyIdSuccess = false;
+            _verifyIdMessage = "An error occurred.";
+        }
+        _verifyIdSaving = false;
+    }
+
+    private async Task ForcePasswordChange()
+    {
+        _forcePasswordSaving = true;
+        _forcePasswordMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsync($"/api/v1/admin/users/{Id}/force-password-change", null);
+            _forcePasswordSuccess = resp.IsSuccessStatusCode;
+            _forcePasswordMessage = resp.IsSuccessStatusCode
+                ? "User will be required to change password on next login."
+                : "Failed to set flag.";
+        }
+        catch { _forcePasswordSuccess = false; _forcePasswordMessage = "An error occurred."; }
+        _forcePasswordSaving = false;
+    }
+
+    private async Task ForceMfaSetup()
+    {
+        _forceMfaSaving = true;
+        _forceMfaMessage = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsync($"/api/v1/admin/users/{Id}/force-mfa-setup", null);
+            _forceMfaSuccess = resp.IsSuccessStatusCode;
+            _forceMfaMessage = resp.IsSuccessStatusCode
+                ? "User will be required to enable MFA on next login."
+                : "Failed to set flag.";
+        }
+        catch { _forceMfaSuccess = false; _forceMfaMessage = "An error occurred."; }
+        _forceMfaSaving = false;
+    }
+
+    private sealed record MembershipRow(Guid OrganisationId, string OrganisationName, string? OrganisationType,
+        string? Status, bool IsOwner, string? CompanyRole, string? RecruiterRole, DateTime? JoinedUtc);
+
+    private sealed record UserDetail(
+        Guid Id, string? Email, string DisplayName, string? UserType,
+        bool IsEnabled, bool IsIdentityVerified, DateTime? IdentityVerifiedUtc, string? IdentityVerificationNotes,
+        bool IsPhoneNumberVerified, bool PhoneNumberConfirmed, bool EmailConfirmed,
+        DateTimeOffset? LockoutEnd, int AccessFailedCount,
+        List<string> Roles, List<MembershipRow> Memberships);
+}

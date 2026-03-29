@@ -1,0 +1,532 @@
+@page "/app/applications/{Id}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Jobs
+@using Aethon.Shared.Applications
+@using Aethon.Shared.Enums
+@using Microsoft.AspNetCore.Authorization
+@inject AethonApiClient Api
+
+<PageTitle>Application | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading application…</div>
+    </div>
+}
+else if (_item is null)
+{
+    <div class="alert alert-danger rounded-4 mb-0">@(_error ?? "Application not found.")</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                        <h1 class="h3 fw-bold mb-2">@_item.ApplicantDisplayName</h1>
+                        <div class="text-secondary">@_item.ApplicantEmail</div>
+                        <div class="text-secondary mt-1">Applied for <a href="/app/jobs/@_item.JobId">@_item.JobTitle</a></div>
+                    </div>
+
+                    <a class="btn btn-outline-secondary rounded-4 px-4" href="/app/jobs/@_item.JobId/applications">Back</a>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_message))
+                {
+                    <div class="alert alert-success rounded-4 mt-3 mb-0">@_message</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <div class="alert alert-danger rounded-4 mt-3 mb-0">@_error</div>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Application status</h2>
+
+                <EditForm Model="_updateModel" OnValidSubmit="SaveStatusAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">Status</label>
+                            <InputSelect @bind-Value="_updateModel.Status" class="form-select rounded-4">
+                                @foreach (var status in _statusOptions)
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Internal notes</label>
+                            <InputTextArea @bind-Value="_updateModel.Notes" class="form-control rounded-4" rows="5" />
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                            @(_saving ? "Saving..." : "Save status")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Cover letter</h2>
+                <div style="white-space: pre-wrap;">@(!string.IsNullOrWhiteSpace(_item.CoverLetter) ? _item.CoverLetter : "-")</div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Resume</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_item.ResumeDownloadUrl))
+                {
+                    <a class="btn btn-outline-dark rounded-4 px-4" href="@_item.ResumeDownloadUrl" target="_blank">Download resume</a>
+                }
+                else
+                {
+                    <div class="text-secondary">No resume attached.</div>
+                }
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Metadata</h2>
+                <div class="small text-secondary">Submitted: @_item.SubmittedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                <div class="small text-secondary">Source: @(_item.Source ?? "-")</div>
+                <div class="small text-secondary">Last status change: @(_item.LastStatusChangedUtc?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "-")</div>
+            </div>
+        </div>
+
+        @* ── Timeline panel ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Timeline</h2>
+
+                @if (_timelineLoading)
+                {
+                    <div class="text-secondary small">Loading timeline…</div>
+                }
+                else if (_timeline.Count == 0)
+                {
+                    <div class="text-secondary small">No timeline events yet.</div>
+                }
+                else
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var item in _timeline)
+                        {
+                            <div class="card border-0 bg-light rounded-4">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                        <span class="fw-semibold">@item.Title</span>
+                                        <span class="text-secondary small text-nowrap">@item.OccurredUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(item.PerformedByDisplayName))
+                                    {
+                                        <div class="text-secondary small mb-1">By @item.PerformedByDisplayName</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.FromStatus) || !string.IsNullOrWhiteSpace(item.ToStatus))
+                                    {
+                                        <div class="small text-secondary mb-1">
+                                            @if (!string.IsNullOrWhiteSpace(item.FromStatus) && !string.IsNullOrWhiteSpace(item.ToStatus))
+                                            {
+                                                <span>@item.FromStatus &rarr; @item.ToStatus</span>
+                                            }
+                                            else if (!string.IsNullOrWhiteSpace(item.ToStatus))
+                                            {
+                                                <span>Status: @item.ToStatus</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                                    {
+                                        <div class="small" style="white-space: pre-wrap;">@item.Description</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Add note panel ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Add note</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_noteSuccess))
+                {
+                    <div class="alert alert-success rounded-4 mb-3">@_noteSuccess</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_noteError))
+                {
+                    <div class="alert alert-danger rounded-4 mb-3">@_noteError</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Note content</label>
+                    <InputTextArea @bind-Value="_noteContent" class="form-control rounded-4" rows="4" placeholder="Write an internal note…" />
+                </div>
+
+                <button type="button" class="btn btn-dark rounded-4 px-4" disabled="@_savingNote" @onclick="AddNoteAsync">
+                    @(_savingNote ? "Saving..." : "Add note")
+                </button>
+            </div>
+        </div>
+
+        @* ── Comments thread panel ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Comments</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_commentSuccess))
+                {
+                    <div class="alert alert-success rounded-4 mb-3">@_commentSuccess</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_commentError))
+                {
+                    <div class="alert alert-danger rounded-4 mb-3">@_commentError</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Comment</label>
+                    <InputTextArea @bind-Value="_commentContent" class="form-control rounded-4" rows="4" placeholder="Write a comment…" />
+                </div>
+
+                <button type="button" class="btn btn-dark rounded-4 px-4" disabled="@_savingComment" @onclick="AddCommentAsync">
+                    @(_savingComment ? "Saving..." : "Add comment")
+                </button>
+            </div>
+        </div>
+
+        @* ── Schedule interview panel ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Schedule interview</h2>
+
+                @if (!string.IsNullOrWhiteSpace(_interviewSuccess))
+                {
+                    <div class="alert alert-success rounded-4 mb-3">@_interviewSuccess</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_interviewError))
+                {
+                    <div class="alert alert-danger rounded-4 mb-3">@_interviewError</div>
+                }
+
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Type</label>
+                        <InputSelect @bind-Value="_interviewForm.Type" class="form-select rounded-4">
+                            <option value="@InterviewType.PhoneScreen">Phone Screen</option>
+                            <option value="@InterviewType.VideoInterview">Video Interview</option>
+                            <option value="@InterviewType.InPerson">In Person</option>
+                            <option value="@InterviewType.TechnicalAssessment">Technical Assessment</option>
+                            <option value="@InterviewType.PanelInterview">Panel Interview</option>
+                            <option value="@InterviewType.FinalInterview">Final Interview</option>
+                            <option value="@InterviewType.Other">Other</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 col-lg-8">
+                        <label class="form-label fw-semibold">Title</label>
+                        <InputText @bind-Value="_interviewForm.Title" class="form-control rounded-4" placeholder="e.g. First round interview" />
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Location <span class="text-secondary fw-normal">(optional)</span></label>
+                        <InputText @bind-Value="_interviewForm.Location" class="form-control rounded-4" placeholder="e.g. 123 Main St, Room 4B" />
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Meeting URL <span class="text-secondary fw-normal">(optional)</span></label>
+                        <InputText @bind-Value="_interviewForm.MeetingUrl" class="form-control rounded-4" placeholder="https://meet.example.com/…" />
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Start (UTC)</label>
+                        <input type="datetime-local" class="form-control rounded-4" @bind="_interviewForm.ScheduledStartUtc" />
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">End (UTC)</label>
+                        <input type="datetime-local" class="form-control rounded-4" @bind="_interviewForm.ScheduledEndUtc" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Notes <span class="text-secondary fw-normal">(optional)</span></label>
+                        <InputTextArea @bind-Value="_interviewForm.Notes" class="form-control rounded-4" rows="4" placeholder="Any additional notes…" />
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="button" class="btn btn-dark rounded-4 px-4" disabled="@_savingInterview" @onclick="ScheduleInterviewAsync">
+                        @(_savingInterview ? "Scheduling..." : "Schedule interview")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "";
+
+    // ── existing state ──────────────────────────────────────────────────────
+    private bool _loaded;
+    private bool _saving;
+    private string? _error;
+    private string? _message;
+    private EmployerJobApplicationDetailDto? _item;
+    private UpdateJobApplicationStatusRequestDto _updateModel = new();
+    private List<string> _statusOptions = [];
+
+    // ── timeline ────────────────────────────────────────────────────────────
+    private bool _timelineLoading;
+    private List<ApplicationTimelineItemDto> _timeline = [];
+
+    // ── add note ────────────────────────────────────────────────────────────
+    private bool _savingNote;
+    private string? _noteError;
+    private string? _noteSuccess;
+    private string _noteContent = "";
+
+    // ── comments ────────────────────────────────────────────────────────────
+    private bool _savingComment;
+    private string? _commentError;
+    private string? _commentSuccess;
+    private string _commentContent = "";
+
+    // ── schedule interview ──────────────────────────────────────────────────
+    private bool _savingInterview;
+    private string? _interviewError;
+    private string? _interviewSuccess;
+    private InterviewFormModel _interviewForm = new();
+
+    private sealed class InterviewFormModel
+    {
+        public InterviewType Type { get; set; } = InterviewType.PhoneScreen;
+        public string Title { get; set; } = "";
+        public string? Location { get; set; }
+        public string? MeetingUrl { get; set; }
+        public string? Notes { get; set; }
+        public DateTime ScheduledStartUtc { get; set; } = DateTime.UtcNow;
+        public DateTime ScheduledEndUtc { get; set; } = DateTime.UtcNow.AddHours(1);
+    }
+
+    // ── lifecycle ────────────────────────────────────────────────────────────
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _error = null;
+        _message = null;
+        _timeline = [];
+
+        try
+        {
+            var client = await Api.CreateAsync();
+
+            _statusOptions = await client.GetFromJsonAsync<List<string>>("/api/v1/applications/status-options", AethonApiClient.JsonOptions) ?? [];
+
+            var response = await client.GetAsync($"/api/v1/applications/{Id}");
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                _error = "Application not found.";
+                return;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Could not load application.";
+                return;
+            }
+
+            _item = await response.Content.ReadFromJsonAsync<EmployerJobApplicationDetailDto>(AethonApiClient.JsonOptions);
+            if (_item is not null)
+            {
+                _updateModel = new UpdateJobApplicationStatusRequestDto
+                {
+                    Status = _item.Status,
+                    Notes = _item.Notes
+                };
+            }
+
+            // Load timeline alongside the main data fetch
+            _timelineLoading = true;
+            try
+            {
+                _timeline = await client.GetFromJsonAsync<List<ApplicationTimelineItemDto>>($"/api/v1/applications/{Id}/timeline", AethonApiClient.JsonOptions) ?? [];
+            }
+            catch
+            {
+                // Timeline failure is non-fatal; leave _timeline empty
+            }
+            finally
+            {
+                _timelineLoading = false;
+            }
+        }
+        catch
+        {
+            _error = "Could not load application.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    // ── save status ──────────────────────────────────────────────────────────
+    private async Task SaveStatusAsync()
+    {
+        _saving = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync($"/api/v1/applications/{Id}/status", _updateModel);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Could not save application status.";
+                return;
+            }
+
+            _item = await response.Content.ReadFromJsonAsync<EmployerJobApplicationDetailDto>(AethonApiClient.JsonOptions);
+            _message = "Application updated.";
+        }
+        catch
+        {
+            _error = "Could not save application status.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    // ── add note ──────────────────────────────────────────────────────────────
+    private async Task AddNoteAsync()
+    {
+        _savingNote = true;
+        _noteError = null;
+        _noteSuccess = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var payload = new { applicationId = Id, content = _noteContent };
+            var response = await client.PostAsJsonAsync($"/api/v1/applications/{Id}/notes", payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _noteError = "Could not add note.";
+                return;
+            }
+
+            _noteSuccess = "Note added.";
+            _noteContent = "";
+        }
+        catch
+        {
+            _noteError = "Could not add note.";
+        }
+        finally
+        {
+            _savingNote = false;
+        }
+    }
+
+    // ── add comment ───────────────────────────────────────────────────────────
+    private async Task AddCommentAsync()
+    {
+        _savingComment = true;
+        _commentError = null;
+        _commentSuccess = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var payload = new { applicationId = Id, content = _commentContent, parentCommentId = (Guid?)null };
+            var response = await client.PostAsJsonAsync($"/api/v1/applications/{Id}/comments", payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _commentError = "Could not add comment.";
+                return;
+            }
+
+            _commentSuccess = "Comment added.";
+            _commentContent = "";
+        }
+        catch
+        {
+            _commentError = "Could not add comment.";
+        }
+        finally
+        {
+            _savingComment = false;
+        }
+    }
+
+    // ── schedule interview ─────────────────────────────────────────────────────
+    private async Task ScheduleInterviewAsync()
+    {
+        _savingInterview = true;
+        _interviewError = null;
+        _interviewSuccess = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var payload = new
+            {
+                applicationId = Id,
+                type = _interviewForm.Type,
+                title = _interviewForm.Title,
+                location = _interviewForm.Location,
+                meetingUrl = _interviewForm.MeetingUrl,
+                notes = _interviewForm.Notes,
+                scheduledStartUtc = _interviewForm.ScheduledStartUtc,
+                scheduledEndUtc = _interviewForm.ScheduledEndUtc
+            };
+            var response = await client.PostAsJsonAsync($"/api/v1/applications/{Id}/interviews", payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _interviewError = "Could not schedule interview.";
+                return;
+            }
+
+            _interviewSuccess = "Interview scheduled.";
+            _interviewForm = new InterviewFormModel();
+        }
+        catch
+        {
+            _interviewError = "Could not schedule interview.";
+        }
+        finally
+        {
+            _savingInterview = false;
+        }
+    }
+}

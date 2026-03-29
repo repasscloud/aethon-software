@@ -1,0 +1,186 @@
+@page "/verify-email"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>Verify your email | Aethon</PageTitle>
+
+<div class="container-fluid login-shell py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+            <div class="card border-0 shadow-lg rounded-4">
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
+                             style="width:64px;height:64px;font-size:1.4rem;font-weight:700;">
+                            A
+                        </div>
+
+                        @if (_loading)
+                        {
+                            <h2 class="h4 fw-bold mb-1">Verifying your email…</h2>
+                            <p class="text-secondary small mb-0">Please wait a moment.</p>
+                        }
+                        else if (_succeeded)
+                        {
+                            <h2 class="h4 fw-bold mb-1">Email verified!</h2>
+                            <p class="text-secondary small mb-0">Your email address has been confirmed.</p>
+                        }
+                        else
+                        {
+                            <h2 class="h4 fw-bold mb-1">Verification failed</h2>
+                            <p class="text-secondary small mb-0">This link is invalid or has expired.</p>
+                        }
+                    </div>
+
+                    @if (_loading)
+                    {
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-dark" role="status"></div>
+                        </div>
+                    }
+                    else if (_succeeded)
+                    {
+                        <div class="d-grid mb-3">
+                            <a href="/login" class="btn btn-dark btn-lg rounded-4" style="min-height:52px;line-height:52px;padding:0;">
+                                Sign in to Aethon
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger rounded-3 mb-3 small">@_errorMessage</div>
+                        }
+
+                        <p class="text-secondary small mb-3">
+                            Enter your email address to receive a new verification link.
+                        </p>
+
+                        <div class="mb-3">
+                            <input type="email"
+                                   class="form-control form-control-lg rounded-4"
+                                   style="min-height:52px;"
+                                   placeholder="name@example.com"
+                                   @bind="_resendEmail" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_resendMessage))
+                        {
+                            <div class="alert @(_resendError ? "alert-danger" : "alert-success") rounded-3 mb-3 small">@_resendMessage</div>
+                        }
+
+                        <div class="d-grid mb-3">
+                            <button class="btn btn-dark btn-lg rounded-4" style="min-height:52px;"
+                                    @onclick="ResendVerification" disabled="@(_resending || _resentOk)">
+                                @if (_resending)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <span>Sending…</span>
+                                }
+                                else if (_resentOk)
+                                {
+                                    <span>Email sent</span>
+                                }
+                                else
+                                {
+                                    <span>Send new verification link</span>
+                                }
+                            </button>
+                        </div>
+
+                        <div class="text-center">
+                            <a href="/login" class="small text-secondary text-decoration-none">Back to sign in</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _succeeded;
+    private string? _errorMessage;
+
+    private string _resendEmail = "";
+    private bool _resending;
+    private bool _resentOk;
+    private string? _resendMessage;
+    private bool _resendError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        query.TryGetValue("userId", out var userIdVal);
+        query.TryGetValue("token", out var tokenVal);
+
+        var userId = userIdVal.ToString();
+        var token  = tokenVal.ToString();
+
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
+        {
+            _loading = false;
+            _errorMessage = "Missing verification parameters. Please use the link from your email.";
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApiDirect");
+            var response = await client.PostAsJsonAsync("/api/v1/auth/verify-email", new { userId, token });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _succeeded = true;
+            }
+            else
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _errorMessage = "This verification link is invalid or has expired. Please request a new one below.";
+            }
+        }
+        catch
+        {
+            _errorMessage = "Unable to reach the service. Please try again later.";
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private async Task ResendVerification()
+    {
+        if (string.IsNullOrWhiteSpace(_resendEmail)) return;
+
+        _resending = true;
+        _resendMessage = null;
+        try
+        {
+            var client = HttpClientFactory.CreateClient("AethonApiDirect");
+            var response = await client.PostAsJsonAsync("/api/v1/auth/resend-verification", new { email = _resendEmail });
+            _resentOk = response.IsSuccessStatusCode;
+            _resendMessage = "If that email is registered and unverified, a new link has been sent.";
+            _resendError = false;
+        }
+        catch
+        {
+            _resendMessage = "Unable to reach the service. Please try again later.";
+            _resendError = true;
+        }
+        finally
+        {
+            _resending = false;
+        }
+    }
+}

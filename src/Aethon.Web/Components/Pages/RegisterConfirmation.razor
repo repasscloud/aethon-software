@@ -1,0 +1,67 @@
+@page "/register/confirmation"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@inject NavigationManager NavigationManager
+
+<PageTitle>Confirm your email | Aethon</PageTitle>
+
+<div class="container-fluid login-shell login-page-wrap py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-lg-7 col-xl-6">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="card-body p-4 p-lg-5 text-center">
+                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-4"
+                         style="width: 72px; height: 72px; font-size: 1.5rem; font-weight: 700;">
+                        A
+                    </div>
+
+                    <h1 class="h2 fw-bold mb-3">Confirm your account</h1>
+                    <p class="text-secondary fs-5 mb-3">
+                        We created your account and sent a confirmation link to
+                        <span class="fw-semibold text-dark">@Email</span>.
+                    </p>
+
+                    <p class="text-secondary mb-4">
+                        Open the email and click the confirmation link before signing in.
+                    </p>
+
+                    <div class="alert alert-secondary rounded-4 text-start mb-4">
+                        <div class="fw-semibold mb-2">Development note</div>
+                        <div class="mb-0">
+                            The API currently logs the confirmation link to its output. Use that link until email delivery is wired up.
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-3 d-sm-flex justify-content-center">
+                        <a class="btn btn-dark rounded-4 px-4 py-3" href="/login">Back to sign in</a>
+                        <a class="btn btn-outline-dark rounded-4 px-4 py-3" href="@RegisterAgainUrl">Register another account</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Email = "";
+    private string Type = "company";
+
+    private string RegisterAgainUrl => $"/register?type={Uri.EscapeDataString(Type)}";
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("email", out var email))
+        {
+            Email = email.ToString();
+        }
+
+        if (query.TryGetValue("type", out var type))
+        {
+            Type = type.ToString();
+        }
+    }
+}

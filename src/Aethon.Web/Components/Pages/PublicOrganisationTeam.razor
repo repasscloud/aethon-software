@@ -1,0 +1,139 @@
+@page "/organisations/{Slug}/team"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using System.Net
+@using System.Net.Http.Json
+@using Aethon.Shared.Organisations
+@using Microsoft.AspNetCore.Authorization
+@inject AethonApiClient Api
+@inject NavigationManager NavigationManager
+
+<PageTitle>Team | @(_orgName ?? Slug) | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading team…</div>
+    </div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <!-- Header -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <a href="/organisations/@Slug" class="text-secondary small text-decoration-none">← @(_orgName ?? Slug)</a>
+                <h1 class="h3 fw-bold mt-2 mb-0">Meet the team</h1>
+            </div>
+        </div>
+
+        <!-- Team grid -->
+        @if (_members.Count == 0)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <p class="text-secondary mb-0">No team members have published their profiles yet.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var m in _members)
+                {
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                        <a href="/organisations/@Slug/team/@m.Slug" class="text-decoration-none">
+                            <div class="card border-0 shadow-sm rounded-4 h-100 p-3 d-flex flex-column align-items-center text-center gap-2">
+                                @if (!string.IsNullOrEmpty(m.ProfilePictureUrl))
+                                {
+                                    <img src="@m.ProfilePictureUrl" alt="@m.DisplayName"
+                                         style="width:72px;height:72px;border-radius:50%;object-fit:cover;" />
+                                }
+                                else
+                                {
+                                    <div class="d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 rounded-circle"
+                                         style="width:72px;height:72px;">
+                                        <i class="bi bi-person text-secondary" style="font-size:1.8rem;"></i>
+                                    </div>
+                                }
+                                <div>
+                                    <div class="fw-semibold text-dark">
+                                        @m.DisplayName
+                                        @if (m.IsIdentityVerified)
+                                        {
+                                            <i class="bi bi-patch-check-fill text-success ms-1" title="ID Verified"></i>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(m.JobTitle))
+                                    {
+                                        <div class="text-secondary small">@m.JobTitle</div>
+                                    }
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+
+    private bool _loaded;
+    private string? _error;
+    private string? _orgName;
+    private List<PublicTeamMemberDto> _members = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loaded = false;
+        _error = null;
+        _members = [];
+
+        try
+        {
+            var client = await Api.CreateAsync();
+
+            // Load org name for breadcrumb
+            var orgResp = await client.GetAsync($"/api/v1/public/organisations/{Uri.EscapeDataString(Slug)}");
+            if (orgResp.StatusCode == HttpStatusCode.NotFound)
+            {
+                _error = "Organisation not found.";
+                return;
+            }
+            if (orgResp.IsSuccessStatusCode)
+            {
+                var org = await orgResp.Content.ReadFromJsonAsync<PublicOrganisationProfileDto>(AethonApiClient.JsonOptions);
+                _orgName = org?.Name;
+            }
+
+            var teamResp = await client.GetAsync($"/api/v1/public/organisations/{Uri.EscapeDataString(Slug)}/team");
+            if (teamResp.StatusCode == HttpStatusCode.NotFound)
+            {
+                _error = "Organisation not found.";
+                return;
+            }
+            if (teamResp.IsSuccessStatusCode)
+                _members = await teamResp.Content.ReadFromJsonAsync<List<PublicTeamMemberDto>>(AethonApiClient.JsonOptions) ?? [];
+            else
+                _error = "Could not load team.";
+        }
+        catch
+        {
+            _error = "Could not load team.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+}

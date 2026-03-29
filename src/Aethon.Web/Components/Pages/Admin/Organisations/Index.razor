@@ -1,0 +1,165 @@
+@page "/admin/organisations"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using System.Text.Json
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Organisations | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
+                <div class="flex-grow-1">
+                    <h1 class="h4 fw-bold mb-0">Organisations</h1>
+                </div>
+                <div class="d-flex gap-2">
+                    <input class="form-control form-control-sm" style="width:220px;" placeholder="Search name or slug…"
+                           @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadAsync">Search</button>
+                </div>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">Name</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Verification</th>
+                                    <th>Jobs</th>
+                                    <th>Public</th>
+                                    <th class="pe-4">Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_orgs.Count == 0)
+                                {
+                                    <tr><td colspan="7" class="ps-4 text-secondary py-4">No organisations found.</td></tr>
+                                }
+                                @foreach (var o in _orgs)
+                                {
+                                    <tr style="cursor:pointer;" @onclick="@(() => Nav.NavigateTo(OrgUrl(o.Id)))"  >
+                                        <td class="ps-4">
+                                            <div class="fw-semibold">@o.Name</div>
+                                            @if (!string.IsNullOrEmpty(o.Slug))
+                                            {
+                                                <div class="text-secondary small">@o.Slug</div>
+                                            }
+                                        </td>
+                                        <td><span class="badge bg-secondary rounded-pill">@o.Type</span></td>
+                                        <td><span class="badge @StatusBadge(o.Status) rounded-pill">@o.Status</span></td>
+                                        <td>@VerificationBadge(o.VerificationTier)</td>
+                                        <td>@o.JobCount</td>
+                                        <td>@(o.IsPublicProfileEnabled ? "✓" : "—")</td>
+                                        <td class="pe-4 text-secondary small">@o.CreatedUtc?.ToString("dd MMM yyyy")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @if (_total > _pageSize)
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">@_total total</span>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page <= 1)" @onclick="PrevPage">← Prev</button>
+                        <span class="btn btn-sm disabled">@_page</span>
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page * _pageSize >= _total)" @onclick="NextPage">Next →</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private bool _isSuperAdmin;
+    private bool _isStaff;
+    private bool _loading = true;
+    private string _search = "";
+    private List<OrgRow> _orgs = [];
+    private int _total, _page = 1;
+    private const int _pageSize = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = _isSuperAdmin || isAdmin || isSupport;
+        if (_isStaff) await LoadAsync();
+        else _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var url = $"/api/v1/admin/organisations?page={_page}&search={Uri.EscapeDataString(_search)}";
+            var result = await client.GetFromJsonAsync<PagedResult<OrgRow>>(url, AethonApiClient.JsonOptions);
+            if (result is not null) { _orgs = result.Items; _total = result.Total; }
+        }
+        catch { _orgs = []; }
+        _loading = false;
+    }
+
+    private async Task PrevPage() { _page--; await LoadAsync(); }
+    private async Task NextPage() { _page++; await LoadAsync(); }
+    private async Task OnSearchKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+    private static string OrgUrl(Guid id) => $"/admin/organisations/{id}";
+
+    private static string StatusBadge(string? s) => s switch
+    {
+        "Active" => "bg-success",
+        "Suspended" => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static RenderFragment VerificationBadge(string? tier) => tier switch
+    {
+        "EnhancedTrusted" => @<span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted</span>,
+        "StandardEmployer" => @<span class="badge bg-success rounded-pill"><i class="bi bi-patch-check me-1"></i>Standard</span>,
+        _ => @<span class="text-secondary small">None</span>
+    };
+
+    private sealed record OrgRow(Guid Id, string Name, string? Slug, string? Type, string? Status,
+        string? VerificationTier, bool IsPublicProfileEnabled, int JobCount, DateTime? CreatedUtc);
+
+    private sealed class PagedResult<T>
+    {
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public List<T> Items { get; set; } = [];
+    }
+}

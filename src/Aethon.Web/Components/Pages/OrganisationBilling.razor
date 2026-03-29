@@ -1,0 +1,359 @@
+@page "/app/organisation/billing"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using Aethon.Shared.Auth
+@using Aethon.Shared.Billing
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Organisations
+@using Microsoft.AspNetCore.Authorization
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Billing & Credits | Aethon</PageTitle>
+
+@if (!_ready)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        @* ── Header ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h1 class="h3 fw-bold mb-1">Billing &amp; Credits</h1>
+                    <p class="text-secondary mb-0">Manage your posting credits, view invoices, and update payment methods.</p>
+                </div>
+                <button class="btn btn-outline-secondary rounded-4 @(_portalBusy ? "disabled" : "")"
+                        @onclick="OpenBillingPortal">
+                    @if (_portalBusy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    <i class="bi bi-receipt me-1"></i> Invoices &amp; payment methods
+                </button>
+            </div>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger rounded-4">@_error</div>
+        }
+
+        @if (Nav.Uri.Contains("payment=success"))
+        {
+            <div class="alert alert-success rounded-4 d-flex align-items-center gap-2">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Payment successful. Your credits will appear below shortly once the payment is confirmed.</span>
+            </div>
+        }
+
+        @if (Nav.Uri.Contains("reason=no_payment_method"))
+        {
+            <div class="alert alert-warning rounded-4 d-flex align-items-center gap-2">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span>
+                    Your job was saved as a <strong>draft</strong> because no payment method is on file.
+                    Purchase credits below or complete a verification to add a payment method, then publish your job from the drafts list.
+                </span>
+            </div>
+        }
+
+        @* ── Verification status ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                        <h2 class="h5 fw-bold mb-1">Verification status</h2>
+                        @if (_profile?.VerificationTier == VerificationTier.EnhancedTrusted)
+                        {
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2">
+                                <i class="bi bi-patch-check-fill me-1"></i> Enhanced Trusted Employer
+                            </span>
+                        }
+                        else if (_profile?.VerificationTier == VerificationTier.StandardEmployer)
+                        {
+                            <span class="badge bg-primary rounded-pill px-3 py-2">
+                                <i class="bi bi-patch-check me-1"></i> Standard Verified Employer
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary rounded-pill px-3 py-2">Not verified</span>
+                        }
+                    </div>
+                    @if (_profile?.VerificationTier != VerificationTier.EnhancedTrusted)
+                    {
+                        <a href="/app/organisation/verification" class="btn btn-outline-primary rounded-4">
+                            @(_profile?.VerificationTier == VerificationTier.None ? "Get verified" : "Upgrade to Enhanced")
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ── Credit balance ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Credit balance</h2>
+
+                @if (_credits.Count == 0)
+                {
+                    <p class="text-secondary mb-0">No credits on your account yet. Purchase credits below or complete verification to receive your launch promotion credits.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Source</th>
+                                    <th class="text-end">Remaining</th>
+                                    <th class="text-end">Original</th>
+                                    <th>Expires</th>
+                                    <th>Converted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in _credits)
+                                {
+                                    var expired = c.ExpiresAt.HasValue && c.ExpiresAt.Value < DateTime.UtcNow;
+                                    <tr class="@(expired ? "text-secondary" : "") @(c.QuantityRemaining == 0 ? "text-decoration-line-through text-muted" : "")">
+                                        <td>
+                                            @switch (c.CreditType)
+                                            {
+                                                case CreditType.JobPostingStandard:
+                                                    <span class="badge bg-secondary rounded-pill">Standard post</span>
+                                                    break;
+                                                case CreditType.JobPostingPremium:
+                                                    <span class="badge bg-primary rounded-pill">Premium post</span>
+                                                    break;
+                                                case CreditType.StickyTop24h:
+                                                    <span class="badge bg-info text-dark rounded-pill">Sticky 24h</span>
+                                                    break;
+                                                case CreditType.StickyTop7d:
+                                                    <span class="badge bg-info text-dark rounded-pill">Sticky 7d</span>
+                                                    break;
+                                                case CreditType.StickyTop30d:
+                                                    <span class="badge bg-info text-dark rounded-pill">Sticky 30d</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td class="small text-secondary">
+                                            @switch (c.Source)
+                                            {
+                                                case CreditSource.LaunchPromotion:
+                                                    <span>Launch promo</span>
+                                                    break;
+                                                case CreditSource.StripePurchase:
+                                                    <span>Purchased</span>
+                                                    break;
+                                                case CreditSource.AdminGrant:
+                                                    <span>Admin grant</span>
+                                                    break;
+                                                case CreditSource.ConvertedFromStandard:
+                                                    <span>Converted</span>
+                                                    break;
+                                            }
+                                        </td>
+                                        <td class="text-end fw-bold">@c.QuantityRemaining</td>
+                                        <td class="text-end text-secondary">@c.QuantityOriginal</td>
+                                        <td class="small @(expired ? "text-danger" : "")">
+                                            @(c.ExpiresAt.HasValue ? (expired ? $"Expired {c.ExpiresAt.Value:d MMM yyyy}" : c.ExpiresAt.Value.ToString("d MMM yyyy")) : "No expiry")
+                                        </td>
+                                        <td class="small text-secondary">
+                                            @(c.ConvertedAt.HasValue ? c.ConvertedAt.Value.ToString("d MMM yyyy") : "—")
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Buy Standard credits ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-1">Buy Standard Job Post credits</h2>
+                <p class="text-secondary small mb-3">Each credit publishes one Standard job listing. Credits do not expire after purchase.</p>
+                <div class="row g-2">
+                    @foreach (var pack in _standardPacks)
+                    {
+                        <div class="col-6 col-md-3">
+                            <button class="btn btn-outline-secondary rounded-4 w-100 h-100 py-3 @(_checkoutBusy == pack.PriceKey ? "disabled" : "")"
+                                    @onclick="() => BuyCredits(pack.PriceKey)">
+                                @if (_checkoutBusy == pack.PriceKey)
+                                {
+                                    <span class="spinner-border spinner-border-sm d-block mx-auto mb-1"></span>
+                                }
+                                <div class="fw-bold">@pack.Label</div>
+                                <div class="small text-secondary">@DisplayPrice(pack.DisplayPriceKey)</div>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ── Buy Premium credits ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-1">Buy Premium Job Post credits</h2>
+                <p class="text-secondary small mb-3">Each credit publishes one Premium listing with enhanced visibility, highlight colour, video, and AI matching.</p>
+                <div class="row g-2">
+                    @foreach (var pack in _premiumPacks)
+                    {
+                        <div class="col-6 col-md-3">
+                            <button class="btn btn-outline-primary rounded-4 w-100 h-100 py-3 @(_checkoutBusy == pack.PriceKey ? "disabled" : "")"
+                                    @onclick="() => BuyCredits(pack.PriceKey)">
+                                @if (_checkoutBusy == pack.PriceKey)
+                                {
+                                    <span class="spinner-border spinner-border-sm d-block mx-auto mb-1"></span>
+                                }
+                                <div class="fw-bold">@pack.Label</div>
+                                <div class="small text-secondary">@DisplayPrice(pack.DisplayPriceKey)</div>
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _ready;
+    private bool _portalBusy;
+    private string? _checkoutBusy;
+    private string? _error;
+
+    private OrganisationProfileDto? _profile;
+    private List<CreditBalanceItemDto> _credits = [];
+
+    private record CreditPack(string PriceKey, string Label, string DisplayPriceKey);
+
+    private static readonly List<CreditPack> _standardPacks =
+    [
+        new("Stripe.Price.Job.Standard.1x",  "1 credit",   "Display.Price.Job.Standard.1x"),
+        new("Stripe.Price.Job.Standard.5x",  "5 credits",  "Display.Price.Job.Standard.5x"),
+        new("Stripe.Price.Job.Standard.10x", "10 credits", "Display.Price.Job.Standard.10x"),
+        new("Stripe.Price.Job.Standard.20x", "20 credits", "Display.Price.Job.Standard.20x"),
+    ];
+
+    private static readonly List<CreditPack> _premiumPacks =
+    [
+        new("Stripe.Price.Job.Premium.1x",  "1 credit",   "Display.Price.Job.Premium.1x"),
+        new("Stripe.Price.Job.Premium.5x",  "5 credits",  "Display.Price.Job.Premium.5x"),
+        new("Stripe.Price.Job.Premium.10x", "10 credits", "Display.Price.Job.Premium.10x"),
+        new("Stripe.Price.Job.Premium.20x", "20 credits", "Display.Price.Job.Premium.20x"),
+    ];
+
+    private Dictionary<string, string> _displayPrices = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var client = await Api.CreateAsync();
+
+        try
+        {
+            _profile = await client.GetFromJsonAsync<OrganisationProfileDto>(
+                "/api/v1/organisations/me/profile", AethonApiClient.JsonOptions);
+        }
+        catch { }
+
+        try
+        {
+            _credits = await client.GetFromJsonAsync<List<CreditBalanceItemDto>>(
+                "/api/v1/billing/me/credits", AethonApiClient.JsonOptions) ?? [];
+        }
+        catch { }
+
+        try
+        {
+            _displayPrices = await client.GetFromJsonAsync<Dictionary<string, string>>(
+                "/api/v1/billing/display-prices", AethonApiClient.JsonOptions) ?? [];
+        }
+        catch { }
+
+        _ready = true;
+    }
+
+    private string DisplayPrice(string key)
+    {
+        if (_displayPrices.TryGetValue(key, out var val) && !string.IsNullOrWhiteSpace(val))
+            return $"A${val}";
+        return "—";
+    }
+
+    private async Task BuyCredits(string priceKey)
+    {
+        _error = null;
+        _checkoutBusy = priceKey;
+        StateHasChanged();
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync("/api/v1/billing/credits/checkout",
+                new CreditsCheckoutRequestDto { PriceKey = priceKey });
+
+            if (resp.IsSuccessStatusCode)
+            {
+                var result = await resp.Content.ReadFromJsonAsync<BillingCheckoutResponseDto>(AethonApiClient.JsonOptions);
+                if (!string.IsNullOrEmpty(result?.CheckoutUrl))
+                {
+                    Nav.NavigateTo(result.CheckoutUrl, forceLoad: true);
+                    return;
+                }
+            }
+            _error = "Could not start checkout. Please try again.";
+        }
+        catch
+        {
+            _error = "Could not connect to billing service. Please try again.";
+        }
+
+        _checkoutBusy = null;
+    }
+
+    private async Task OpenBillingPortal()
+    {
+        _error = null;
+        _portalBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.GetFromJsonAsync<BillingPortalResponseDto>(
+                "/api/v1/billing/portal", AethonApiClient.JsonOptions);
+
+            if (!string.IsNullOrEmpty(resp?.Url))
+            {
+                Nav.NavigateTo(resp.Url, forceLoad: true);
+                return;
+            }
+            _error = "Billing portal unavailable. Complete a purchase first to enable invoice management.";
+        }
+        catch
+        {
+            _error = "Could not connect to billing service. Please try again.";
+        }
+
+        _portalBusy = false;
+    }
+
+    private sealed class BillingPortalResponseDto
+    {
+        public string Url { get; set; } = "";
+    }
+}

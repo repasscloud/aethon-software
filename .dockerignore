@@ -1,0 +1,27 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/.DS_Store
+.git
+.gitignore
+README.md
+
+# files to ignore
+aethon-software-c36b8dfa3564.json
+*.txt
+*.md
+*.ico
+*.png
+*.svg
+*.zsh
+*.sh
+*.txt
+*.log
+
+# folders to ignore
+_img/
+_old-notes/
+.claude/
+.github/
+db/

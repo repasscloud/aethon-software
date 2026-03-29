@@ -1,0 +1,314 @@
+@page "/admin/stripe-products"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+
+<PageTitle>Stripe Products | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else if (_loading)
+{
+    <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex align-items-center gap-3">
+                <div class="flex-grow-1">
+                    <h1 class="h4 fw-bold mb-0">Stripe Products &amp; Prices</h1>
+                    <p class="text-secondary small mb-0 mt-1">
+                        Enter the Stripe Price IDs from your Stripe Dashboard. These are used when generating checkout sessions.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_globalMessage))
+        {
+            <div class="alert @(_globalSuccess ? "alert-success" : "alert-danger") rounded-4">@_globalMessage</div>
+        }
+
+        @* ── API Keys ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">API Keys</h2>
+                <p class="text-secondary small mb-3">
+                    Secret key from <strong>Stripe Dashboard → Developers → API keys</strong>.
+                    Test keys start with <code>sk_test_</code> — live keys start with <code>sk_live_</code>.
+                    This is used for all Stripe API calls (checkout, customer creation, billing portal).
+                </p>
+                @RenderSettingRow("Stripe.SecretKey", "Secret API Key", isSecret: true, placeholder: "sk_test_… or sk_live_…")
+            </div>
+        </div>
+
+        @* ── Webhook Secret ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Webhook</h2>
+                <p class="text-secondary small mb-3">Signing secret from your Stripe webhook endpoint (starts with <code>whsec_</code>).</p>
+                @RenderSettingRow("Stripe.WebhookSecret", "Webhook Signing Secret", isSecret: true)
+            </div>
+        </div>
+
+        @* ── Verification ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Verification</h2>
+                <p class="text-secondary small mb-3">One-time verification payment products. Price IDs start with <code>price_</code>.</p>
+                @RenderSettingRow("Stripe.Price.VerificationStandard", "Standard Verification (A$49)")
+                @RenderSettingRow("Stripe.Price.VerificationEnhanced", "Enhanced Verification (A$149)")
+            </div>
+        </div>
+
+        @* ── Bundles ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Bundles (Verification + First Post)</h2>
+                <p class="text-secondary small mb-3">Bundled products combining verification and one posting credit.</p>
+                @RenderSettingRow("Stripe.Price.Bundle.StandardVerificationPost", "Standard Bundle (A$68)")
+                @RenderSettingRow("Stripe.Price.Bundle.EnhancedVerificationPost", "Enhanced Bundle (A$208)")
+            </div>
+        </div>
+
+        @* ── Standard Job Credits ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Standard Job Post Credits</h2>
+                <p class="text-secondary small mb-3">Credit packs for Standard job listings.</p>
+                @RenderSettingRow("Stripe.Price.Job.Standard.1x",  "1 credit")
+                @RenderSettingRow("Stripe.Price.Job.Standard.5x",  "5 credits")
+                @RenderSettingRow("Stripe.Price.Job.Standard.10x", "10 credits")
+                @RenderSettingRow("Stripe.Price.Job.Standard.20x", "20 credits")
+            </div>
+        </div>
+
+        @* ── Premium Job Credits ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Premium Job Post Credits</h2>
+                <p class="text-secondary small mb-3">Credit packs for Premium job listings.</p>
+                @RenderSettingRow("Stripe.Price.Job.Premium.1x",  "1 credit")
+                @RenderSettingRow("Stripe.Price.Job.Premium.5x",  "5 credits")
+                @RenderSettingRow("Stripe.Price.Job.Premium.10x", "10 credits")
+                @RenderSettingRow("Stripe.Price.Job.Premium.20x", "20 credits")
+            </div>
+        </div>
+
+        @* ── Sticky — Verified ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Sticky Top — Verified Employers</h2>
+                <p class="text-secondary small mb-3">Sticky listing prices for verified organisations.</p>
+                @RenderSettingRow("Stripe.Price.Sticky.Verified.24h", "24 hours")
+                @RenderSettingRow("Stripe.Price.Sticky.Verified.7d",  "7 days")
+                @RenderSettingRow("Stripe.Price.Sticky.Verified.30d", "30 days")
+            </div>
+        </div>
+
+        @* ── Sticky — Unverified ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Sticky Top — Unverified Employers</h2>
+                <p class="text-secondary small mb-3">Sticky listing prices for unverified organisations (higher rate).</p>
+                @RenderSettingRow("Stripe.Price.Sticky.Unverified.24h", "24 hours")
+                @RenderSettingRow("Stripe.Price.Sticky.Unverified.7d",  "7 days")
+                @RenderSettingRow("Stripe.Price.Sticky.Unverified.30d", "30 days")
+            </div>
+        </div>
+
+        @* ── Add-ons ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Job Post Add-ons</h2>
+                <p class="text-secondary small mb-3">One-time charges applied when adding features to a published listing.</p>
+                @RenderSettingRow("Stripe.Price.Addon.Highlight",   "Highlight colour")
+                @RenderSettingRow("Stripe.Price.Addon.Video",       "Video attachment")
+                @RenderSettingRow("Stripe.Price.Addon.AiMatching",  "AI candidate matching")
+            </div>
+        </div>
+
+        @* ── Display Prices ── *@
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-1 text-uppercase text-secondary" style="letter-spacing:.05em">Display Prices</h2>
+                <p class="text-secondary small mb-3">
+                    Plain numeric values shown in the UI as <code>A$xx</code>. No currency symbol — just the number.
+                    Update these whenever you change pricing. Used on the billing, verification, and job posting pages.
+                </p>
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Standard Job Credits</h3>
+                @RenderSettingRow("Display.Price.Job.Standard.1x",  "1 credit",   placeholder: "e.g. 19")
+                @RenderSettingRow("Display.Price.Job.Standard.5x",  "5 credits",  placeholder: "e.g. 85")
+                @RenderSettingRow("Display.Price.Job.Standard.10x", "10 credits", placeholder: "e.g. 159")
+                @RenderSettingRow("Display.Price.Job.Standard.20x", "20 credits", placeholder: "e.g. 299")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Premium Job Credits</h3>
+                @RenderSettingRow("Display.Price.Job.Premium.1x",  "1 credit",   placeholder: "e.g. 69")
+                @RenderSettingRow("Display.Price.Job.Premium.5x",  "5 credits",  placeholder: "e.g. 299")
+                @RenderSettingRow("Display.Price.Job.Premium.10x", "10 credits", placeholder: "e.g. 549")
+                @RenderSettingRow("Display.Price.Job.Premium.20x", "20 credits", placeholder: "e.g. 999")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Verification</h3>
+                @RenderSettingRow("Display.Price.Verification.Standard",            "Standard verification",   placeholder: "e.g. 49")
+                @RenderSettingRow("Display.Price.Verification.Enhanced",            "Enhanced verification",   placeholder: "e.g. 149")
+                @RenderSettingRow("Display.Price.Bundle.StandardVerificationPost",  "Standard bundle",         placeholder: "e.g. 68")
+                @RenderSettingRow("Display.Price.Bundle.EnhancedVerificationPost",  "Enhanced bundle",         placeholder: "e.g. 208")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Add-ons</h3>
+                @RenderSettingRow("Display.Price.Addon.Highlight",  "Highlight colour",      placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Addon.Video",      "Video attachment",      placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Addon.AiMatching", "AI candidate matching", placeholder: "e.g. 9")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Sticky Top — Verified</h3>
+                @RenderSettingRow("Display.Price.Sticky.Verified.24h", "24 hours", placeholder: "e.g. 9")
+                @RenderSettingRow("Display.Price.Sticky.Verified.7d",  "7 days",   placeholder: "e.g. 39")
+                @RenderSettingRow("Display.Price.Sticky.Verified.30d", "30 days",  placeholder: "e.g. 79")
+                <h3 class="small fw-semibold text-secondary mt-3 mb-2">Sticky Top — Unverified</h3>
+                @RenderSettingRow("Display.Price.Sticky.Unverified.24h", "24 hours", placeholder: "e.g. 15")
+                @RenderSettingRow("Display.Price.Sticky.Unverified.7d",  "7 days",   placeholder: "e.g. 49")
+                @RenderSettingRow("Display.Price.Sticky.Unverified.30d", "30 days",  placeholder: "e.g. 99")
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _isStaff;
+    private bool _loading = true;
+
+    private Dictionary<string, string> _values = new();
+    private Dictionary<string, string> _drafts = new();
+    private Dictionary<string, bool?> _saveState = new(); // null=idle, true=saved, false=error
+    private Dictionary<string, bool> _saving = new();
+    private string? _globalMessage;
+    private bool _globalSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = isSuperAdmin || isAdmin || isSupport;
+
+        if (_isStaff)
+            await LoadAsync();
+
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            var settings = await client.GetFromJsonAsync<List<SettingDto>>("/api/v1/admin/settings", AethonApiClient.JsonOptions);
+            if (settings is not null)
+            {
+                foreach (var s in settings)
+                {
+                    _values[s.Key] = s.Value ?? "";
+                    _drafts[s.Key] = s.Value ?? "";
+                }
+            }
+        }
+        catch
+        {
+            _globalMessage = "Failed to load settings.";
+            _globalSuccess = false;
+        }
+    }
+
+    private async Task SaveKey(string key)
+    {
+        _saving[key] = true;
+        _saveState[key] = null;
+        StateHasChanged();
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                $"/api/v1/admin/settings/{Uri.EscapeDataString(key)}",
+                new { value = _drafts.GetValueOrDefault(key, "") },
+                AethonApiClient.JsonOptions);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _values[key] = _drafts.GetValueOrDefault(key, "");
+                _saveState[key] = true;
+            }
+            else
+            {
+                _saveState[key] = false;
+            }
+        }
+        catch
+        {
+            _saveState[key] = false;
+        }
+
+        _saving[key] = false;
+        StateHasChanged();
+
+        // Clear the saved/error indicator after 2 seconds
+        await Task.Delay(2000);
+        _saveState.Remove(key);
+        StateHasChanged();
+    }
+
+    private RenderFragment RenderSettingRow(string key, string label, bool isSecret = false, string? placeholder = null) => __builder =>
+    {
+        var draft = _drafts.GetValueOrDefault(key, "");
+        var isSaving = _saving.GetValueOrDefault(key, false);
+        var state = _saveState.GetValueOrDefault(key, null);
+        var ph = placeholder ?? (isSecret ? "whsec_…" : "price_…");
+
+        <div class="row align-items-center mb-2 g-2">
+            <div class="col-12 col-md-3">
+                <div class="fw-semibold small">@label</div>
+                <div class="text-secondary" style="font-size:.7rem;font-family:monospace;">@key</div>
+            </div>
+            <div class="col-12 col-md-7">
+                <input type="@(isSecret ? "password" : "text")"
+                       class="form-control form-control-sm font-monospace"
+                       placeholder="@ph"
+                       value="@draft"
+                       @oninput="e => _drafts[key] = e.Value?.ToString() ?? string.Empty"
+                       autocomplete="off" />
+            </div>
+            <div class="col-12 col-md-2 d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-primary rounded-3 @(isSaving ? "disabled" : "")"
+                        style="min-width:60px;"
+                        @onclick="@(() => SaveKey(key))">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm"></span>
+                    }
+                    else
+                    {
+                        <span>Save</span>
+                    }
+                </button>
+                @if (state == true)
+                {
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                }
+                else if (state == false)
+                {
+                    <i class="bi bi-x-circle-fill text-danger"></i>
+                }
+            </div>
+        </div>
+    };
+
+    private sealed record SettingDto(string Key, string? Value, string? Description);
+}

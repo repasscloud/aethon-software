@@ -1,0 +1,58 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<textarea id="@_editorId"
+          class="form-control rounded-4"
+          rows="6"
+          @oninput="OnTextareaInput">@Value</textarea>
+
+@code {
+    private string _editorId = "rte-" + Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<RichTextEditor>? _dotNetRef;
+    private bool _tinyMceActive;
+
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _dotNetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("tinymceInterop.init", _editorId, _dotNetRef);
+                _tinyMceActive = true;
+            }
+            catch
+            {
+                // TinyMCE not available — plain textarea stays visible and functional
+            }
+        }
+    }
+
+    // Called by Blazor when the plain <textarea> changes (TinyMCE not active)
+    private async Task OnTextareaInput(ChangeEventArgs e)
+    {
+        if (!_tinyMceActive)
+        {
+            Value = e.Value?.ToString() ?? "";
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
+
+    // Called by JS when TinyMCE editor content changes
+    [JSInvokable]
+    public async Task OnEditorChange(string html)
+    {
+        Value = html;
+        await ValueChanged.InvokeAsync(html);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("tinymceInterop.destroy", _editorId); } catch { }
+        _dotNetRef?.Dispose();
+    }
+}

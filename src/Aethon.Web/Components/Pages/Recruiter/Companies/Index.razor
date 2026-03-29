@@ -1,0 +1,148 @@
+@page "/recruiter/companies"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Aethon.Shared.Enums
+@using Aethon.Shared.RecruiterCompanies
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Client companies | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 fw-bold mb-1">Client companies</h1>
+                <p class="text-secondary mb-0">Companies your agency recruits for.</p>
+            </div>
+            <button class="btn btn-dark rounded-4 px-4" @onclick="CreateNew">Request access</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
+
+    @if (_items is null)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">Loading…</div>
+        </div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <p class="text-secondary mb-0">No company relationships yet. Request access to start recruiting.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Status</th>
+                                <th>Scope</th>
+                                <th>Since</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _items)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.CompanyOrganisationName</td>
+                                    <td>
+                                        @if (item.Status == OrganisationRecruitmentPartnershipStatus.Active)
+                                        {
+                                            <span class="badge bg-success rounded-pill">Active</span>
+                                        }
+                                        else if (item.Status == OrganisationRecruitmentPartnershipStatus.Pending)
+                                        {
+                                            <span class="badge bg-warning text-dark rounded-pill">Pending</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary rounded-pill">@item.Status</span>
+                                        }
+                                    </td>
+                                    <td>@item.Scope</td>
+                                    <td>@item.CreatedUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        @if (item.Status == OrganisationRecruitmentPartnershipStatus.Pending)
+                                        {
+                                            <button class="btn btn-outline-danger btn-sm rounded-3"
+                                                    @onclick="() => CancelAsync(item.Id)"
+                                                    disabled="@_busy">
+                                                Cancel
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<RecruiterCompanyRelationshipDto>? _items;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _error = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            _items = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/recruiter/companies", AethonApiClient.JsonOptions) ?? [];
+        }
+        catch
+        {
+            _error = "Could not load company relationships.";
+            _items = [];
+        }
+    }
+
+    private void CreateNew() => Nav.NavigateTo("/recruiter/companies/request");
+
+    private async Task CancelAsync(Guid relationshipId)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsync($"/api/v1/recruiter/companies/requests/{relationshipId}/cancel", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = "Could not cancel request.";
+                return;
+            }
+            await LoadAsync();
+        }
+        catch
+        {
+            _error = "Could not cancel request.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

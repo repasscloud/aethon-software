@@ -1,0 +1,103 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aethon
+      POSTGRES_USER: aethon
+      POSTGRES_PASSWORD: aethon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/sql:/docker-entrypoint-initdb.d:ro. # Mount the generated SQL migration script into the container to initialize the database on first run.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aethon -d aethon"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: repasscloud/aethon-api:dev
+    build:
+      context: .
+      dockerfile: src/Aethon.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=aethon;Username=aethon;Password=aethon"
+      Auth__JwtKey: "${Auth__JwtKey:-}"
+      Auth__Issuer: "${Auth__Issuer:-aethon-api}"
+      Auth__Audience: "${Auth__Audience:-aethon-web}"
+      Email__MailerSendApiKey: "${Email__MailerSendApiKey:-}"
+      Email__FromEmail: "${Email__FromEmail:-}"
+      Email__FromName: "${Email__FromName:-Aethon}"
+      Email__WebBaseUrl: "${Email__WebBaseUrl:-}"
+      Email__FromEmailSupport: "${Email__FromEmailSupport:-}"
+      Claude__ApiKey: "${Claude__ApiKey:-}"
+      Stripe__SecretKey: "${Stripe__SecretKey:-}"
+      LinkedIn__ClientId: "${LinkedIn__ClientId:-}"
+      LinkedIn__ClientSecret: "${LinkedIn__ClientSecret:-}"
+      LinkedIn__RedirectUri: "${LinkedIn__RedirectUri:-}"
+      Seed__AdminEmail: "${Seed__AdminEmail:-}"
+      Seed__AdminPassword: "${Seed__AdminPassword:-}"
+    volumes:
+      - api_uploads:/app/uploads
+      - dp_keys:/keys
+    # No direct port binding — Caddy is the only public entry point.
+    # Uncomment the line below for local debugging without Caddy:
+    # ports:
+    #   - "5201:8080"
+
+  web:
+    image: repasscloud/aethon-web:dev
+    build:
+      context: .
+      dockerfile: src/Aethon.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ApiBaseUrl: "http://api:8080"
+      PublicApiBaseUrl: "${PublicApiBaseUrl:-}"
+      DataProtection__CertBase64: "${DataProtection__CertBase64:-}"
+      DataProtection__KeysPath: /keys
+      DataProtection__ApplicationName: Aethon
+      GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
+    volumes:
+      - dp_keys:/keys
+    # No direct port binding — Caddy is the only public entry point.
+    # Uncomment the line below for local debugging without Caddy:
+    # ports:
+    #   - "5200:8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  postgres_data:
+  api_uploads:
+  dp_keys:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,164 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Users | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
+                <div class="flex-grow-1">
+                    <h1 class="h4 fw-bold mb-0">Users</h1>
+                </div>
+                <div class="d-flex gap-2">
+                    <input class="form-control form-control-sm" style="width:240px;" placeholder="Search email or name…"
+                           @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKey" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadAsync">Search</button>
+                    @if (_isSuperAdmin)
+                    {
+                        <a href="/admin/users/create" class="btn btn-sm btn-success">+ Create staff user</a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+        }
+        else
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4">User</th>
+                                    <th>Type</th>
+                                    <th>Organisation</th>
+                                    <th>Identity</th>
+                                    <th class="pe-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_users.Count == 0)
+                                {
+                                    <tr><td colspan="5" class="ps-4 text-secondary py-4">No users found.</td></tr>
+                                }
+                                @foreach (var u in _users)
+                                {
+                                    <tr style="cursor:pointer;" @onclick="@(() => Nav.NavigateTo(UserUrl(u.Id)))"  >
+                                        <td class="ps-4">
+                                            <div class="fw-semibold">@u.DisplayName</div>
+                                            <div class="text-secondary small">@u.Email</div>
+                                        </td>
+                                        <td><span class="badge bg-secondary rounded-pill small">@u.UserType</span></td>
+                                        <td class="small text-secondary">@(u.OrganisationName ?? "—")</td>
+                                        <td>
+                                            @if (u.IsIdentityVerified)
+                                            {
+                                                <span class="badge bg-success rounded-pill small">Verified</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-secondary small">—</span>
+                                            }
+                                        </td>
+                                        <td class="pe-4">
+                                            @if (u.IsEnabled)
+                                            {
+                                                <span class="badge bg-success rounded-pill small">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger rounded-pill small">Disabled</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @if (_total > _pageSize)
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">@_total total</span>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page <= 1)" @onclick="PrevPage">← Prev</button>
+                        <span class="btn btn-sm disabled">@_page</span>
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page * _pageSize >= _total)" @onclick="NextPage">Next →</button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private bool _isSuperAdmin;
+    private bool _isStaff;
+    private bool _loading = true;
+    private string _search = "";
+    private List<UserRow> _users = [];
+    private int _total, _page = 1;
+    private const int _pageSize = 50;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = _isSuperAdmin || isAdmin || isSupport;
+        if (_isStaff) await LoadAsync();
+        else _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var url = $"/api/v1/admin/users?page={_page}&search={Uri.EscapeDataString(_search)}";
+            var result = await client.GetFromJsonAsync<PagedResult<UserRow>>(url, AethonApiClient.JsonOptions);
+            if (result is not null) { _users = result.Items; _total = result.Total; }
+        }
+        catch { _users = []; }
+        _loading = false;
+    }
+
+    private async Task PrevPage() { _page--; await LoadAsync(); }
+    private async Task NextPage() { _page++; await LoadAsync(); }
+    private async Task OnSearchKey(KeyboardEventArgs e) { if (e.Key == "Enter") { _page = 1; await LoadAsync(); } }
+    private static string UserUrl(Guid id) => $"/admin/users/{id}";
+
+    private sealed record UserRow(Guid Id, string? Email, string DisplayName, string? UserType,
+        bool IsEnabled, bool IsIdentityVerified, string? OrganisationName);
+
+    private sealed class PagedResult<T>
+    {
+        public int Total { get; set; }
+        public List<T> Items { get; set; } = [];
+    }
+}

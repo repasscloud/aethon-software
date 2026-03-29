@@ -1,0 +1,744 @@
+@page "/admin/settings"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using System.Net.Http.Json
+@using Aethon.Shared.Auth
+@inject AuthenticationStateProvider AuthProvider
+@inject AethonApiClient Api
+
+<PageTitle>Settings | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else
+{
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex align-items-center mb-4">
+                <h2 class="h4 fw-bold mb-0 me-3">System Settings</h2>
+                <span class="badge bg-secondary">Admin</span>
+            </div>
+
+            @if (_loading)
+            {
+                <p class="text-secondary">Loading settings...</p>
+            }
+            else
+            {
+                <!-- Google Job Indexing -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Job Syndication</h5>
+                        <p class="text-secondary small mb-4">Control how jobs are syndicated to external platforms.</p>
+
+                        <div class="mb-4 pb-4 border-bottom">
+                            <div class="d-flex align-items-start justify-content-between">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">
+                                        <i class="bi bi-google me-2"></i>Google Job Indexing
+                                    </div>
+                                    <div class="text-secondary small">
+                                        Automatically submit new, updated, and closed jobs to the Google Indexing API.
+                                        Requires a Service Account JSON key and site verification in Google Search Console.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="googleIndexingToggle"
+                                           checked="@_googleIndexingEnabled"
+                                           @onchange="ToggleGoogleIndexing"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_googleIndexingMessage))
+                            {
+                                <div class="alert @(_googleIndexingSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_googleIndexingMessage
+                                </div>
+                            }
+                        </div>
+
+                        @if (_isSuperAdmin)
+                        {
+                            <div>
+                                <label class="form-label fw-semibold">Google Service Account JSON</label>
+                                <div class="text-secondary small mb-2">
+                                    Paste the full JSON key file downloaded from Google Cloud Console.
+                                    This is required for the Indexing API.
+                                    <strong>Never share this key.</strong>
+                                </div>
+                                <textarea class="form-control rounded-3 font-monospace small"
+                                          rows="6"
+                                          @bind="_serviceAccountJson"
+                                          placeholder='{"type":"service_account","project_id":"..."}' />
+                                <div class="alert alert-warning rounded-3 mt-2 py-2 small">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    The Service Account email must be added as an <strong>Owner</strong> in Google Search Console
+                                    before any indexing requests will be accepted.
+                                </div>
+                                <button class="btn btn-dark rounded-3 mt-2" @onclick="SaveServiceAccountJson" disabled="@_saving">
+                                    @(_saving ? "Saving..." : "Save Service Account JSON")
+                                </button>
+                                @if (!string.IsNullOrEmpty(_saJsonMessage))
+                                {
+                                    <div class="alert @(_saJsonSuccess ? "alert-success" : "alert-danger") rounded-3 mt-2 py-2 mb-0">
+                                        @_saJsonMessage
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Billing & Promotions -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Billing &amp; Promotions</h5>
+                        <p class="text-secondary small mb-4">Control credit-granting promotions and verification perks. Changes take effect immediately — no deployment needed.</p>
+
+                        <!-- Verification upgrades promo credits -->
+                        <div class="mb-4 pb-4 border-bottom">
+                            <div class="d-flex align-items-start justify-content-between">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">Verification upgrades promo credits to Premium</div>
+                                    <div class="text-secondary small">
+                                        When enabled, any unused Standard launch-promo credits are automatically
+                                        converted to Premium credits when an organisation verifies. The credits
+                                        retain their original expiry date.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="verifUpgradeToggle"
+                                           checked="@_verifUpgradesPromo"
+                                           @onchange="ToggleVerifUpgradesPromo"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(_verifUpgradeMsg))
+                            {
+                                <div class="alert @(_verifUpgradeSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_verifUpgradeMsg
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Launch promotion -->
+                        <div>
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <div class="me-3">
+                                    <div class="fw-semibold mb-1">Launch promotion — free job post credits</div>
+                                    <div class="text-secondary small">
+                                        Grants Standard job post credits to every new Company or Recruiter that
+                                        registers. Turn this off between promotions without touching the code.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-1">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="launchPromoEnabledToggle"
+                                           checked="@_launchPromoEnabled"
+                                           @onchange="ToggleLaunchPromo"
+                                           disabled="@_saving" />
+                                </div>
+                            </div>
+                            @if (_launchPromoEnabled)
+                            {
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label fw-semibold small">Free credits per registration</label>
+                                        <input type="number" class="form-control form-control-sm rounded-3"
+                                               min="1" max="100"
+                                               @bind="_launchPromoCount"
+                                               disabled="@_saving" />
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <label class="form-label fw-semibold small">Credit expiry (days)</label>
+                                        <input type="number" class="form-control form-control-sm rounded-3"
+                                               min="1" max="365"
+                                               @bind="_launchPromoDays"
+                                               disabled="@_saving" />
+                                    </div>
+                                    <div class="col-12 col-md-4 d-flex align-items-end">
+                                        <button class="btn btn-sm btn-dark rounded-3 w-100" @onclick="SaveLaunchPromoSettings" disabled="@_saving">
+                                            @(_saving ? "Saving…" : "Save")
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-text mt-1">
+                                    Example: 10 credits, 90 days → each new company gets 10 Standard posting credits expiring 90 days after registration.
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(_launchPromoMsg))
+                            {
+                                <div class="alert @(_launchPromoSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                    @_launchPromoMsg
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Email</h5>
+                        <p class="text-secondary small mb-4">
+                            Transactional email configuration (MailerSend). Resolution order: DB (here) → environment variable → misconfigured.
+                            If both are empty, the admin dashboard will show a warning.
+                        </p>
+
+                        @if (_isSuperAdmin)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold small">MailerSend API Key</label>
+                                <div class="text-secondary small mb-1">Bearer token from your MailerSend account. <strong>SuperAdmin only.</strong></div>
+                                <input type="password" class="form-control form-control-sm font-monospace rounded-3"
+                                       placeholder="mlsn.…"
+                                       @bind="_emailApiKey"
+                                       autocomplete="off" />
+                            </div>
+                        }
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">From Email</label>
+                            <div class="text-secondary small mb-1">Used for all automated transactional emails (verification, password reset, etc.).</div>
+                            <input type="email" class="form-control form-control-sm rounded-3"
+                                   placeholder="do-not-reply@example.com"
+                                   @bind="_emailFromEmail" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">Support From Email</label>
+                            <div class="text-secondary small mb-1">Used as the sender (and reply-to) for admin-composed emails sent from <strong>Compose Email</strong>.</div>
+                            <input type="email" class="form-control form-control-sm rounded-3"
+                                   placeholder="support@example.com"
+                                   @bind="_emailFromEmailSupport" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">From Name</label>
+                            <input type="text" class="form-control form-control-sm rounded-3"
+                                   placeholder="Aethon Software"
+                                   @bind="_emailFromName" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small">Web Base URL</label>
+                            <div class="text-secondary small mb-1">Used to build links inside emails (e.g. verification link).</div>
+                            <input type="url" class="form-control form-control-sm rounded-3"
+                                   placeholder="https://app.example.com"
+                                   @bind="_emailWebBaseUrl" />
+                        </div>
+
+                        <button class="btn btn-sm btn-dark rounded-3" @onclick="SaveEmailSettings" disabled="@_saving">
+                            @(_saving ? "Saving…" : "Save Email Settings")
+                        </button>
+                        @if (!string.IsNullOrEmpty(_emailMsg))
+                        {
+                            <div class="alert @(_emailSuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                @_emailMsg
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Email Templates -->
+                @if (_isSuperAdmin)
+                {
+                    <div class="card border-0 shadow-sm rounded-4 mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-1">Email Templates</h5>
+                            <p class="text-secondary small mb-1">
+                                Override the built-in email templates. Leave blank to use the system default.
+                                Templates are identified by a slug name (e.g. <code>Verification</code>, <code>PasswordReset</code>).
+                                Use <code>&#123;&#123;VarName&#125;&#125;</code> tokens for dynamic values.
+                            </p>
+                            <p class="text-secondary small mb-4">
+                                <strong>System template variable reference:</strong><br />
+                                <code>Verification</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;VerificationUrl&#125;&#125;</code><br />
+                                <code>PasswordReset</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;ResetUrl&#125;&#125;</code>, <code>&#123;&#123;MfaWarning&#125;&#125;</code><br />
+                                <code>PasswordResetConfirm</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code><br />
+                                <code>StaffWelcome</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;Email&#125;&#125;</code>, <code>&#123;&#123;TempPassword&#125;&#125;</code>, <code>&#123;&#123;LoginUrl&#125;&#125;</code><br />
+                                <code>IdentityRejection</code>: <code>&#123;&#123;DisplayName&#125;&#125;</code>, <code>&#123;&#123;RejectionReason&#125;&#125;</code>
+                            </p>
+
+                            @foreach (var tmpl in _emailTemplates)
+                            {
+                                <div class="border rounded-3 p-3 mb-3">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="fw-semibold">@tmpl.Name</div>
+                                        <button class="btn btn-sm btn-outline-danger rounded-3"
+                                                @onclick="@(() => DeleteTemplate(tmpl.Name))">
+                                            Delete
+                                        </button>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold mb-1">Subject</label>
+                                        <input type="text" class="form-control form-control-sm rounded-3"
+                                               placeholder="(uses system default if blank)"
+                                               value="@tmpl.Subject"
+                                               @oninput="e => tmpl.Subject = e.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold mb-1">HTML Body</label>
+                                        <textarea class="form-control form-control-sm font-monospace rounded-3"
+                                                  rows="6"
+                                                  placeholder="(uses system default if blank)"
+                                                  @bind="tmpl.Html"></textarea>
+                                    </div>
+                                    <button class="btn btn-sm btn-dark rounded-3" @onclick="@(() => SaveTemplate(tmpl))">
+                                        Save Template
+                                    </button>
+                                    @if (!string.IsNullOrEmpty(tmpl.Message))
+                                    {
+                                        <span class="ms-2 small @(tmpl.SavedOk ? "text-success" : "text-danger")">@tmpl.Message</span>
+                                    }
+                                </div>
+                            }
+
+                            <div class="border rounded-3 p-3 mt-2">
+                                <div class="fw-semibold mb-2">Add New Template</div>
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold mb-1">Template Name (slug, no spaces)</label>
+                                        <input type="text" class="form-control form-control-sm rounded-3"
+                                               placeholder="e.g. WelcomeCampaign"
+                                               @bind="_newTemplateName" />
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <button class="btn btn-sm btn-primary rounded-3 w-100" @onclick="AddNewTemplate">
+                                            Add
+                                        </button>
+                                    </div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(_newTemplateMsg))
+                                {
+                                    <div class="small text-danger mt-1">@_newTemplateMsg</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- Coming Soon platforms -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Additional Platforms</h5>
+                        <p class="text-secondary small mb-3">More syndication providers coming soon.</p>
+                        @foreach (var platform in _comingSoon)
+                        {
+                            <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
+                                <div class="fw-semibold text-secondary">@platform</div>
+                                <span class="badge bg-light text-secondary border">Coming soon</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Syndication History -->
+                <div class="card border-0 shadow-sm rounded-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Recent Syndication History</h5>
+                        @if (_syndicationRecords.Count == 0)
+                        {
+                            <p class="text-secondary">No syndication records yet.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Job</th>
+                                            <th>Provider</th>
+                                            <th>Status</th>
+                                            <th>Submitted</th>
+                                            <th>Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var rec in _syndicationRecords)
+                                        {
+                                            <tr>
+                                                <td class="text-truncate" style="max-width:200px;">@rec.JobTitle</td>
+                                                <td>@rec.Provider</td>
+                                                <td>
+                                                    <span class="badge @(rec.Status == "Success" ? "bg-success" : "bg-danger")">
+                                                        @rec.Status
+                                                    </span>
+                                                </td>
+                                                <td class="small text-secondary">@rec.SubmittedUtc.ToString("dd MMM yyyy HH:mm")</td>
+                                                <td class="small text-danger text-truncate" style="max-width:250px;">@rec.LastErrorMessage</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+} @* end else _isStaff *@
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private bool _isStaff;
+    private bool _isSuperAdmin;
+
+    private bool _googleIndexingEnabled;
+    private string? _googleIndexingMessage;
+    private bool _googleIndexingSuccess;
+
+    private string _serviceAccountJson = "";
+    private string? _saJsonMessage;
+    private bool _saJsonSuccess;
+
+    // Billing & Promotions
+    private bool _verifUpgradesPromo = true;
+    private string? _verifUpgradeMsg;
+    private bool _verifUpgradeSuccess;
+
+    private bool _launchPromoEnabled = true;
+    private int _launchPromoCount = 10;
+    private int _launchPromoDays = 90;
+    private string? _launchPromoMsg;
+    private bool _launchPromoSuccess;
+
+    private List<SyndicationRecordDto> _syndicationRecords = [];
+
+    private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
+
+    // Email settings
+    private string _emailApiKey = "";
+    private string _emailFromEmail = "";
+    private string _emailFromEmailSupport = "";
+    private string _emailFromName = "";
+    private string _emailWebBaseUrl = "";
+    private string? _emailMsg;
+    private bool _emailSuccess;
+
+    // Email templates
+    private List<EmailTemplateModel> _emailTemplates = [];
+    private string _newTemplateName = "";
+    private string? _newTemplateMsg;
+
+    private sealed class EmailTemplateModel
+    {
+        public string Name { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string Html { get; set; } = "";
+        public string? Message { get; set; }
+        public bool SavedOk { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var appType = (user.FindFirstValue(AppClaimTypes.AppType) ?? "").Trim().ToLowerInvariant();
+        _isSuperAdmin = appType == "superadmin";
+        _isStaff = _isSuperAdmin || appType == "admin" || appType == "support";
+
+        var client = await Api.CreateAsync();
+        try
+        {
+            var settings = await client.GetFromJsonAsync<List<SettingDto>>("/api/v1/admin/settings");
+            if (settings is not null)
+            {
+                var enabled = settings.FirstOrDefault(s => s.Key == "GoogleIndexing.Enabled");
+                _googleIndexingEnabled = enabled?.Value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
+
+                if (_isSuperAdmin)
+                {
+                    var saJson = settings.FirstOrDefault(s => s.Key == "GoogleIndexing.ServiceAccountJson");
+                    _serviceAccountJson = saJson?.Value ?? "";
+                }
+
+                // Billing & promotions
+                var verifUpgrade = settings.FirstOrDefault(s => s.Key == "Feature.VerificationUpgradesPromoCredits");
+                _verifUpgradesPromo = verifUpgrade is null || verifUpgrade.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                var promoEnabled = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.Enabled");
+                _launchPromoEnabled = promoEnabled is null || promoEnabled.Value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+                var promoCount = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.FreeJobPostCount");
+                if (int.TryParse(promoCount?.Value, out var pc) && pc > 0) _launchPromoCount = pc;
+
+                var promoDays = settings.FirstOrDefault(s => s.Key == "Feature.LaunchPromotion.ExpiryDays");
+                if (int.TryParse(promoDays?.Value, out var pd) && pd > 0) _launchPromoDays = pd;
+
+                // Email settings
+                if (_isSuperAdmin)
+                    _emailApiKey = settings.FirstOrDefault(s => s.Key == "Email__MailerSendApiKey")?.Value ?? "";
+                _emailFromEmail        = settings.FirstOrDefault(s => s.Key == "Email__FromEmail")?.Value ?? "";
+                _emailFromEmailSupport = settings.FirstOrDefault(s => s.Key == "Email__FromEmailSupport")?.Value ?? "";
+                _emailFromName         = settings.FirstOrDefault(s => s.Key == "Email__FromName")?.Value ?? "";
+                _emailWebBaseUrl       = settings.FirstOrDefault(s => s.Key == "Email__WebBaseUrl")?.Value ?? "";
+
+                // Email templates — group by name slug from keys like EmailTemplate__{Name}__{Subject|Html}
+                if (_isSuperAdmin)
+                {
+                    var templateGroups = settings
+                        .Where(s => s.Key.StartsWith("EmailTemplate__"))
+                        .GroupBy(s =>
+                        {
+                            var parts = s.Key.Split("__");
+                            return parts.Length >= 2 ? parts[1] : s.Key;
+                        });
+
+                    foreach (var grp in templateGroups)
+                    {
+                        _emailTemplates.Add(new EmailTemplateModel
+                        {
+                            Name    = grp.Key,
+                            Subject = grp.FirstOrDefault(s => s.Key.EndsWith("__Subject"))?.Value ?? "",
+                            Html    = grp.FirstOrDefault(s => s.Key.EndsWith("__Html"))?.Value ?? ""
+                        });
+                    }
+                }
+            }
+
+            var records = await client.GetFromJsonAsync<List<SyndicationRecordDto>>("/api/v1/admin/syndication-records");
+            _syndicationRecords = records ?? [];
+        }
+        catch { /* degrade gracefully */ }
+
+        _loading = false;
+    }
+
+    private async Task ToggleGoogleIndexing(ChangeEventArgs e)
+    {
+        _googleIndexingEnabled = (bool)(e.Value ?? false);
+        _googleIndexingMessage = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/GoogleIndexing.Enabled",
+                new { Value = _googleIndexingEnabled ? "true" : "false" });
+
+            _googleIndexingSuccess = response.IsSuccessStatusCode;
+            _googleIndexingMessage = response.IsSuccessStatusCode
+                ? $"Google Indexing {(_googleIndexingEnabled ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _googleIndexingSuccess = false;
+            _googleIndexingMessage = "Unable to reach settings service.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveServiceAccountJson()
+    {
+        _saJsonMessage = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/GoogleIndexing.ServiceAccountJson",
+                new { Value = _serviceAccountJson });
+
+            _saJsonSuccess = response.IsSuccessStatusCode;
+            _saJsonMessage = response.IsSuccessStatusCode
+                ? "Service Account JSON saved."
+                : "Failed to save Service Account JSON.";
+        }
+        catch
+        {
+            _saJsonSuccess = false;
+            _saJsonMessage = "Unable to reach settings service.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleVerifUpgradesPromo(ChangeEventArgs e)
+    {
+        _verifUpgradesPromo = (bool)(e.Value ?? false);
+        _verifUpgradeMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.VerificationUpgradesPromoCredits",
+                new { Value = _verifUpgradesPromo ? "true" : "false" });
+            _verifUpgradeSuccess = resp.IsSuccessStatusCode;
+            _verifUpgradeMsg = resp.IsSuccessStatusCode
+                ? $"Verification upgrade {(_verifUpgradesPromo ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _verifUpgradeSuccess = false;
+            _verifUpgradeMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task ToggleLaunchPromo(ChangeEventArgs e)
+    {
+        _launchPromoEnabled = (bool)(e.Value ?? false);
+        _launchPromoMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.Enabled",
+                new { Value = _launchPromoEnabled ? "true" : "false" });
+            _launchPromoSuccess = resp.IsSuccessStatusCode;
+            _launchPromoMsg = resp.IsSuccessStatusCode
+                ? $"Launch promotion {(_launchPromoEnabled ? "enabled" : "disabled")}."
+                : "Failed to update setting.";
+        }
+        catch
+        {
+            _launchPromoSuccess = false;
+            _launchPromoMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveLaunchPromoSettings()
+    {
+        _launchPromoMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var r1 = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.FreeJobPostCount",
+                new { Value = _launchPromoCount.ToString() });
+            var r2 = await client.PutAsJsonAsync(
+                "/api/v1/admin/settings/Feature.LaunchPromotion.ExpiryDays",
+                new { Value = _launchPromoDays.ToString() });
+            _launchPromoSuccess = r1.IsSuccessStatusCode && r2.IsSuccessStatusCode;
+            _launchPromoMsg = _launchPromoSuccess
+                ? $"Saved: {_launchPromoCount} credits, {_launchPromoDays}-day expiry."
+                : "Failed to save one or more settings.";
+        }
+        catch
+        {
+            _launchPromoSuccess = false;
+            _launchPromoMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveEmailSettings()
+    {
+        _emailMsg = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var tasks = new List<Task<HttpResponseMessage>>();
+            if (_isSuperAdmin)
+                tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__MailerSendApiKey",   new { Value = _emailApiKey }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__FromEmail",         new { Value = _emailFromEmail }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__FromEmailSupport",  new { Value = _emailFromEmailSupport }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__FromName",          new { Value = _emailFromName }));
+            tasks.Add(client.PutAsJsonAsync("/api/v1/admin/settings/Email__WebBaseUrl",        new { Value = _emailWebBaseUrl }));
+
+            var results = await Task.WhenAll(tasks);
+            _emailSuccess = results.All(r => r.IsSuccessStatusCode);
+            _emailMsg = _emailSuccess ? "Email settings saved." : "One or more settings failed to save.";
+        }
+        catch
+        {
+            _emailSuccess = false;
+            _emailMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task SaveTemplate(EmailTemplateModel tmpl)
+    {
+        tmpl.Message = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var r1 = await client.PutAsJsonAsync(
+                $"/api/v1/admin/settings/EmailTemplate__{tmpl.Name}__Subject",
+                new { Value = tmpl.Subject });
+            var r2 = await client.PutAsJsonAsync(
+                $"/api/v1/admin/settings/EmailTemplate__{tmpl.Name}__Html",
+                new { Value = tmpl.Html });
+
+            tmpl.SavedOk = r1.IsSuccessStatusCode && r2.IsSuccessStatusCode;
+            tmpl.Message = tmpl.SavedOk ? "Saved." : "Failed to save.";
+        }
+        catch
+        {
+            tmpl.SavedOk = false;
+            tmpl.Message = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task DeleteTemplate(string name)
+    {
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            await client.DeleteAsync($"/api/v1/admin/settings/EmailTemplate__{name}__Subject");
+            await client.DeleteAsync($"/api/v1/admin/settings/EmailTemplate__{name}__Html");
+            _emailTemplates.RemoveAll(t => t.Name == name);
+        }
+        catch { /* ignore */ }
+        finally { _saving = false; }
+    }
+
+    private void AddNewTemplate()
+    {
+        _newTemplateMsg = null;
+        var name = _newTemplateName.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            _newTemplateMsg = "Template name is required.";
+            return;
+        }
+        if (name.Contains(' ') || name.Contains("__"))
+        {
+            _newTemplateMsg = "Name must not contain spaces or double underscores.";
+            return;
+        }
+        if (_emailTemplates.Any(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            _newTemplateMsg = "A template with that name already exists.";
+            return;
+        }
+        _emailTemplates.Add(new EmailTemplateModel { Name = name });
+        _newTemplateName = "";
+    }
+
+    private record SettingDto(string Key, string Value, string? Description);
+    private record SyndicationRecordDto(
+        Guid Id, Guid JobId, string JobTitle, string Provider,
+        string Status, string? ExternalRef, DateTime SubmittedUtc,
+        DateTime? LastAttemptUtc, string? LastErrorMessage);
+}

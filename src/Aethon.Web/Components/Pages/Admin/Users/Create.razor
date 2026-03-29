@@ -1,0 +1,124 @@
+@page "/admin/users/create"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Create Staff User | Admin | Aethon</PageTitle>
+
+@if (!_isSuperAdmin)
+{
+    <div class="alert alert-danger rounded-4">Access denied. Only Super Admins can create staff accounts.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4" style="max-width:520px;">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <a href="/admin/users" class="text-secondary small text-decoration-none">← All users</a>
+                <h1 class="h4 fw-bold mb-0 mt-2">Create staff user</h1>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                @if (!string.IsNullOrEmpty(_message))
+                {
+                    <div class="alert @(_success ? "alert-success" : "alert-danger") rounded-3 py-2 mb-3">@_message</div>
+                }
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Email</label>
+                    <input class="form-control" type="email" @bind="_email" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Display name</label>
+                    <input class="form-control" @bind="_displayName" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Password</label>
+                    <input class="form-control" type="password" @bind="_password" />
+                </div>
+                <div class="mb-4">
+                    <label class="form-label small fw-semibold">Role</label>
+                    <select class="form-select" @bind="_role">
+                        <option value="Admin">Admin</option>
+                        <option value="Support">Support</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary rounded-pill" @onclick="CreateUser" disabled="@_saving">
+                    @(_saving ? "Creating…" : "Create account")
+                </button>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private bool _isSuperAdmin;
+    private string _email = "";
+    private string _displayName = "";
+    private string _password = "";
+    private string _role = "Support";
+    private bool _saving;
+    private string? _message;
+    private bool _success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isSuperAdmin = string.Equals(
+            authState.User.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task CreateUser()
+    {
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_displayName) || string.IsNullOrWhiteSpace(_password))
+        {
+            _message = "All fields are required.";
+            _success = false;
+            return;
+        }
+
+        _saving = true;
+        _message = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync("/api/v1/admin/users", new
+            {
+                email = _email,
+                displayName = _displayName,
+                password = _password,
+                role = _role
+            }, AethonApiClient.JsonOptions);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _success = true;
+                _message = $"{_role} account created for {_email}.";
+                _email = "";
+                _displayName = "";
+                _password = "";
+            }
+            else
+            {
+                _success = false;
+                _message = "Failed to create account. Check that the email is unique and the password meets requirements.";
+            }
+        }
+        catch
+        {
+            _success = false;
+            _message = "An error occurred.";
+        }
+        _saving = false;
+    }
+}
