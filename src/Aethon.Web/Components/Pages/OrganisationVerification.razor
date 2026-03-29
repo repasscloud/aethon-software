@@ -362,6 +362,7 @@ else
         if (missing.Count > 0)
         {
             _missingFields = missing;
+            StateHasChanged();
             await JS.InvokeVoidAsync("eval", "new bootstrap.Modal(document.getElementById('verificationRequirementsModal')).show()");
             return;
         }
