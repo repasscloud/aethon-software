@@ -1,0 +1,135 @@
+@page "/info/privacy"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Privacy & Data Protection | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4" style="max-width:720px; margin:0 auto;">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span style="font-size:2.5rem;"><i class="bi bi-shield-lock-fill text-primary"></i></span>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Privacy &amp; Data Protection</h1>
+                    <div class="text-secondary">How we collect, use, and protect your data</div>
+                </div>
+            </div>
+
+            <p class="lead text-secondary mb-4">
+                This platform is designed with a minimal data collection and processing model.
+                Only data required to operate the service is collected and processed.
+                No analytics, marketing, or tracking technologies are used.
+            </p>
+
+            <h2 class="h5 fw-bold mb-3">Cookies</h2>
+            <p>The platform only uses <strong>strictly necessary cookies</strong>. These include:</p>
+            <ul class="mb-3">
+                <li>Authentication and session cookies (login state)</li>
+                <li>Security cookies (e.g. CSRF protection)</li>
+                <li>Infrastructure cookies (load balancer, CDN, where applicable)</li>
+            </ul>
+            <p>The platform does <strong>not</strong> use analytics, advertising, tracking, or personalisation cookies.
+            No cookie consent banner is required and no consent cookie is set.</p>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Data Collection</h2>
+            <p>We collect only what is necessary to operate the platform:</p>
+            <ul class="mb-3">
+                <li>Account data (email, name)</li>
+                <li>Job seeker data (profiles, resumes)</li>
+                <li>Recruiter and company data</li>
+            </ul>
+            <p><strong>Purpose of processing:</strong> providing job platform functionality, enabling job applications
+            and recruitment workflows, and maintaining system security and integrity.</p>
+            <p><strong>Legal basis (GDPR):</strong> contract (service delivery) and legitimate interest (security, operations).</p>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Data Storage</h2>
+            <ul class="mb-3">
+                <li>All data is stored in <strong>Australia</strong></li>
+                <li>Data is processed using secure infrastructure providers</li>
+                <li>Appropriate safeguards are applied where required</li>
+            </ul>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Data Retention</h2>
+            <p>Inactivity is measured from the time of last successful login.</p>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered rounded-3 overflow-hidden mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Account type</th>
+                            <th>Warning sent</th>
+                            <th>Auto-deleted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Under 18</td>
+                            <td>Day 25</td>
+                            <td>Day 30</td>
+                        </tr>
+                        <tr>
+                            <td>18 and over</td>
+                            <td>Day 80</td>
+                            <td>Day 90</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p>Accounts are automatically deleted after the inactivity threshold. Associated personal data is removed
+            from active systems. Backup data may be retained temporarily before permanent deletion. Certain data may
+            be retained longer where required for legal obligations, security, dispute resolution, or operational backups.</p>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Your Rights</h2>
+            <p>You have the right to:</p>
+            <ul class="mb-3">
+                <li>Access your data (in-app export available)</li>
+                <li>Correct your data</li>
+                <li>Delete your account</li>
+                <li>Restrict or object to processing</li>
+            </ul>
+            <p>These controls are available within your account settings, or by contacting us via our privacy email.</p>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Children's Data</h2>
+            <p>The platform may be used by individuals under 18. Stricter retention rules apply (30-day inactivity limit)
+            and automatic deletion is enforced for inactive accounts.</p>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Data Sharing</h2>
+            <ul class="mb-3">
+                <li>No sale of personal data</li>
+                <li>No sharing for advertising or tracking purposes</li>
+                <li>Limited sharing with infrastructure providers only (hosting, delivery)</li>
+            </ul>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Security</h2>
+            <ul class="mb-3">
+                <li>HTTPS encryption in transit</li>
+                <li>Secure authentication mechanisms</li>
+                <li>Access control and role-based permissions</li>
+                <li>Industry-standard password hashing</li>
+            </ul>
+
+            <h2 class="h5 fw-bold mt-4 mb-3">Compliance</h2>
+            <p>This platform aligns with:</p>
+            <ul class="mb-3">
+                <li>GDPR (EU)</li>
+                <li>Australian Privacy Principles (APP)</li>
+                <li>CCPA/CPRA (where applicable — no sale or share model)</li>
+            </ul>
+            <p>Key principles: data minimisation, storage limitation, transparency, user control, and security by design.</p>
+
+            <div class="alert alert-primary rounded-4 mt-4 mb-0">
+                <i class="bi bi-file-earmark-text me-2"></i>
+                For the full Privacy Policy, visit
+                <a href="https://repasscloud.com/legal/privacy-policy/aethonsoftware"
+                   target="_blank" rel="noopener noreferrer" class="alert-link">
+                    repasscloud.com/legal/privacy-policy/aethonsoftware
+                </a>.
+            </div>
+        </div>
+    </div>
+    <div class="text-center">
+        <button onclick="history.back()" class="btn btn-outline-dark rounded-4 px-4">
+            <i class="bi bi-arrow-left me-2"></i>Go back
+        </button>
+    </div>
+</div>

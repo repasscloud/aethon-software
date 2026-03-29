@@ -184,6 +184,21 @@
                                 </div>
                             </div>
 
+                            @if (Model.RegistrationType == "jobseeker")
+                            {
+                                <div class="col-12 mt-2">
+                                    <div class="form-check">
+                                        <InputCheckbox id="ageConfirmed"
+                                                       @bind-Value="Model.AgeConfirmed"
+                                                       class="form-check-input" />
+                                        <label for="ageConfirmed" class="form-check-label">
+                                            I confirm I am 16 years of age or older.
+                                        </label>
+                                    </div>
+                                    <ValidationMessage For="@(() => Model.AgeConfirmed)" />
+                                </div>
+                            }
+
                             <div class="d-grid mt-3">
                                 <button type="submit" class="btn btn-dark btn-lg rounded-3" disabled="@IsSubmitting">
                                     @(IsSubmitting ? "Creating account..." : "Create account")
@@ -200,6 +215,19 @@
 
                         <div class="text-center">
                             <a class="btn btn-outline-dark rounded-4 px-4 py-3" href="/login">Sign in</a>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-center gap-3 mt-3 flex-wrap">
+                            <a href="/info/privacy" class="d-inline-flex align-items-center gap-1 text-secondary text-decoration-none small">
+                                <img src="/img/ccpa-icons/privacyoptions29x14.svg"
+                                     alt="California Consumer Privacy Act (CCPA) Opt-Out Icon"
+                                     width="29" height="14" />
+                                <span>Your Privacy Choices</span>
+                            </a>
+                            <span class="text-secondary" aria-hidden="true">·</span>
+                            <a href="https://repasscloud.com/legal/privacy-policy/aethonsoftware"
+                               target="_blank" rel="noopener noreferrer"
+                               class="text-secondary text-decoration-none small">Privacy Policy</a>
                         </div>
                     </div>
                 </div>
@@ -370,6 +398,7 @@
             nameof(RegisterRequestDto.LastName) => nameof(RegisterRequestDto.LastName),
             nameof(RegisterRequestDto.RegistrationType) => nameof(RegisterRequestDto.RegistrationType),
             nameof(RegisterRequestDto.OrganisationName) => nameof(RegisterRequestDto.OrganisationName),
+            nameof(RegisterRequestDto.AgeConfirmed) => nameof(RegisterRequestDto.AgeConfirmed),
             _ => string.Empty
         };
     }
