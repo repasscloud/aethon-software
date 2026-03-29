@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deployment Card Options</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: rgba(148, 163, 184, 0.22);
+      --success: #22c55e;
+      --info: #38bdf8;
+      --warn: #f59e0b;
+      --accent: #8b5cf6;
+      --danger: #ef4444;
+      --shadow: 0 20px 40px rgba(0,0,0,0.35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.14), transparent 30%),
+        radial-gradient(circle at top right, rgba(139, 92, 246, 0.14), transparent 35%),
+        linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      color: var(--text);
+      padding: 32px;
+    }
+
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .sub {
+      color: var(--muted);
+      margin-bottom: 28px;
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .option {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+
+    .option h2 {
+      margin: 0 0 14px;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .card {
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(17,24,39,.98), rgba(15,23,42,.98));
+    }
+
+    .header {
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(148,163,184,.14);
+    }
+
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: white;
+      flex: 0 0 auto;
+    }
+
+    .icon.success { background: linear-gradient(135deg, #16a34a, #22c55e); }
+    .icon.info { background: linear-gradient(135deg, #0284c7, #38bdf8); }
+    .icon.warn { background: linear-gradient(135deg, #d97706, #f59e0b); }
+    .icon.accent { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+
+    .status {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      white-space: nowrap;
+    }
+
+    .status.success { color: #bbf7d0; background: rgba(34, 197, 94, 0.14); }
+    .status.info { color: #bae6fd; background: rgba(56, 189, 248, 0.14); }
+    .status.warn { color: #fde68a; background: rgba(245, 158, 11, 0.14); }
+
+    .body {
+      padding: 18px 20px 20px;
+    }
+
+    .service {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 4px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .desc {
+      font-size: 14px;
+      color: #dbeafe;
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px 12px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .kv .k { color: var(--muted); }
+    .kv .v { color: var(--text); font-weight: 600; word-break: break-word; }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .chip {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(148,163,184,.12);
+      color: #dbeafe;
+      border: 1px solid rgba(148,163,184,.18);
+    }
+
+    .footer {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-top: 14px;
+      border-top: 1px solid rgba(148,163,184,.12);
+    }
+
+    .btn {
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border: 1px solid rgba(255,255,255,.1);
+      display: inline-block;
+    }
+
+    .btn.secondary {
+      background: rgba(148,163,184,.10);
+      color: #e5e7eb;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      margin-top: 4px;
+      background: var(--success);
+      box-shadow: 0 0 0 4px rgba(34,197,94,.14);
+    }
+
+    .step small { color: var(--muted); display: block; margin-top: 2px; }
+
+    .banner {
+      padding: 14px 16px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(148,163,184,.12);
+      background: linear-gradient(90deg, rgba(34,197,94,.18), rgba(56,189,248,.12));
+    }
+
+    .compact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .mini {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(148,163,184,.08);
+      border: 1px solid rgba(148,163,184,.14);
+    }
+
+    .mini .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .mini .value {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #c4b5fd;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 18px; }
+      .kv { grid-template-columns: 1fr; }
+      .compact-grid { grid-template-columns: 1fr; }
+      .header { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Deployment Notification Card Concepts</h1>
+    <div class="sub">
+      Browser preview mockups for a Teams deployment notification. Swap the sample values with real deployment metadata later.
+    </div>
+
+    <div class="grid">
+      <section class="option">
+        <h2>Option 1 — Executive Summary</h2>
+        <article class="card">
+          <div class="header">
+            <div class="title">
+              <div class="icon success">✓</div>
+              <div>
+                <div style="font-size:12px; color:var(--muted); font-weight:700; letter-spacing:.08em; text-transform:uppercase;">Deployment Complete</div>
+                <div style="font-size:18px; font-weight:800;">Production Release</div>
+              </div>
+            </div>
+            <div class="status success">Succeeded</div>
+          </div>
+          <div class="body">
+            <div class="service">Cinturon360 API</div>
+            <div class="meta">Version 2026.03.30.4 · australia-southeast · Production</div>
+            <div class="desc">Deployment finished successfully with all health checks passing. No manual intervention required.</div>
+            <div class="kv">
+              <div class="k">Started</div><div class="v">30 Mar 2026, 8:42 PM AEDT</div>
+              <div class="k">Finished</div><div class="v">30 Mar 2026, 8:49 PM AEDT</div>
+              <div class="k">Duration</div><div class="v">6m 58s</div>
+              <div class="k">Commit</div><div class="v"><code>9f2d13b</code> · Add deployment telemetry and retry guard</div>
+              <div class="k">Triggered by</div><div class="v">DJ via GitHub Actions</div>
+            </div>
+            <div class="chips">
+              <span class="chip">App Service</span>
+              <span class="chip">Database migration: none</span>
+              <span class="chip">Zero downtime</span>
+            </div>
+            <div class="footer">
+              <a class="btn" href="#">Open Pipeline</a>
+              <a class="btn secondary" href="#">Release Notes</a>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="option">
+        <h2>Option 2 — Timeline Focused</h2>
+        <article class="card">
+          <div class="banner">Deployment completed successfully for <strong>jobs.aethon.work</strong></div>
+          <div class="body">
+            <div class="service">Public Jobs Platform</div>
+            <div class="meta">Build #1842 · main → prod</div>
+            <div class="timeline">
+              <div class="step">
+                <div class="dot"></div>
+                <div>
+                  <strong>Build packaged</strong>
+                  <small>8:37 PM AEDT · Container image <code>jobs-platform:1842</code></small>
+                </div>
+              </div>
+              <div class="step">
+                <div class="dot"></div>
+                <div>
+                  <strong>Infrastructure updated</strong>
+                  <small>8:44 PM AEDT · Caddy config and service rollout completed</small>
+                </div>
+              </div>
+              <div class="step">
+                <div class="dot"></div>
+                <div>
+                  <strong>Health checks passed</strong>
+                  <small>8:49 PM AEDT · 200 OK on /health and homepage</small>
+                </div>
+              </div>
+            </div>
+            <div class="compact-grid">
+              <div class="mini">
+                <div class="label">Environment</div>
+                <div class="value">Production</div>
+              </div>
+              <div class="mini">
+                <div class="label">Duration</div>
+                <div class="value">11m 44s</div>
+              </div>
+              <div class="mini">
+                <div class="label">Commit</div>
+                <div class="value"><code>2c804fe</code></div>
+              </div>
+              <div class="mini">
+                <div class="label">Requested by</div>
+                <div class="value">Release Workflow</div>
+              </div>
+            </div>
+            <div class="footer">
+              <a class="btn" href="#">View Logs</a>
+              <a class="btn secondary" href="#">Open Site</a>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="option">
+        <h2>Option 3 — Minimal / Teams-like</h2>
+        <article class="card">
+          <div class="header">
+            <div class="title">
+              <div class="icon info">↗</div>
+              <div>
+                <div style="font-size:18px; font-weight:800;">Deployment Notification</div>
+                <div style="font-size:13px; color:var(--muted);">Ready for posting to channel</div>
+              </div>
+            </div>
+            <div class="status info">Completed</div>
+          </div>
+          <div class="body">
+            <div class="kv" style="margin-bottom:20px;">
+              <div class="k">Application</div><div class="v">Aethon Admin Portal</div>
+              <div class="k">Environment</div><div class="v">UAT</div>
+              <div class="k">Version</div><div class="v">2026.03.30-rc.2</div>
+              <div class="k">Branch</div><div class="v"><code>release/2026.03</code></div>
+              <div class="k">Commit</div><div class="v"><code>a84ce71</code></div>
+              <div class="k">Result</div><div class="v">Deployment finished and service is healthy</div>
+            </div>
+            <div class="footer">
+              <a class="btn" href="#">Pipeline</a>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="option">
+        <h2>Option 4 — Premium / Rich Detail</h2>
+        <article class="card" style="background: linear-gradient(180deg, rgba(30,41,59,.98), rgba(15,23,42,.98));">
+          <div class="header" style="background: linear-gradient(90deg, rgba(124,58,237,.18), rgba(56,189,248,.16));">
+            <div class="title">
+              <div class="icon accent">◆</div>
+              <div>
+                <div style="font-size:12px; color:#c4b5fd; font-weight:700; letter-spacing:.08em; text-transform:uppercase;">Release Event</div>
+                <div style="font-size:20px; font-weight:900;">API + Web Frontend Rollout</div>
+              </div>
+            </div>
+            <div class="status success">Successful</div>
+          </div>
+          <div class="body">
+            <div class="service">Multi-service Deployment</div>
+            <div class="meta">prod-au · coordinated release</div>
+            <div class="desc">Both services were deployed in sequence, smoke tests passed, and the canary window closed without alerts.</div>
+            <div class="chips">
+              <span class="chip">API 2026.03.30.4</span>
+              <span class="chip">Web 2026.03.30.7</span>
+              <span class="chip">Canary complete</span>
+              <span class="chip">Alerts: 0</span>
+            </div>
+            <div class="kv">
+              <div class="k">Services</div><div class="v">gateway-api, jobs-web, worker-sync</div>
+              <div class="k">Window</div><div class="v">8:30 PM → 8:52 PM AEDT</div>
+              <div class="k">Migration</div><div class="v">Applied 1 non-breaking schema update</div>
+              <div class="k">Approver</div><div class="v">Operations</div>
+              <div class="k">Source</div><div class="v">GitHub Actions / Release Workflow</div>
+              <div class="k">Reference</div><div class="v">REL-2481</div>
+            </div>
+            <div class="footer">
+              <a class="btn" href="#">Deployment Run</a>
+              <a class="btn secondary" href="#">JIRA Ticket</a>
+              <a class="btn secondary" href="#">Dashboards</a>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="option">
+        <h2>Option 5 — Warning / Partial Success</h2>
+        <article class="card">
+          <div class="header">
+            <div class="title">
+              <div class="icon warn">!</div>
+              <div>
+                <div style="font-size:12px; color:var(--muted); font-weight:700; letter-spacing:.08em; text-transform:uppercase;">Deployment Completed with Notes</div>
+                <div style="font-size:18px; font-weight:800;">Review Recommended</div>
+              </div>
+            </div>
+            <div class="status warn">Succeeded with warnings</div>
+          </div>
+          <div class="body">
+            <div class="service">Identity Worker</div>
+            <div class="meta">NonProd · build #782</div>
+            <div class="desc">Deployment succeeded, but one optional post-deploy step was skipped. Core service checks are healthy.</div>
+            <div class="kv">
+              <div class="k">Skipped step</div><div class="v">Cache warm-up job timed out after 30s</div>
+              <div class="k">Impact</div><div class="v">Low — first request may be slower</div>
+              <div class="k">Commit</div><div class="v"><code>66bb1ae</code></div>
+              <div class="k">Finished</div><div class="v">30 Mar 2026, 9:03 PM AEDT</div>
+            </div>
+            <div class="footer">
+              <a class="btn" href="#">Inspect Logs</a>
+              <a class="btn secondary" href="#">Open Runbook</a>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+  </div>
+</body>
+</html>
