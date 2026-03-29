@@ -12,6 +12,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject AethonApiClient Api
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Organisation Verification | Aethon</PageTitle>
 
@@ -51,6 +52,16 @@ else
                         </div>
                     </div>
                 }
+                else if (_profile?.VerificationPendingTier != null)
+                {
+                    <div class="alert alert-warning rounded-4 d-flex align-items-center gap-3">
+                        <i class="bi bi-hourglass-split fs-4"></i>
+                        <div>
+                            <div class="fw-semibold">Verification Pending</div>
+                            <div class="small">Your verification request has been received and is being processed. We'll notify you by email once it's been reviewed.</div>
+                        </div>
+                    </div>
+                }
                 else
                 {
                     <div class="alert alert-secondary rounded-4 d-flex align-items-center gap-3">
@@ -69,8 +80,8 @@ else
             <div class="alert alert-danger rounded-4">@_error</div>
         }
 
-        @* ── Tier options ── *@
-        @if (_profile?.VerificationTier != VerificationTier.EnhancedTrusted)
+        @* ── Tier options — hidden while any verification is pending ── *@
+        @if (_profile?.VerificationTier != VerificationTier.EnhancedTrusted && _profile?.VerificationPendingTier == null)
         {
             <div class="row g-3">
 
@@ -215,6 +226,33 @@ else
     </div>
 }
 
+@* ── Missing fields modal ── *@
+<div class="modal fade" id="verificationRequirementsModal" tabindex="-1" aria-labelledby="verificationRequirementsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="verificationRequirementsModalLabel">
+                    <i class="bi bi-exclamation-circle text-warning me-2"></i>Complete your profile first
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <p class="text-secondary small mb-3">Please fill in the following required fields before purchasing verification:</p>
+                <ul class="mb-0">
+                    @foreach (var field in _missingFields)
+                    {
+                        <li class="small">@field</li>
+                    }
+                </ul>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-3" data-bs-dismiss="modal">Close</button>
+                <a href="/app/organisation/profile" class="btn btn-primary btn-sm rounded-3">Update profile →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
     private bool _ready;
     private bool _busy;
@@ -222,6 +260,7 @@ else
     private string? _error;
     private OrganisationProfileDto? _profile;
     private bool _launchPromoEnabled = true;
+    private List<string> _missingFields = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -245,9 +284,88 @@ else
 
     private record PublicFeaturesDto(bool LaunchPromotionEnabled);
 
+    // ── Validation ────────────────────────────────────────────────────────────
+
+    private List<string> GetMissingStandardFields()
+    {
+        if (_profile is null) return ["Profile not loaded."];
+        var missing = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(_profile.WebsiteUrl))
+            missing.Add("Website URL");
+        if (string.IsNullOrWhiteSpace(_profile.LegalName))
+            missing.Add("Legal name");
+        if (_profile.Industry is null)
+            missing.Add("Industry");
+        if (_profile.CompanySize is null)
+            missing.Add("Company size");
+        if (string.IsNullOrWhiteSpace(_profile.PublicContactEmail))
+            missing.Add("Public contact email");
+
+        var hasSocial = !string.IsNullOrWhiteSpace(_profile.LinkedInUrl)
+                     || !string.IsNullOrWhiteSpace(_profile.TwitterHandle)
+                     || !string.IsNullOrWhiteSpace(_profile.FacebookUrl)
+                     || !string.IsNullOrWhiteSpace(_profile.TikTokHandle)
+                     || !string.IsNullOrWhiteSpace(_profile.InstagramHandle)
+                     || !string.IsNullOrWhiteSpace(_profile.YouTubeUrl);
+
+        if (!hasSocial)
+            missing.Add("At least one social media profile (LinkedIn, X/Twitter, Facebook, TikTok, Instagram, or YouTube)");
+
+        return missing;
+    }
+
+    private List<string> GetMissingEnhancedFields()
+    {
+        var missing = GetMissingStandardFields();
+        if (_profile is null) return missing;
+
+        if (string.IsNullOrWhiteSpace(_profile.RegisteredAddressLine1))
+            missing.Add("Registered address line 1");
+        if (string.IsNullOrWhiteSpace(_profile.RegisteredCity))
+            missing.Add("City");
+        if (string.IsNullOrWhiteSpace(_profile.RegisteredState))
+            missing.Add("State / Province");
+        if (string.IsNullOrWhiteSpace(_profile.RegisteredPostcode))
+            missing.Add("Postcode / ZIP");
+        if (string.IsNullOrWhiteSpace(_profile.RegisteredCountry))
+            missing.Add("Country");
+
+        var hasRegNumber = !string.IsNullOrWhiteSpace(_profile.TaxRegistrationNumber)
+                        || !string.IsNullOrWhiteSpace(_profile.BusinessRegistrationNumber);
+        if (!hasRegNumber)
+            missing.Add("Tax registration number or Business registration number");
+
+        if (string.IsNullOrWhiteSpace(_profile.PrimaryContactName))
+            missing.Add("Primary contact full name");
+        if (string.IsNullOrWhiteSpace(_profile.PrimaryContactEmail))
+            missing.Add("Primary contact email address");
+        if (string.IsNullOrWhiteSpace(_profile.PrimaryContactPhone))
+            missing.Add("Primary contact phone number");
+        if (!_profile.IsPublicProfileEnabled)
+            missing.Add("Public profile must be enabled");
+
+        return missing;
+    }
+
+    // ── Checkout ──────────────────────────────────────────────────────────────
+
     private async Task StartCheckout(string tier, bool bundle)
     {
         _error = null;
+
+        // Validate required fields before proceeding to payment
+        var missing = tier == "enhanced"
+            ? GetMissingEnhancedFields()
+            : GetMissingStandardFields();
+
+        if (missing.Count > 0)
+        {
+            _missingFields = missing;
+            await JS.InvokeVoidAsync("eval", "new bootstrap.Modal(document.getElementById('verificationRequirementsModal')).show()");
+            return;
+        }
+
         _busy = true;
         _pendingAction = bundle ? $"{tier}-bundle" : tier;
         StateHasChanged();
@@ -268,7 +386,6 @@ else
                 }
             }
 
-            var err = await resp.Content.ReadAsStringAsync();
             _error = "Could not start checkout. Please try again.";
         }
         catch

@@ -105,7 +105,16 @@ if (string.IsNullOrWhiteSpace(stripeKey))
 else
     Console.WriteLine($"[STARTUP] Stripe key loaded: {stripeKey[..7]}...");
 StripeConfiguration.ApiKey = stripeKey;
-services.AddScoped<IOrganisationAutoVerifier, StubOrganisationAutoVerifier>();
+services.AddScoped<IOrganisationAutoVerifier, OrganisationAutoVerifier>();
+services.AddHttpClient("AutoVerifier", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(10);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Aethon-Verifier/1.0");
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = true,
+    MaxAutomaticRedirections = 5
+});
 services.AddScoped<StripeWebhookProcessor>();
 services.AddScoped<StripeCheckoutService>();
 services.AddScoped<JobPublishBillingService>();

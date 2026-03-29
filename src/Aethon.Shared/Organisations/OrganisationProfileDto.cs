@@ -44,6 +44,7 @@ public sealed class OrganisationProfileDto
     public bool IsAccessibleWorkplace { get; set; }
     public bool IsVerified { get; set; }
     public VerificationTier VerificationTier { get; set; }
+    public VerificationTier? VerificationPendingTier { get; set; }
     public CompanySize? CompanySize { get; set; }
     public JobCategory? Industry { get; set; }
     public string? LinkedInUrl { get; set; }

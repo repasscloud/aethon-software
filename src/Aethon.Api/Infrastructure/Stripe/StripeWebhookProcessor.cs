@@ -1,3 +1,4 @@
+using Aethon.Application.Abstractions.Email;
 using Aethon.Application.Abstractions.Settings;
 using Aethon.Data;
 using Aethon.Data.Entities;
@@ -17,17 +18,23 @@ public sealed class StripeWebhookProcessor
     private readonly AethonDbContext _db;
     private readonly IOrganisationAutoVerifier _autoVerifier;
     private readonly ISystemSettingsService _settings;
+    private readonly IEmailService _emailService;
+    private readonly IEmailTemplateService _emailTemplates;
     private readonly ILogger<StripeWebhookProcessor> _logger;
 
     public StripeWebhookProcessor(
         AethonDbContext db,
         IOrganisationAutoVerifier autoVerifier,
         ISystemSettingsService settings,
+        IEmailService emailService,
+        IEmailTemplateService emailTemplates,
         ILogger<StripeWebhookProcessor> logger)
     {
         _db = db;
         _autoVerifier = autoVerifier;
         _settings = settings;
+        _emailService = emailService;
+        _emailTemplates = emailTemplates;
         _logger = logger;
     }
 
@@ -138,39 +145,46 @@ public sealed class StripeWebhookProcessor
     {
         metadata.TryGetValue("verification_tier", out var tierStr);
 
-        org.VerificationPaidAt = DateTime.UtcNow;
-        org.VerificationExpiresAt = DateTime.UtcNow.AddYears(1);
+        var now = DateTime.UtcNow;
+        org.VerificationPaidAt = now;
+        org.VerificationExpiresAt = now.AddYears(1);
         org.VerificationStripeEventId = dbEvent.StripeEventId;
 
         if (tierStr == "enhanced")
         {
             // Enhanced always goes to manual admin review
+            org.VerificationPendingTier = VerificationTier.EnhancedTrusted;
             dbEvent.Status = StripeEventStatus.Pending;
             dbEvent.InternalNotes = "Enhanced Trusted Employer verification payment received. Requires manual admin review.";
             await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgEnhancedVerificationReceived", ct);
             return;
         }
 
         // Standard — attempt auto-verification
+        org.VerificationPendingTier = VerificationTier.StandardEmployer;
         bool passed = await _autoVerifier.CheckAsync(org, ct);
 
         if (passed)
         {
             org.VerificationTier = VerificationTier.StandardEmployer;
-            org.VerifiedUtc = DateTime.UtcNow;
+            org.VerifiedUtc = now;
+            org.VerificationPendingTier = null;
 
             await ConvertPromoCreditsToPremiumAsync(org.Id, ct);
 
             dbEvent.Status = StripeEventStatus.Completed;
             dbEvent.InternalNotes = "Standard Employer Verification: auto-verification passed.";
+            await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgVerificationAutoApproved", ct);
         }
         else
         {
             dbEvent.Status = StripeEventStatus.Pending;
             dbEvent.InternalNotes = "Standard Employer Verification: auto-verification did not pass. Requires manual admin review.";
+            await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgVerificationPendingManualReview", ct);
         }
-
-        await _db.SaveChangesAsync(ct);
     }
 
     // ─── Bundle: Verification + First Post ───────────────────────────────────
@@ -185,8 +199,9 @@ public sealed class StripeWebhookProcessor
         metadata.TryGetValue("credit_type", out var creditTypeStr);
         var creditQty = ParseInt(metadata, "credit_quantity", 1);
 
-        org.VerificationPaidAt = DateTime.UtcNow;
-        org.VerificationExpiresAt = DateTime.UtcNow.AddYears(1);
+        var now = DateTime.UtcNow;
+        org.VerificationPaidAt = now;
+        org.VerificationExpiresAt = now.AddYears(1);
         org.VerificationStripeEventId = dbEvent.StripeEventId;
 
         // Grant the bundled posting credit
@@ -195,29 +210,35 @@ public sealed class StripeWebhookProcessor
 
         if (tierStr == "enhanced")
         {
+            org.VerificationPendingTier = VerificationTier.EnhancedTrusted;
             dbEvent.Status = StripeEventStatus.Pending;
             dbEvent.InternalNotes = $"Bundle (Enhanced + Premium post): payment received. 1x {creditType} credit granted. Verification requires manual admin review.";
             await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgEnhancedVerificationReceived", ct);
             return;
         }
 
+        org.VerificationPendingTier = VerificationTier.StandardEmployer;
         bool passed = await _autoVerifier.CheckAsync(org, ct);
 
         if (passed)
         {
             org.VerificationTier = VerificationTier.StandardEmployer;
-            org.VerifiedUtc = DateTime.UtcNow;
+            org.VerifiedUtc = now;
+            org.VerificationPendingTier = null;
             await ConvertPromoCreditsToPremiumAsync(org.Id, ct);
             dbEvent.Status = StripeEventStatus.Completed;
             dbEvent.InternalNotes = $"Bundle (Standard + Standard post): auto-verification passed. 1x {creditType} credit granted.";
+            await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgVerificationAutoApproved", ct);
         }
         else
         {
             dbEvent.Status = StripeEventStatus.Pending;
             dbEvent.InternalNotes = $"Bundle (Standard + Standard post): auto-verification did not pass. 1x {creditType} credit granted. Verification requires manual admin review.";
+            await _db.SaveChangesAsync(ct);
+            await SendOrgEmailAsync(org, "OrgVerificationPendingManualReview", ct);
         }
-
-        await _db.SaveChangesAsync(ct);
     }
 
     // ─── Job Credits ─────────────────────────────────────────────────────────
@@ -374,6 +395,43 @@ public sealed class StripeWebhookProcessor
         dbEvent.Status = StripeEventStatus.Completed;
         dbEvent.InternalNotes = $"job_addons: add-ons applied and job {jobId} published.";
         await _db.SaveChangesAsync(ct);
+    }
+
+    // ─── Email helper ─────────────────────────────────────────────────────────
+
+    private async Task SendOrgEmailAsync(Organisation org, string templateName, CancellationToken ct)
+    {
+        var toEmail = org.PrimaryContactEmail;
+        if (string.IsNullOrWhiteSpace(toEmail))
+            return;
+
+        try
+        {
+            var contactName = !string.IsNullOrWhiteSpace(org.PrimaryContactName) ? org.PrimaryContactName : toEmail;
+            var tierLabel = org.VerificationTier == VerificationTier.EnhancedTrusted
+                ? "Enhanced Trusted Employer"
+                : "Standard Verified Employer";
+
+            var (subject, html) = await _emailTemplates.RenderAsync(templateName, new()
+            {
+                ["ContactName"]       = contactName,
+                ["OrgName"]           = org.Name,
+                ["VerificationTier"]  = tierLabel
+            }, ct);
+
+            await _emailService.SendAsync(new EmailMessage
+            {
+                ToEmail  = toEmail,
+                ToName   = contactName,
+                Subject  = subject,
+                TextBody = $"Hi {contactName},\n\nThis is a notification regarding the verification of {org.Name} on Aethon.\n\nPlease log in to your Aethon account for more details.",
+                HtmlBody = html
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send org verification email (template={Template}) for org {OrgId}.", templateName, org.Id);
+        }
     }
 
     // ─── Credit conversion (Standard promo → Premium on verification) ─────────

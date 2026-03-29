@@ -73,6 +73,7 @@ public sealed class GetMyOrganisationProfileHandler
             IsAccessibleWorkplace = org.IsAccessibleWorkplace,
             IsVerified = org.IsVerified,
             VerificationTier = org.VerificationTier,
+            VerificationPendingTier = org.VerificationPendingTier,
             BannerImageUrl = org.BannerImageUrl,
             CompanySize = org.CompanySize,
             Industry = org.Industry,

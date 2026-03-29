@@ -75,6 +75,12 @@ public class Organisation : EntityBase
     public DateTime? VerificationExpiresAt { get; set; }
     public string? VerificationStripeEventId { get; set; }
 
+    /// <summary>
+    /// Set when a verification payment has been received but the request is not yet approved or denied.
+    /// Null when no pending verification request exists.
+    /// </summary>
+    public VerificationTier? VerificationPendingTier { get; set; }
+
     public string? StripeCustomerId { get; set; }
 
     [NotMapped]

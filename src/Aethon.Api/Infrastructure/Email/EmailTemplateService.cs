@@ -45,24 +45,38 @@ public sealed class EmailTemplateService : IEmailTemplateService
 
     private static string GetDefaultSubject(string templateName) => templateName switch
     {
-        "Verification"         => "Verify your Aethon account",
-        "PasswordReset"        => "Reset your Aethon password",
-        "PasswordResetConfirm" => "Your Aethon password has been reset",
-        "StaffWelcome"         => "Welcome to Aethon — your account is ready",
-        "IdentityRejection"    => "Your Aethon identity verification was unsuccessful",
-        _                      => "Aethon notification"
+        "Verification"                        => "Verify your Aethon account",
+        "PasswordReset"                       => "Reset your Aethon password",
+        "PasswordResetConfirm"                => "Your Aethon password has been reset",
+        "StaffWelcome"                        => "Welcome to Aethon — your account is ready",
+        "IdentityRejection"                   => "Your Aethon identity verification was unsuccessful",
+        "OrgVerificationAutoApproved"         => "Your organisation is now Standard Verified on Aethon",
+        "OrgVerificationPendingManualReview"  => "Your verification request is being reviewed",
+        "OrgVerificationApproved"             => "Your organisation is now verified on Aethon",
+        "OrgVerificationDenied"               => "Update on your Aethon verification request",
+        "OrgEnhancedVerificationReceived"     => "Enhanced verification request received",
+        "OrgEnhancedVerificationApproved"     => "Your organisation is now Enhanced Trusted on Aethon",
+        "OrgEnhancedVerificationDenied"       => "Update on your Enhanced verification request",
+        _                                     => "Aethon notification"
     };
 
     // ── Default HTML templates ────────────────────────────────────────────────
 
     private static string GetDefaultHtml(string templateName) => templateName switch
     {
-        "Verification"         => VerificationHtml,
-        "PasswordReset"        => PasswordResetHtml,
-        "PasswordResetConfirm" => PasswordResetConfirmHtml,
-        "StaffWelcome"         => StaffWelcomeHtml,
-        "IdentityRejection"    => IdentityRejectionHtml,
-        _                      => GenericHtml
+        "Verification"                        => VerificationHtml,
+        "PasswordReset"                       => PasswordResetHtml,
+        "PasswordResetConfirm"                => PasswordResetConfirmHtml,
+        "StaffWelcome"                        => StaffWelcomeHtml,
+        "IdentityRejection"                   => IdentityRejectionHtml,
+        "OrgVerificationAutoApproved"         => OrgVerificationAutoApprovedHtml,
+        "OrgVerificationPendingManualReview"  => OrgVerificationPendingManualReviewHtml,
+        "OrgVerificationApproved"             => OrgVerificationApprovedHtml,
+        "OrgVerificationDenied"               => OrgVerificationDeniedHtml,
+        "OrgEnhancedVerificationReceived"     => OrgEnhancedVerificationReceivedHtml,
+        "OrgEnhancedVerificationApproved"     => OrgEnhancedVerificationApprovedHtml,
+        "OrgEnhancedVerificationDenied"       => OrgEnhancedVerificationDeniedHtml,
+        _                                     => GenericHtml
     };
 
     // ── Layout helpers ────────────────────────────────────────────────────────
@@ -140,6 +154,55 @@ public sealed class EmailTemplateService : IEmailTemplateService
         "<p style=\"margin:0 0 16px;\">Unfortunately we were unable to verify your identity on Aethon.</p>" +
         "<p style=\"margin:0 0 16px;\"><strong>Reason:</strong> {{RejectionReason}}</p>" +
         "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you believe this is an error, please contact support.</p>"
+    );
+
+    private static readonly string OrgVerificationAutoApprovedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Great news — <strong>{{OrgName}}</strong> has been automatically verified as a <strong>Standard Verified Employer</strong> on Aethon.</p>" +
+        "<p style=\"margin:0 0 16px;\">Your organisation will now display the Standard Verified badge on all job listings, helping candidates trust your opportunities.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions, please don't hesitate to contact our support team.</p>"
+    );
+
+    private static readonly string OrgVerificationPendingManualReviewHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Thank you for your Standard Verification payment for <strong>{{OrgName}}</strong>.</p>" +
+        "<p style=\"margin:0 0 16px;\">We were unable to automatically verify some of your details, so your request has been passed to our team for manual review. We'll be in touch once the review is complete.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions in the meantime, please contact our support team.</p>"
+    );
+
+    private static readonly string OrgVerificationApprovedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">We're pleased to let you know that <strong>{{OrgName}}</strong> has been approved for <strong>{{VerificationTier}}</strong> status on Aethon.</p>" +
+        "<p style=\"margin:0 0 16px;\">Your organisation will now display the verified badge on all job listings.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions, please don't hesitate to contact our support team.</p>"
+    );
+
+    private static readonly string OrgVerificationDeniedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Thank you for submitting a verification request for <strong>{{OrgName}}</strong>.</p>" +
+        "<p style=\"margin:0 0 16px;\">Unfortunately, we were unable to approve your verification request at this time. A member of our team will reach out to you shortly to discuss next steps.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions in the meantime, please contact our support team.</p>"
+    );
+
+    private static readonly string OrgEnhancedVerificationReceivedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Thank you for purchasing <strong>Enhanced Trusted Verification</strong> for <strong>{{OrgName}}</strong>.</p>" +
+        "<p style=\"margin:0 0 16px;\">Enhanced verification is a manual process. One of our team members will review your organisation's details and update your verification status within <strong>24 hours</strong>.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions in the meantime, please contact our support team.</p>"
+    );
+
+    private static readonly string OrgEnhancedVerificationApprovedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Congratulations — <strong>{{OrgName}}</strong> has successfully completed <strong>Enhanced Trusted Verification</strong> on Aethon.</p>" +
+        "<p style=\"margin:0 0 16px;\">Your organisation will now display the Enhanced Trusted badge on all job listings, giving candidates the highest level of confidence in your opportunities.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions, please don't hesitate to contact our support team.</p>"
+    );
+
+    private static readonly string OrgEnhancedVerificationDeniedHtml = Wrap(
+        "<p style=\"margin:0 0 16px;\">Hi <strong>{{ContactName}}</strong>,</p>" +
+        "<p style=\"margin:0 0 16px;\">Thank you for submitting an Enhanced Trusted Verification request for <strong>{{OrgName}}</strong>.</p>" +
+        "<p style=\"margin:0 0 16px;\">We were unable to approve your enhanced verification request at this time. A member of our team will reach out to you shortly to discuss the details and next steps.</p>" +
+        "<p style=\"margin:0;font-size:13px;color:#6b7280;\">If you have any questions in the meantime, please contact our support team.</p>"
     );
 
     private static readonly string GenericHtml = Wrap(

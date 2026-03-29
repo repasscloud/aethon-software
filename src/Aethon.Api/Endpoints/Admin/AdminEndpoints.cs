@@ -844,6 +844,206 @@ public static class AdminEndpoints
             });
         });
 
+        // ── Organisation verification requests ────────────────────────────────
+
+        // GET /api/v1/admin/org-verification-requests?page= — all staff
+        // Lists organisations with a pending verification payment (VerificationPendingTier != null).
+        group.MapGet("/org-verification-requests", async (
+            AethonDbContext db,
+            int page = 1,
+            CancellationToken ct = default) =>
+        {
+            const int pageSize = 50;
+
+            var query = db.Organisations
+                .AsNoTracking()
+                .Where(o => o.VerificationPendingTier != null);
+
+            var total = await query.CountAsync(ct);
+            var items = await query
+                .OrderBy(o => o.VerificationPaidAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(o => new
+                {
+                    o.Id,
+                    o.Name,
+                    OrgType = o.Type.ToString(),
+                    PendingTier = o.VerificationPendingTier.ToString(),
+                    o.VerificationPaidAt,
+                    o.PrimaryContactName,
+                    o.PrimaryContactEmail,
+                    o.PrimaryContactPhone,
+                    o.WebsiteUrl,
+                    o.LinkedInUrl,
+                    o.TwitterHandle,
+                    o.FacebookUrl,
+                    o.TikTokHandle,
+                    o.InstagramHandle,
+                    o.YouTubeUrl,
+                    o.RegisteredAddressLine1,
+                    o.RegisteredCity,
+                    o.RegisteredState,
+                    o.RegisteredPostcode,
+                    o.RegisteredCountry,
+                    o.TaxRegistrationNumber,
+                    o.BusinessRegistrationNumber
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new { total, page, pageSize, items });
+        });
+
+        // POST /api/v1/admin/org-verification-requests/{orgId}/approve — Admin+ only
+        group.MapPost("/org-verification-requests/{orgId:guid}/approve", async (
+            HttpContext http,
+            AethonDbContext db,
+            [FromServices] ISystemSettingsService settings,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailService emailService,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailTemplateService emailTemplates,
+            Guid orgId,
+            ReviewVerificationRequest? request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == orgId, ct);
+            if (org is null)
+                return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            if (org.VerificationPendingTier is null)
+                return Results.BadRequest(new { code = "org_verification.not_pending", message = "No pending verification request for this organisation." });
+
+            var userIdStr = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid = userIdStr != null && Guid.TryParse(userIdStr, out var g) ? (Guid?)g : null;
+
+            var tier = org.VerificationPendingTier.Value;
+            var now = DateTime.UtcNow;
+            var wasUnverified = org.VerificationTier == VerificationTier.None;
+
+            org.VerificationTier = tier;
+            org.VerifiedUtc = now;
+            org.VerifiedByUserId = userGuid;
+            org.VerificationPendingTier = null;
+            org.UpdatedUtc = now;
+
+            if (wasUnverified)
+            {
+                var shouldConvert = await settings.GetBoolAsync(
+                    SystemSettingKeys.FeatureVerificationUpgradesPromoCredits, defaultValue: true, ct: ct);
+                if (shouldConvert)
+                {
+                    var promoCredits = await db.OrganisationJobCredits
+                        .Where(c =>
+                            c.OrganisationId == orgId &&
+                            c.CreditType == CreditType.JobPostingStandard &&
+                            c.Source == CreditSource.LaunchPromotion &&
+                            c.QuantityRemaining > 0 &&
+                            c.ConvertedAt == null &&
+                            (c.ExpiresAt == null || c.ExpiresAt > now))
+                        .ToListAsync(ct);
+
+                    foreach (var credit in promoCredits)
+                    {
+                        credit.CreditType = CreditType.JobPostingPremium;
+                        credit.ConvertedAt = now;
+                    }
+                }
+            }
+
+            await db.SaveChangesAsync(ct);
+
+            // Send approval email
+            if (!string.IsNullOrWhiteSpace(org.PrimaryContactEmail))
+            {
+                try
+                {
+                    var templateName = tier == VerificationTier.EnhancedTrusted
+                        ? "OrgEnhancedVerificationApproved"
+                        : "OrgVerificationApproved";
+                    var tierLabel = tier == VerificationTier.EnhancedTrusted
+                        ? "Enhanced Trusted Employer"
+                        : "Standard Verified Employer";
+                    var contactName = !string.IsNullOrWhiteSpace(org.PrimaryContactName) ? org.PrimaryContactName : org.PrimaryContactEmail;
+                    var (subject, html) = await emailTemplates.RenderAsync(templateName, new()
+                    {
+                        ["ContactName"]      = contactName,
+                        ["OrgName"]          = org.Name,
+                        ["VerificationTier"] = tierLabel
+                    }, ct);
+                    await emailService.SendAsync(new Aethon.Application.Abstractions.Email.EmailMessage
+                    {
+                        ToEmail  = org.PrimaryContactEmail,
+                        ToName   = contactName,
+                        Subject  = subject,
+                        TextBody = $"Hi {contactName},\n\n{org.Name} has been approved for {tierLabel} verification on Aethon.",
+                        HtmlBody = html
+                    }, ct);
+                }
+                catch { /* non-fatal */ }
+            }
+
+            return Results.Ok(new { organisationId = orgId, tier = tier.ToString(), approved = true });
+        });
+
+        // POST /api/v1/admin/org-verification-requests/{orgId}/deny — Admin+ only
+        group.MapPost("/org-verification-requests/{orgId:guid}/deny", async (
+            HttpContext http,
+            AethonDbContext db,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailService emailService,
+            [FromServices] Aethon.Application.Abstractions.Email.IEmailTemplateService emailTemplates,
+            Guid orgId,
+            ReviewVerificationRequest? request,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var org = await db.Organisations.FirstOrDefaultAsync(o => o.Id == orgId, ct);
+            if (org is null)
+                return Results.NotFound(new { code = "organisations.not_found", message = "Organisation not found." });
+
+            if (org.VerificationPendingTier is null)
+                return Results.BadRequest(new { code = "org_verification.not_pending", message = "No pending verification request for this organisation." });
+
+            var deniedTier = org.VerificationPendingTier.Value;
+            var now = DateTime.UtcNow;
+
+            org.VerificationPendingTier = null;
+            org.UpdatedUtc = now;
+
+            await db.SaveChangesAsync(ct);
+
+            // Send denial email
+            if (!string.IsNullOrWhiteSpace(org.PrimaryContactEmail))
+            {
+                try
+                {
+                    var templateName = deniedTier == VerificationTier.EnhancedTrusted
+                        ? "OrgEnhancedVerificationDenied"
+                        : "OrgVerificationDenied";
+                    var contactName = !string.IsNullOrWhiteSpace(org.PrimaryContactName) ? org.PrimaryContactName : org.PrimaryContactEmail;
+                    var (subject, html) = await emailTemplates.RenderAsync(templateName, new()
+                    {
+                        ["ContactName"] = contactName,
+                        ["OrgName"]     = org.Name
+                    }, ct);
+                    await emailService.SendAsync(new Aethon.Application.Abstractions.Email.EmailMessage
+                    {
+                        ToEmail  = org.PrimaryContactEmail,
+                        ToName   = contactName,
+                        Subject  = subject,
+                        TextBody = $"Hi {contactName},\n\nUnfortunately we were unable to approve the verification request for {org.Name} at this time. A member of our team will reach out to you shortly.",
+                        HtmlBody = html
+                    }, ct);
+                }
+                catch { /* non-fatal */ }
+            }
+
+            return Results.Ok(new { organisationId = orgId, denied = true });
+        });
+
         // GET /api/v1/admin/files?search=&page=
         group.MapGet("/files", async (
             AethonDbContext db,

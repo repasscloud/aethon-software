@@ -21,18 +21,8 @@ else
     <div class="d-flex flex-column gap-4">
 
         <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
-                <div class="flex-grow-1">
-                    <h1 class="h4 fw-bold mb-0">Identity verification requests</h1>
-                </div>
-                <div class="d-flex gap-2">
-                    <select class="form-select form-select-sm rounded-3" style="width:140px;" @bind="_filterStatus" @bind:after="LoadAsync">
-                        <option value="">All</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Denied">Denied</option>
-                    </select>
-                </div>
+            <div class="card-body p-4">
+                <h1 class="h4 fw-bold mb-0">Verification Requests</h1>
             </div>
         </div>
 
@@ -45,144 +35,313 @@ else
             <div class="alert alert-success rounded-4">@_successMsg</div>
         }
 
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                @if (!_loaded)
-                {
-                    <p class="text-secondary mb-0">Loading…</p>
-                }
-                else if (_requests.Count == 0)
-                {
-                    <p class="text-secondary mb-0">No verification requests found.</p>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>User</th>
-                                    <th>Full name</th>
-                                    <th>Contact</th>
-                                    <th>Status</th>
-                                    <th>Requested</th>
-                                    <th>Reviewer</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var r in _requests)
-                                {
+        @* ── Tabs ── *@
+        <ul class="nav nav-tabs px-1">
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == Tab.Identity ? "active" : "")"
+                        @onclick="() => SwitchTab(Tab.Identity)">
+                    Identity Verification
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(_activeTab == Tab.Organisation ? "active" : "") position-relative"
+                        @onclick="() => SwitchTab(Tab.Organisation)">
+                    Organisation Verification
+                    @if (_orgPendingCount > 0)
+                    {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:0.65rem;">
+                            @_orgPendingCount
+                        </span>
+                    }
+                </button>
+            </li>
+        </ul>
+
+        @* ── Identity verification tab ── *@
+        @if (_activeTab == Tab.Identity)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4 d-flex align-items-center gap-3 flex-wrap">
+                    <div class="flex-grow-1">
+                        <h2 class="h5 fw-semibold mb-0">Identity verification requests</h2>
+                    </div>
+                    <select class="form-select form-select-sm rounded-3" style="width:140px;" @bind="_filterStatus" @bind:after="LoadIdentityAsync">
+                        <option value="">All</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Denied">Denied</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    @if (!_identityLoaded)
+                    {
+                        <p class="text-secondary mb-0">Loading…</p>
+                    }
+                    else if (_identityRequests.Count == 0)
+                    {
+                        <p class="text-secondary mb-0">No identity verification requests found.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead>
                                     <tr>
-                                        <td>
-                                            <div class="fw-semibold">@r.UserDisplayName</div>
-                                            <div class="small text-secondary">@r.UserEmail</div>
-                                        </td>
-                                        <td>@r.FullName</td>
-                                        <td>
-                                            <div class="small">@r.EmailAddress</div>
-                                            <div class="small text-secondary">@r.PhoneNumber</div>
-                                        </td>
-                                        <td>
-                                            <span class="badge @StatusBadge(r.Status) rounded-pill">@r.Status</span>
-                                        </td>
-                                        <td class="small">@r.RequestedUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
-                                        <td class="small">@(r.ReviewerType ?? "—")</td>
-                                        <td>
-                                            @if (r.Status == "Pending")
-                                            {
+                                        <th>User</th>
+                                        <th>Full name</th>
+                                        <th>Contact</th>
+                                        <th>Status</th>
+                                        <th>Requested</th>
+                                        <th>Reviewer</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _identityRequests)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@r.UserDisplayName</div>
+                                                <div class="small text-secondary">@r.UserEmail</div>
+                                            </td>
+                                            <td>@r.FullName</td>
+                                            <td>
+                                                <div class="small">@r.EmailAddress</div>
+                                                <div class="small text-secondary">@r.PhoneNumber</div>
+                                            </td>
+                                            <td>
+                                                <span class="badge @StatusBadge(r.Status) rounded-pill">@r.Status</span>
+                                            </td>
+                                            <td class="small">@r.RequestedUtc.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                            <td class="small">@(r.ReviewerType ?? "—")</td>
+                                            <td>
+                                                @if (r.Status == "Pending")
+                                                {
+                                                    <div class="d-flex gap-1">
+                                                        <button class="btn btn-sm btn-outline-success rounded-pill"
+                                                                @onclick="() => OpenIdentityReview(r, approve: true)"
+                                                                disabled="@_saving">
+                                                            Approve
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-danger rounded-pill"
+                                                                @onclick="() => OpenIdentityReview(r, approve: false)"
+                                                                disabled="@_saving">
+                                                            Deny
+                                                        </button>
+                                                    </div>
+                                                }
+                                                else if (r.Status == "Denied" && !string.IsNullOrEmpty(r.ReviewNotes))
+                                                {
+                                                    <span class="small text-secondary" title="@r.ReviewNotes">
+                                                        <i class="bi bi-chat-left-text"></i>
+                                                    </span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @if (_identityReviewing is not null)
+            {
+                <div class="card border-0 shadow-sm rounded-4 border-@(_identityApproving ? "success" : "danger")-subtle">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-1">@(_identityApproving ? "Approve" : "Deny") — @_identityReviewing.UserDisplayName</h2>
+                        <p class="small text-secondary mb-3">
+                            @_identityReviewing.FullName &bull; @_identityReviewing.EmailAddress &bull; @_identityReviewing.PhoneNumber
+                            @if (!string.IsNullOrEmpty(_identityReviewing.AdditionalNotes))
+                            {
+                                <br /><em>@_identityReviewing.AdditionalNotes</em>
+                            }
+                        </p>
+
+                        <div class="mb-3" style="max-width:480px;">
+                            <label class="form-label small fw-semibold mb-1">
+                                @(_identityApproving ? "Notes (optional)" : "Denial reason (required)")
+                            </label>
+                            <textarea class="form-control form-control-sm rounded-3" rows="3"
+                                      @bind="_reviewNotes" maxlength="1000"
+                                      placeholder="@(_identityApproving ? "Any internal notes…" : "Explain why the request is denied…")"></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            @if (_identityApproving)
+                            {
+                                <button class="btn btn-sm btn-success rounded-pill"
+                                        @onclick="SubmitIdentityReviewAsync" disabled="@_saving">
+                                    @(_saving ? "Approving…" : "Confirm approve")
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-danger rounded-pill"
+                                        @onclick="SubmitIdentityReviewAsync" disabled="@_saving">
+                                    @(_saving ? "Denying…" : "Confirm deny")
+                                </button>
+                            }
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill"
+                                    @onclick="CancelIdentityReview" disabled="@_saving">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        @* ── Organisation verification tab ── *@
+        @if (_activeTab == Tab.Organisation)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-semibold mb-0">Pending organisation verifications</h2>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    @if (!_orgLoaded)
+                    {
+                        <p class="text-secondary mb-0">Loading…</p>
+                    }
+                    else if (_orgRequests.Count == 0)
+                    {
+                        <p class="text-secondary mb-0">No pending organisation verifications.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Organisation</th>
+                                        <th>Type</th>
+                                        <th>Tier requested</th>
+                                        <th>Primary contact</th>
+                                        <th>Paid at</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in _orgRequests)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@r.Name</div>
+                                                @if (!string.IsNullOrEmpty(r.WebsiteUrl))
+                                                {
+                                                    <div class="small text-secondary">@r.WebsiteUrl</div>
+                                                }
+                                            </td>
+                                            <td class="small">@r.OrgType</td>
+                                            <td>
+                                                <span class="badge @TierBadge(r.PendingTier) rounded-pill">@r.PendingTier</span>
+                                            </td>
+                                            <td>
+                                                <div class="small">@(r.PrimaryContactName ?? "—")</div>
+                                                <div class="small text-secondary">@(r.PrimaryContactEmail ?? "—")</div>
+                                            </td>
+                                            <td class="small">@(r.VerificationPaidAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "—")</td>
+                                            <td>
                                                 <div class="d-flex gap-1">
                                                     <button class="btn btn-sm btn-outline-success rounded-pill"
-                                                            @onclick="() => OpenReview(r, approve: true)"
+                                                            @onclick="() => OpenOrgReview(r, approve: true)"
                                                             disabled="@_saving">
                                                         Approve
                                                     </button>
                                                     <button class="btn btn-sm btn-outline-danger rounded-pill"
-                                                            @onclick="() => OpenReview(r, approve: false)"
+                                                            @onclick="() => OpenOrgReview(r, approve: false)"
                                                             disabled="@_saving">
                                                         Deny
                                                     </button>
                                                 </div>
-                                            }
-                                            else if (r.Status == "Denied" && !string.IsNullOrEmpty(r.ReviewNotes))
-                                            {
-                                                <span class="small text-secondary" title="@r.ReviewNotes">
-                                                    <i class="bi bi-chat-left-text"></i>
-                                                </span>
-                                            }
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-        </div>
-
-        <!-- Inline review panel -->
-        @if (_reviewing is not null)
-        {
-            <div class="card border-0 shadow-sm rounded-4 border-@(_approving ? "success" : "danger")-subtle">
-                <div class="card-body p-4">
-                    <h2 class="h5 fw-bold mb-1">@(_approving ? "Approve" : "Deny") — @_reviewing.UserDisplayName</h2>
-                    <p class="small text-secondary mb-3">
-                        @_reviewing.FullName &bull; @_reviewing.EmailAddress &bull; @_reviewing.PhoneNumber
-                        @if (!string.IsNullOrEmpty(_reviewing.AdditionalNotes))
-                        {
-                            <br /><em>@_reviewing.AdditionalNotes</em>
-                        }
-                    </p>
-
-                    <div class="mb-3" style="max-width:480px;">
-                        <label class="form-label small fw-semibold mb-1">
-                            @(_approving ? "Notes (optional)" : "Denial reason (required)")
-                        </label>
-                        <textarea class="form-control form-control-sm rounded-3" rows="3"
-                                  @bind="_reviewNotes" maxlength="1000"
-                                  placeholder="@(_approving ? "Any internal notes…" : "Explain why the request is denied…")"></textarea>
-                    </div>
-
-                    <div class="d-flex gap-2">
-                        @if (_approving)
-                        {
-                            <button class="btn btn-sm btn-success rounded-pill"
-                                    @onclick="SubmitReviewAsync" disabled="@_saving">
-                                @(_saving ? "Approving…" : "Confirm approve")
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-danger rounded-pill"
-                                    @onclick="SubmitReviewAsync" disabled="@_saving">
-                                @(_saving ? "Denying…" : "Confirm deny")
-                            </button>
-                        }
-                        <button class="btn btn-sm btn-outline-secondary rounded-pill"
-                                @onclick="CancelReview" disabled="@_saving">
-                            Cancel
-                        </button>
-                    </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
                 </div>
             </div>
+
+            @if (_orgReviewing is not null)
+            {
+                <div class="card border-0 shadow-sm rounded-4 border-@(_orgApproving ? "success" : "danger")-subtle">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-1">@(_orgApproving ? "Approve" : "Deny") verification — @_orgReviewing.Name</h2>
+                        <p class="small text-secondary mb-3">
+                            @_orgReviewing.PendingTier tier &bull; Contact: @(_orgReviewing.PrimaryContactEmail ?? "—")
+                        </p>
+
+                        @if (!_orgApproving)
+                        {
+                            <div class="mb-3" style="max-width:480px;">
+                                <label class="form-label small fw-semibold mb-1">Denial reason (optional)</label>
+                                <textarea class="form-control form-control-sm rounded-3" rows="3"
+                                          @bind="_reviewNotes" maxlength="1000"
+                                          placeholder="Internal notes on why the request is being denied…"></textarea>
+                            </div>
+                        }
+
+                        <div class="d-flex gap-2">
+                            @if (_orgApproving)
+                            {
+                                <button class="btn btn-sm btn-success rounded-pill"
+                                        @onclick="SubmitOrgReviewAsync" disabled="@_saving">
+                                    @(_saving ? "Approving…" : "Confirm approve")
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-danger rounded-pill"
+                                        @onclick="SubmitOrgReviewAsync" disabled="@_saving">
+                                    @(_saving ? "Denying…" : "Confirm deny")
+                                </button>
+                            }
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill"
+                                    @onclick="CancelOrgReview" disabled="@_saving">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
         }
 
     </div>
 }
 
 @code {
+    private enum Tab { Identity, Organisation }
+
     private bool _isStaff;
-    private bool _loaded;
     private bool _saving;
     private string? _pageError;
     private string? _successMsg;
+    private Tab _activeTab = Tab.Identity;
+
+    // ── Identity tab state ─────────────────────────────────────────────────────
+    private bool _identityLoaded;
     private string _filterStatus = "Pending";
-
-    private List<AdminVerificationRequestDto> _requests = [];
-
-    private AdminVerificationRequestDto? _reviewing;
-    private bool _approving;
+    private List<AdminVerificationRequestDto> _identityRequests = [];
+    private AdminVerificationRequestDto? _identityReviewing;
+    private bool _identityApproving;
     private string _reviewNotes = "";
+
+    // ── Org tab state ──────────────────────────────────────────────────────────
+    private bool _orgLoaded;
+    private int _orgPendingCount;
+    private List<OrgVerificationItem> _orgRequests = [];
+    private OrgVerificationItem? _orgReviewing;
+    private bool _orgApproving;
 
     protected override async Task OnInitializedAsync()
     {
@@ -191,14 +350,33 @@ else
         _isStaff = appType is "superadmin" or "admin" or "support";
 
         if (_isStaff)
-            await LoadAsync();
+        {
+            await LoadIdentityAsync();
+            await LoadOrgAsync();
+        }
     }
 
-    private async Task LoadAsync()
+    private async Task SwitchTab(Tab tab)
     {
-        _loaded = false;
+        _activeTab = tab;
         _pageError = null;
-        _requests = [];
+        _successMsg = null;
+        CancelIdentityReview();
+        CancelOrgReview();
+
+        if (tab == Tab.Identity && !_identityLoaded)
+            await LoadIdentityAsync();
+        else if (tab == Tab.Organisation && !_orgLoaded)
+            await LoadOrgAsync();
+    }
+
+    // ── Identity verification ─────────────────────────────────────────────────
+
+    private async Task LoadIdentityAsync()
+    {
+        _identityLoaded = false;
+        _pageError = null;
+        _identityRequests = [];
 
         try
         {
@@ -209,35 +387,35 @@ else
             var resp = await client.GetAsync(url);
             if (resp.IsSuccessStatusCode)
             {
-                var paged = await resp.Content.ReadFromJsonAsync<PagedVerificationResponse>(AethonApiClient.JsonOptions);
-                _requests = paged?.Items ?? [];
+                var paged = await resp.Content.ReadFromJsonAsync<PagedIdentityResponse>(AethonApiClient.JsonOptions);
+                _identityRequests = paged?.Items ?? [];
             }
             else
-                _pageError = "Could not load verification requests.";
+                _pageError = "Could not load identity verification requests.";
         }
-        catch { _pageError = "Could not load verification requests."; }
-        finally { _loaded = true; }
+        catch { _pageError = "Could not load identity verification requests."; }
+        finally { _identityLoaded = true; }
     }
 
-    private void OpenReview(AdminVerificationRequestDto request, bool approve)
+    private void OpenIdentityReview(AdminVerificationRequestDto request, bool approve)
     {
-        _reviewing = request;
-        _approving = approve;
+        _identityReviewing = request;
+        _identityApproving = approve;
         _reviewNotes = "";
         _successMsg = null;
         _pageError = null;
     }
 
-    private void CancelReview()
+    private void CancelIdentityReview()
     {
-        _reviewing = null;
+        _identityReviewing = null;
         _reviewNotes = "";
     }
 
-    private async Task SubmitReviewAsync()
+    private async Task SubmitIdentityReviewAsync()
     {
-        if (_reviewing is null) return;
-        if (!_approving && string.IsNullOrWhiteSpace(_reviewNotes))
+        if (_identityReviewing is null) return;
+        if (!_identityApproving && string.IsNullOrWhiteSpace(_reviewNotes))
         {
             _pageError = "A denial reason is required.";
             return;
@@ -247,39 +425,151 @@ else
         try
         {
             var client = await Api.CreateAsync();
-            var endpoint = _approving
-                ? $"/api/v1/admin/verification-requests/{_reviewing.Id}/approve"
-                : $"/api/v1/admin/verification-requests/{_reviewing.Id}/deny";
+            var endpoint = _identityApproving
+                ? $"/api/v1/admin/verification-requests/{_identityReviewing.Id}/approve"
+                : $"/api/v1/admin/verification-requests/{_identityReviewing.Id}/deny";
             var body = new { notes = string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes.Trim() };
             var resp = await client.PostAsJsonAsync(endpoint, body);
             if (resp.IsSuccessStatusCode)
             {
-                _successMsg = _approving
-                    ? $"Request approved for {_reviewing.UserDisplayName}."
-                    : $"Request denied for {_reviewing.UserDisplayName}.";
-                CancelReview();
-                await LoadAsync();
+                _successMsg = _identityApproving
+                    ? $"Request approved for {_identityReviewing.UserDisplayName}."
+                    : $"Request denied for {_identityReviewing.UserDisplayName}.";
+                CancelIdentityReview();
+                await LoadIdentityAsync();
             }
             else
-                _pageError = _approving ? "Could not approve request." : "Could not deny request.";
+                _pageError = _identityApproving ? "Could not approve request." : "Could not deny request.";
         }
         catch { _pageError = "Could not submit review."; }
         finally { _saving = false; }
     }
 
+    // ── Organisation verification ─────────────────────────────────────────────
+
+    private async Task LoadOrgAsync()
+    {
+        _orgLoaded = false;
+        _orgRequests = [];
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.GetAsync("/api/v1/admin/org-verification-requests");
+            if (resp.IsSuccessStatusCode)
+            {
+                var paged = await resp.Content.ReadFromJsonAsync<PagedOrgResponse>(AethonApiClient.JsonOptions);
+                _orgRequests = paged?.Items ?? [];
+                _orgPendingCount = paged?.Total ?? 0;
+            }
+            else
+                _pageError = "Could not load organisation verification requests.";
+        }
+        catch { _pageError = "Could not load organisation verification requests."; }
+        finally { _orgLoaded = true; }
+    }
+
+    private void OpenOrgReview(OrgVerificationItem request, bool approve)
+    {
+        _orgReviewing = request;
+        _orgApproving = approve;
+        _reviewNotes = "";
+        _successMsg = null;
+        _pageError = null;
+    }
+
+    private void CancelOrgReview()
+    {
+        _orgReviewing = null;
+        _reviewNotes = "";
+    }
+
+    private async Task SubmitOrgReviewAsync()
+    {
+        if (_orgReviewing is null) return;
+
+        _saving = true; _pageError = null; _successMsg = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var endpoint = _orgApproving
+                ? $"/api/v1/admin/org-verification-requests/{_orgReviewing.Id}/approve"
+                : $"/api/v1/admin/org-verification-requests/{_orgReviewing.Id}/deny";
+            var body = new { notes = string.IsNullOrWhiteSpace(_reviewNotes) ? null : _reviewNotes.Trim() };
+            var resp = await client.PostAsJsonAsync(endpoint, body);
+            if (resp.IsSuccessStatusCode)
+            {
+                _successMsg = _orgApproving
+                    ? $"Verification approved for {_orgReviewing.Name}."
+                    : $"Verification denied for {_orgReviewing.Name}.";
+                CancelOrgReview();
+                await LoadOrgAsync();
+            }
+            else
+                _pageError = _orgApproving ? "Could not approve verification." : "Could not deny verification.";
+        }
+        catch { _pageError = "Could not submit review."; }
+        finally { _saving = false; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private static string StatusBadge(string? s) => s switch
     {
-        "Pending" => "bg-warning text-dark",
+        "Pending"  => "bg-warning text-dark",
         "Approved" => "bg-success",
-        "Denied" => "bg-danger",
-        _ => "bg-secondary"
+        "Denied"   => "bg-danger",
+        _          => "bg-secondary"
     };
 
-    private sealed class PagedVerificationResponse
+    private static string TierBadge(string? tier) => tier switch
+    {
+        "EnhancedTrusted"   => "bg-warning text-dark",
+        "StandardEmployer"  => "bg-primary",
+        _                   => "bg-secondary"
+    };
+
+    // ── Response models ───────────────────────────────────────────────────────
+
+    private sealed class PagedIdentityResponse
     {
         public int Total { get; set; }
         public int Page { get; set; }
         public int PageSize { get; set; }
         public List<AdminVerificationRequestDto> Items { get; set; } = [];
+    }
+
+    private sealed class PagedOrgResponse
+    {
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public List<OrgVerificationItem> Items { get; set; } = [];
+    }
+
+    private sealed class OrgVerificationItem
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? OrgType { get; set; }
+        public string? PendingTier { get; set; }
+        public DateTime? VerificationPaidAt { get; set; }
+        public string? PrimaryContactName { get; set; }
+        public string? PrimaryContactEmail { get; set; }
+        public string? PrimaryContactPhone { get; set; }
+        public string? WebsiteUrl { get; set; }
+        public string? LinkedInUrl { get; set; }
+        public string? TwitterHandle { get; set; }
+        public string? FacebookUrl { get; set; }
+        public string? TikTokHandle { get; set; }
+        public string? InstagramHandle { get; set; }
+        public string? YouTubeUrl { get; set; }
+        public string? RegisteredAddressLine1 { get; set; }
+        public string? RegisteredCity { get; set; }
+        public string? RegisteredState { get; set; }
+        public string? RegisteredPostcode { get; set; }
+        public string? RegisteredCountry { get; set; }
+        public string? TaxRegistrationNumber { get; set; }
+        public string? BusinessRegistrationNumber { get; set; }
     }
 }
