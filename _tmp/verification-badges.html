@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verification Badge Mockups</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <style>
+    body { background: #f8f9fa; }
+    .section-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #6c757d;
+      margin-bottom: .5rem;
+    }
+    .mockup-frame {
+      background: #fff;
+      border-radius: 1rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      padding: 1.5rem;
+    }
+  </style>
+</head>
+<body class="p-4">
+
+  <div class="mb-4">
+    <h1 class="h4 fw-bold mb-0">Verification UI Mockups</h1>
+    <p class="text-secondary small mb-0">Preview of badge and callout changes before deploy.</p>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 1 — /app/organisation/verification
+         Status callout cards at the top of the page
+    ═══════════════════════════════════════════════ -->
+    <div class="col-12">
+      <div class="section-label">1 · /app/organisation/verification — status callouts</div>
+      <div class="mockup-frame d-flex flex-column gap-3" style="max-width:600px;">
+
+        <!-- Enhanced Trusted — NOW YELLOW -->
+        <div>
+          <p class="text-muted small mb-1">Enhanced Trusted Employer (was green, now yellow):</p>
+          <div class="alert alert-warning rounded-4 mb-0 d-flex align-items-center gap-3">
+            <i class="bi bi-patch-check-fill fs-4"></i>
+            <div>
+              <div class="fw-semibold">Enhanced Trusted Employer</div>
+              <div class="small">Your organisation holds the highest verification tier.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standard Verified — unchanged, shown for reference -->
+        <div>
+          <p class="text-muted small mb-1">Standard Verified Employer (unchanged, for reference):</p>
+          <div class="alert alert-primary rounded-4 d-flex align-items-center gap-3">
+            <i class="bi bi-patch-check fs-4"></i>
+            <div>
+              <div class="fw-semibold">Standard Verified Employer</div>
+              <div class="small">You can upgrade to Enhanced Trusted Employer at any time.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pending — unchanged, shown for reference -->
+        <div>
+          <p class="text-muted small mb-1">Verification Pending (unchanged, for reference):</p>
+          <div class="alert alert-warning rounded-4 d-flex align-items-center gap-3">
+            <i class="bi bi-hourglass-split fs-4"></i>
+            <div>
+              <div class="fw-semibold">Verification Pending</div>
+              <div class="small">Your verification request has been received and is being processed.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SECTION 2 — /organisations/{slug} public page
+         Inline name badges
+    ═══════════════════════════════════════════════ -->
+    <div class="col-12">
+      <div class="section-label">2 · /organisations/{slug} — name badge comparison</div>
+      <div class="mockup-frame" style="max-width:700px;">
+
+        <!-- Side-by-side comparison -->
+        <div class="row g-4">
+
+          <!-- Standard Verified -->
+          <div class="col-12 col-md-6">
+            <p class="text-muted small mb-2">Standard Verified (blue — unchanged):</p>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <h1 class="h3 fw-bold mb-0">Acme Corp</h1>
+              <a href="#" class="badge bg-primary rounded-pill text-decoration-none" title="Verified Employer">
+                <i class="bi bi-patch-check-fill me-1"></i>Verified
+              </a>
+            </div>
+            <p class="text-muted small mt-2 mb-0">Sydney, NSW · Technology</p>
+          </div>
+
+          <!-- Enhanced Trusted -->
+          <div class="col-12 col-md-6">
+            <p class="text-muted small mb-2">Enhanced Trusted (yellow/black — updated):</p>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <h1 class="h3 fw-bold mb-0">Repass Cloud</h1>
+              <a href="#" class="badge bg-warning text-dark rounded-pill text-decoration-none" title="Enhanced Trusted Employer">
+                <i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted
+              </a>
+            </div>
+            <p class="text-muted small mt-2 mb-0">Melbourne, VIC · Cloud Services</p>
+          </div>
+
+        </div>
+
+        <!-- ── Realistic header card mock ── -->
+        <hr class="my-4" />
+        <p class="text-muted small mb-3">Realistic header card (Enhanced Trusted org):</p>
+
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+          <div style="height:120px; background: linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);"></div>
+          <div class="card-body p-4">
+            <div class="d-flex flex-column flex-md-row gap-3 align-items-md-start">
+              <div class="flex-shrink-0" style="margin-top:-48px;">
+                <div class="d-flex align-items-center justify-content-center bg-white rounded-3 border"
+                     style="width:80px;height:80px;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+                  <i class="bi bi-cloud-fill text-primary" style="font-size:2rem;"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                  <h1 class="h4 fw-bold mb-0">Repass Cloud</h1>
+                  <a href="#" class="badge bg-warning text-dark rounded-pill text-decoration-none" title="Enhanced Trusted Employer">
+                    <i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted
+                  </a>
+                </div>
+                <div class="text-secondary mb-2 fw-semibold small">
+                  <i class="bi bi-geo-alt-fill text-danger me-1"></i>Melbourne, VIC
+                </div>
+                <div class="d-flex flex-wrap gap-3 text-secondary small">
+                  <span><i class="bi bi-tag-fill me-1"></i>Cloud Services</span>
+                  <span><i class="bi bi-people-fill me-1"></i>51–200 employees</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Standard for compare -->
+        <p class="text-muted small mt-4 mb-3">Same card — Standard Verified org:</p>
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+          <div style="height:120px; background: linear-gradient(135deg,#e9ecef 0%,#dee2e6 100%);"></div>
+          <div class="card-body p-4">
+            <div class="d-flex flex-column flex-md-row gap-3 align-items-md-start">
+              <div class="flex-shrink-0" style="margin-top:-48px;">
+                <div class="d-flex align-items-center justify-content-center bg-white rounded-3 border"
+                     style="width:80px;height:80px;box-shadow:0 2px 8px rgba(0,0,0,.1);">
+                  <i class="bi bi-building text-secondary" style="font-size:2rem;"></i>
+                </div>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                  <h1 class="h4 fw-bold mb-0">Acme Corp</h1>
+                  <a href="#" class="badge bg-primary rounded-pill text-decoration-none" title="Verified Employer">
+                    <i class="bi bi-patch-check-fill me-1"></i>Verified
+                  </a>
+                </div>
+                <div class="text-secondary mb-2 fw-semibold small">
+                  <i class="bi bi-geo-alt-fill text-danger me-1"></i>Sydney, NSW
+                </div>
+                <div class="d-flex flex-wrap gap-3 text-secondary small">
+                  <span><i class="bi bi-tag-fill me-1"></i>Technology</span>
+                  <span><i class="bi bi-people-fill me-1"></i>11–50 employees</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /row -->
+
+</body>
+</html>
