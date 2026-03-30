@@ -64,6 +64,59 @@ else
                     </div>
                 </div>
 
+                <!-- Import Feed API Key -->
+                <div class="card border-0 shadow-sm rounded-4 mb-4">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-1">Import Feed API Key</h5>
+                        <p class="text-secondary small mb-4">
+                            API key used by external sources to push jobs via
+                            <code>POST /api/v1/import/jobs</code> (header: <code>X-Import-Api-Key</code>).
+                            Resolution order: DB (here) → <code>IMPORT_API_KEY</code> environment variable.
+                            Rotate to immediately invalidate the previous key.
+                        </p>
+
+                        <div class="mb-3">
+                            <div class="text-secondary small mb-1">Current key</div>
+                            @if (_importKeyConfigured)
+                            {
+                                <div class="d-flex align-items-center gap-2">
+                                    <code class="user-select-all">@_importKeyMasked</code>
+                                    @if (_importKeyStoredInDb)
+                                    {
+                                        <span class="badge bg-success">DB</span>
+                                    }
+                                    else if (_importKeyStoredInEnv)
+                                    {
+                                        <span class="badge bg-secondary">ENV</span>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-danger small">Not configured — import endpoint will reject all requests.</span>
+                            }
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(_importKeyNewValue))
+                        {
+                            <div class="alert alert-success rounded-3 py-2 mb-3">
+                                <div class="fw-semibold mb-1">New key generated — copy it now, it will not be shown again:</div>
+                                <code class="user-select-all">@_importKeyNewValue</code>
+                            </div>
+                        }
+
+                        <button class="btn btn-sm btn-dark rounded-3" @onclick="RotateImportApiKey" disabled="@_saving">
+                            @(_saving ? "Working…" : "Rotate Key")
+                        </button>
+                        @if (!string.IsNullOrEmpty(_importKeyMsg))
+                        {
+                            <div class="alert @(_importKeySuccess ? "alert-success" : "alert-danger") rounded-3 mt-3 py-2 mb-0">
+                                @_importKeyMsg
+                            </div>
+                        }
+                    </div>
+                </div>
+
                 <!-- Google Job Indexing -->
                 <div class="card border-0 shadow-sm rounded-4 mb-4">
                     <div class="card-body p-4">
@@ -453,6 +506,15 @@ else
 
     private static readonly string[] _comingSoon = ["Indeed", "LinkedIn", "ZipRecruiter", "Adzuna", "Jora", "Jooble"];
 
+    // Import API Key
+    private bool _importKeyConfigured;
+    private string _importKeyMasked = "";
+    private bool _importKeyStoredInDb;
+    private bool _importKeyStoredInEnv;
+    private string? _importKeyNewValue;
+    private string? _importKeyMsg;
+    private bool _importKeySuccess;
+
     // Site settings
     private string _siteBaseUrl = "";
     private string? _siteMsg;
@@ -553,6 +615,19 @@ else
 
             var records = await client.GetFromJsonAsync<List<SyndicationRecordDto>>("/api/v1/admin/syndication-records");
             _syndicationRecords = records ?? [];
+
+            try
+            {
+                var importKey = await client.GetFromJsonAsync<ImportApiKeyStatusDto>("/api/v1/admin/settings/import-api-key");
+                if (importKey is not null)
+                {
+                    _importKeyConfigured = importKey.IsConfigured;
+                    _importKeyMasked     = importKey.MaskedKey ?? "";
+                    _importKeyStoredInDb  = importKey.StoredInDb;
+                    _importKeyStoredInEnv = importKey.StoredInEnv;
+                }
+            }
+            catch { /* degrade gracefully */ }
         }
         catch { /* degrade gracefully */ }
 
@@ -708,6 +783,42 @@ else
         finally { _saving = false; }
     }
 
+    private async Task RotateImportApiKey()
+    {
+        _importKeyMsg = null;
+        _importKeyNewValue = null;
+        _saving = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsync("/api/v1/admin/settings/import-api-key/rotate", null);
+            if (resp.IsSuccessStatusCode)
+            {
+                var result = await resp.Content.ReadFromJsonAsync<RotateImportApiKeyResult>();
+                _importKeySuccess    = true;
+                _importKeyNewValue   = result?.NewKey;
+                _importKeyConfigured = true;
+                _importKeyStoredInDb  = true;
+                _importKeyStoredInEnv = false;
+                _importKeyMasked     = string.IsNullOrEmpty(result?.NewKey)
+                    ? "••••••••"
+                    : result.NewKey[..8] + "••••••••";
+                _importKeyMsg = "Key rotated successfully.";
+            }
+            else
+            {
+                _importKeySuccess = false;
+                _importKeyMsg = "Failed to rotate key.";
+            }
+        }
+        catch
+        {
+            _importKeySuccess = false;
+            _importKeyMsg = "Unable to reach settings service.";
+        }
+        finally { _saving = false; }
+    }
+
     private async Task SaveEmailSettings()
     {
         _emailMsg = null;
@@ -798,6 +909,8 @@ else
     }
 
     private record SettingDto(string Key, string Value, string? Description);
+    private record ImportApiKeyStatusDto(bool IsConfigured, string? MaskedKey, bool StoredInDb, bool StoredInEnv);
+    private record RotateImportApiKeyResult(string NewKey);
     private record SyndicationRecordDto(
         Guid Id, Guid JobId, string JobTitle, string Provider,
         string Status, string? ExternalRef, DateTime SubmittedUtc,

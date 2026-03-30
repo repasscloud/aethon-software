@@ -41,6 +41,7 @@ services:
       LinkedIn__ClientSecret: "${LinkedIn__ClientSecret:-}"
       LinkedIn__RedirectUri: "${LinkedIn__RedirectUri:-http://localhost:5201/signin-linkedin}"
       IMPORT_API_KEY: "${IMPORT_API_KEY:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-http://localhost:5200}"
     volumes:
       - api_uploads:/app/uploads
       - dp_keys:/keys

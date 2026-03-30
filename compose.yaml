@@ -47,6 +47,7 @@ services:
       Seed__AdminEmail: "${Seed__AdminEmail:-}"
       Seed__AdminPassword: "${Seed__AdminPassword:-}"
       IMPORT_API_KEY: "${IMPORT_API_KEY:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-}"
     volumes:
       - api_uploads:/app/uploads
       - dp_keys:/keys

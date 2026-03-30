@@ -288,7 +288,7 @@ using (var scope = app.Services.CreateScope())
         new SystemSetting { Key = SystemSettingKeys.DisplayPriceStickyUnverified30d, Value = "", Description = "Display price: Sticky 30d — unverified org.", UpdatedUtc = DateTime.UtcNow },
 
         // ── Site ──────────────────────────────────────────────────────────────
-        new SystemSetting { Key = SystemSettingKeys.SiteBaseUrl, Value = "", Description = "Canonical public base URL of the web frontend (e.g. https://app.aethonsoftware.com). Used for sitemap generation and absolute URL construction.", UpdatedUtc = DateTime.UtcNow },
+        new SystemSetting { Key = SystemSettingKeys.SiteBaseUrl, Value = (Environment.GetEnvironmentVariable("SiteBaseUrl") ?? "").TrimEnd('/'), Description = "Canonical public base URL of the web frontend (e.g. https://app.aethonsoftware.com). Used for sitemap generation and absolute URL construction.", UpdatedUtc = DateTime.UtcNow },
 
         // ── Import Feed ───────────────────────────────────────────────────────
         new SystemSetting
