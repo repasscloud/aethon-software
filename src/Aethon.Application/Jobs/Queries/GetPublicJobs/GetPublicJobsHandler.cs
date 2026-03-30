@@ -148,7 +148,8 @@ public sealed class GetPublicJobsHandler
                 j.IsImmediateStart,
                 j.IncludeCompanyLogo,
                 j.IsSuitableForSchoolLeavers,
-                j.IsSchoolLeaverTargeted
+                j.IsSchoolLeaverTargeted,
+                j.IsImported
             })
             .ToListAsync(ct);
 
@@ -202,7 +203,8 @@ public sealed class GetPublicJobsHandler
                 IsImmediateStart = j.IsImmediateStart,
                 IncludeCompanyLogo = j.IncludeCompanyLogo,
                 IsSuitableForSchoolLeavers = j.IsSuitableForSchoolLeavers,
-                IsSchoolLeaverTargeted = j.IsSchoolLeaverTargeted
+                IsSchoolLeaverTargeted = j.IsSchoolLeaverTargeted,
+                IsImported = j.IsImported
             };
 
             if (q.Latitude.HasValue && q.Longitude.HasValue && j.LocationLatitude.HasValue && j.LocationLongitude.HasValue)

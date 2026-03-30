@@ -299,6 +299,11 @@ namespace Aethon.Data.Migrations
                     b.Property<bool>("IsImmediateStart")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsImported")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("IsSchoolLeaverTargeted")
                         .HasColumnType("boolean");
 

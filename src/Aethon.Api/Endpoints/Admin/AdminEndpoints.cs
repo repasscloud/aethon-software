@@ -1337,6 +1337,59 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // GET /api/v1/admin/settings/import-api-key — SuperAdmin + Admin
+        // Returns the current key masked for display (last 8 chars visible).
+        group.MapGet("/settings/import-api-key", async (
+            HttpContext http,
+            ISystemSettingsService settings,
+            IConfiguration config,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var stored = await settings.GetStringAsync(SystemSettingKeys.ImportApiKey, ct);
+            var key    = !string.IsNullOrWhiteSpace(stored)
+                ? stored
+                : Environment.GetEnvironmentVariable("IMPORT_API_KEY") ?? "";
+
+            var masked = key.Length >= 8
+                ? $"{"•".PadRight(key.Length - 8, '•')}{key[^8..]}"
+                : (key.Length > 0 ? new string('•', key.Length) : "");
+
+            return Results.Ok(new
+            {
+                isConfigured  = !string.IsNullOrWhiteSpace(key),
+                maskedKey     = masked,
+                storedInDb    = !string.IsNullOrWhiteSpace(stored),
+                storedInEnv   = string.IsNullOrWhiteSpace(stored) && !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("IMPORT_API_KEY"))
+            });
+        });
+
+        // POST /api/v1/admin/settings/import-api-key/rotate — SuperAdmin + Admin
+        // Generates a new cryptographically-random 64-char API key and saves it to SystemSettings.
+        group.MapPost("/settings/import-api-key/rotate", async (
+            HttpContext http,
+            ISystemSettingsService settings,
+            CancellationToken ct) =>
+        {
+            if (!http.User.IsInRole("SuperAdmin") && !http.User.IsInRole("Admin"))
+                return Results.Forbid();
+
+            var userId     = http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userGuid   = userId != null && Guid.TryParse(userId, out var g) ? (Guid?)g : null;
+            var newKey     = GenerateImportApiKey();
+
+            await settings.SetAsync(
+                SystemSettingKeys.ImportApiKey,
+                newKey,
+                description: "Long random API key for the external job import feed endpoint. Rotated via Admin UI.",
+                updatedByUserId: userGuid,
+                ct: ct);
+
+            return Results.Ok(new { newKey });
+        });
+
         // ─── System Logs ─────────────────────────────────────────────────────────
 
         // GET /api/v1/admin/logs
@@ -1940,5 +1993,19 @@ public static class AdminEndpoints
         public Guid UserId { get; set; }
         public string Subject { get; set; } = string.Empty;
         public string HtmlBody { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Generates a cryptographically-random 64-character API key using
+    /// URL-safe Base64 encoding (no padding, no +/).
+    /// </summary>
+    private static string GenerateImportApiKey()
+    {
+        var bytes = new byte[48]; // 48 bytes → 64 Base64 chars
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes)
+            .Replace("+", "-")
+            .Replace("/", "_")
+            .Replace("=", "");
     }
 }

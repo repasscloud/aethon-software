@@ -989,6 +989,7 @@ namespace Aethon.Data.Migrations
                     ScreeningQuestionsJson = table.Column<string>(type: "text", nullable: true),
                     Keywords = table.Column<string>(type: "text", nullable: true),
                     PoNumber = table.Column<string>(type: "text", nullable: true),
+                    IsImported = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
                     AllowAutoMatch = table.Column<bool>(type: "boolean", nullable: false),
                     ShortUrlCode = table.Column<string>(type: "text", nullable: true),
                     CreatedUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),

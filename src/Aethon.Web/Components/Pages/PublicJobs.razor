@@ -337,6 +337,10 @@
                                             {
                                                 <span class="badge bg-primary rounded-pill" style="font-size:.65rem;"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
                                             }
+                                            @if (job.IsImported)
+                                            {
+                                                <span class="badge bg-secondary rounded-pill" style="font-size:.65rem;" title="External listing imported from a third-party source"><i class="bi bi-box-arrow-in-down me-1"></i>External</span>
+                                            }
                                         </div>
                                     </div>
                                     @if (job.IncludeCompanyLogo && !string.IsNullOrWhiteSpace(job.OrganisationLogoUrl))

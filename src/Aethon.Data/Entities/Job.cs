@@ -336,6 +336,14 @@ public class Job : EntityBase
     /// <summary>Internal purchase-order / posting-reference number.</summary>
     public string? PoNumber { get; set; }
 
+    // ─── Import feed ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True when this job was ingested via the external import feed API.
+    /// Never set to true through the UI or standard job creation flows.
+    /// </summary>
+    public bool IsImported { get; set; }
+
     // ─── Auto-match & short URL ───────────────────────────────────────────────
 
     /// <summary>Whether the job should be auto-matched to candidate profiles.</summary>

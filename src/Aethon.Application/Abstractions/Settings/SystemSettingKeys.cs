@@ -143,4 +143,13 @@ public static class SystemSettingKeys
     /// Overridden at runtime by the SiteBaseUrl environment variable / appsettings entry.
     /// </summary>
     public const string SiteBaseUrl = "Site.BaseUrl";
+
+    // ─── Import Feed ──────────────────────────────────────────────────────────
+    /// <summary>
+    /// Long random API key that must be supplied as the X-Import-Api-Key header
+    /// on every request to the job import ingestion endpoint.
+    /// Rotate via Admin → Settings → Import API Key.
+    /// Falls back to IMPORT_API_KEY environment variable if this setting is empty.
+    /// </summary>
+    public const string ImportApiKey = "Import.ApiKey";
 }

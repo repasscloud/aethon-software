@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260329140737_InitDb")]
+    [Migration("20260330105201_InitDb")]
     partial class InitDb
     {
         /// <inheritdoc />
@@ -301,6 +301,11 @@ namespace Aethon.Data.Migrations
 
                     b.Property<bool>("IsImmediateStart")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("IsImported")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsSchoolLeaverTargeted")
                         .HasColumnType("boolean");

@@ -1114,6 +1114,51 @@ Removes a system setting entirely. The platform will fall back to its default va
 
 ---
 
+### Get import API key status
+
+**`GET`** `/api/v1/admin/settings/import-api-key`
+
+> 🛡️⬆️ **SuperAdmin/Admin**
+
+Returns the current import API key status. The key value is masked — only the last 8 characters are visible. Use this to confirm a key is configured without exposing the full value.
+
+#### Response `200 OK`
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `isConfigured` | `boolean` | `true` when a key is set (either in DB or env var). |
+| `maskedKey` | `string` | The key with all but the last 8 characters replaced by `•`. Empty string if not configured. |
+| `storedInDb` | `boolean` | `true` when the key comes from the `Import.ApiKey` system setting. |
+| `storedInEnv` | `boolean` | `true` when the key falls back to the `IMPORT_API_KEY` environment variable. |
+
+---
+
+### Rotate import API key
+
+**`POST`** `/api/v1/admin/settings/import-api-key/rotate`
+
+> 🛡️⬆️ **SuperAdmin/Admin**
+
+Generates a new cryptographically-random 64-character API key and saves it to the `Import.ApiKey` system setting. The previous key is immediately invalidated.
+
+The new key uses URL-safe Base64 encoding (no `+`, `/`, or `=` characters).
+
+After rotating, update the `X-Import-Api-Key` value in any external cron jobs or feed ingesters before the next run.
+
+#### Response `200 OK`
+
+```json
+{
+  "newKey": "aB3dE5fG7hI9jK1lM3nO5pQ7rS9tU1vW3xY5zA7bC9dE1fG3hI5jK7lM9nO1pQ3rS5t"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `newKey` | `string` | The newly generated API key — store this immediately, it is not shown again. |
+
+---
+
 ## System Logs
 
 ### List logs

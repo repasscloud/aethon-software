@@ -7,6 +7,7 @@ using Aethon.Api.Endpoints.CompanyJobs;
 using Aethon.Api.Endpoints.CompanyRecruiters;
 using Aethon.Api.Endpoints.Files;
 using Aethon.Api.Endpoints.Identity;
+using Aethon.Api.Endpoints.Import;
 using Aethon.Api.Endpoints.Integrations;
 using Aethon.Api.Endpoints.Jobs;
 using Aethon.Api.Endpoints.Organisations;
@@ -25,6 +26,7 @@ public static class EndpointRouteBuilderExtensions
 
         api.MapAuthEndpoints();
         api.MapAdminEndpoints();
+        api.MapImportEndpoints();
         api.MapPublicEndpoints();
         api.MapJobEndpoints();
         api.MapApplicationEndpointsGroup();

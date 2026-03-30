@@ -76,6 +76,12 @@ else
                                     </a>
                                 }
                             }
+                            @if (_job.IsImported)
+                            {
+                                <span class="badge bg-secondary rounded-pill" style="font-size:.7rem;" title="This job was imported from an external source">
+                                    <i class="bi bi-box-arrow-in-down me-1"></i>External Listing
+                                </span>
+                            }
                         </div>
 
                         <!-- Badges row -->
@@ -463,6 +469,10 @@ else
 
             _job = await response.Content.ReadFromJsonAsync<PublicJobDetailDto>(AethonApiClient.JsonOptions);
 
+            // Imported jobs always show the apply button (external URL) regardless of account type
+            if (_job is not null && _job.IsImported && !string.IsNullOrWhiteSpace(_job.ExternalApplicationUrl))
+                _canApply = true;
+
             // Redirect old /jobs/{guid} URLs to the SEO-friendly URL
             if (_job is not null && string.IsNullOrEmpty(Slug) && !string.IsNullOrEmpty(_job.Organisation.Slug))
             {
@@ -691,7 +701,8 @@ else
 
     private string BuildJsonLd()
     {
-        if (_job is null) return "{}";
+        // Imported jobs must not be submitted to Google Jobs / structured data (#24)
+        if (_job is null || _job.IsImported) return "{}";
 
         var webBase = (Configuration["Email:WebBaseUrl"] ?? Configuration["ApiBaseUrl"] ?? NavigationManager.BaseUri.TrimEnd('/'));
         var jobUrl = JobUrlHelper.BuildPublicUrl(webBase, _jobId);

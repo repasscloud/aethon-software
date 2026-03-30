@@ -289,6 +289,16 @@ using (var scope = app.Services.CreateScope())
 
         // ── Site ──────────────────────────────────────────────────────────────
         new SystemSetting { Key = SystemSettingKeys.SiteBaseUrl, Value = "", Description = "Canonical public base URL of the web frontend (e.g. https://app.aethonsoftware.com). Used for sitemap generation and absolute URL construction.", UpdatedUtc = DateTime.UtcNow },
+
+        // ── Import Feed ───────────────────────────────────────────────────────
+        new SystemSetting
+        {
+            Key         = SystemSettingKeys.ImportApiKey,
+            Value       = "",
+            Description = "Long random API key for the external job import feed endpoint (/api/v1/import/jobs). " +
+                          "Rotate via Admin → Settings → Import API Key. Falls back to IMPORT_API_KEY env var if empty.",
+            UpdatedUtc  = DateTime.UtcNow
+        },
     };
 
     foreach (var setting in settingsToSeed)

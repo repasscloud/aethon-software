@@ -67,6 +67,7 @@ public sealed class GetPublicJobDetailHandler
                 j.Summary,
                 j.PostingExpiresUtc,
                 j.ScreeningQuestionsJson,
+                j.IsImported,
                 OrgId = j.OwnedByOrganisation.Id,
                 OrgType = j.OwnedByOrganisation.Type,
                 OrgName = j.OwnedByOrganisation.Name,
@@ -126,6 +127,7 @@ public sealed class GetPublicJobDetailHandler
             VideoYouTubeId = raw.VideoYouTubeId,
             VideoVimeoId = raw.VideoVimeoId,
             ScreeningQuestionsJson = raw.ScreeningQuestionsJson,
+            IsImported = raw.IsImported,
             BenefitsTags = raw.BenefitsTags is not null
                 ? JsonSerializer.Deserialize<List<string>>(raw.BenefitsTags) ?? []
                 : [],

@@ -113,6 +113,10 @@ public sealed class JobConfiguration : IEntityTypeConfiguration<Job>
         builder.Property(x => x.HighlightColour)
             .HasMaxLength(20);
 
+        builder.Property(x => x.IsImported)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(x => x.CreatedByUserId);
         builder.Property(x => x.UpdatedByUserId);
 

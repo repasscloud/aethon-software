@@ -41,5 +41,7 @@ public sealed class PublicJobDetailDto
     public string? VideoVimeoId { get; set; }
     /// <summary>JSON-serialised ScreeningConfig — used by the apply page to render questions.</summary>
     public string? ScreeningQuestionsJson { get; set; }
+    /// <summary>True when this job was ingested via the external import feed API.</summary>
+    public bool IsImported { get; set; }
     public PublicOrganisationProfileDto Organisation { get; set; } = new();
 }

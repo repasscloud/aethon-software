@@ -37,4 +37,6 @@ public sealed class PublicJobListItemDto
     public bool IsSuitableForSchoolLeavers { get; set; }
     /// <summary>Job specifically targets school leavers (16–18) — only visible to authenticated school leavers.</summary>
     public bool IsSchoolLeaverTargeted { get; set; }
+    /// <summary>True when this job was ingested via the external import feed API.</summary>
+    public bool IsImported { get; set; }
 }

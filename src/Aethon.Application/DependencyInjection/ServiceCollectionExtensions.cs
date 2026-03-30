@@ -1,4 +1,5 @@
 using Aethon.Application.Abstractions.Integrations;
+using Aethon.Application.Import.Commands.ImportJobs;
 using Aethon.Application.Activity.Services;
 using Aethon.Application.Applications.Commands.AddApplicationComment;
 using Aethon.Application.Applications.Commands.AddApplicationNote;
@@ -95,6 +96,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IWebhookEventDispatcher, WebhookEventDispatcher>();
 
+        services.AddScoped<ImportJobsHandler>();
         services.AddScoped<CreateJobHandler>();
         services.AddScoped<UpdateJobHandler>();
         services.AddScoped<PublishJobHandler>();
