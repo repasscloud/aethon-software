@@ -292,6 +292,43 @@ jobs:
           echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
           echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
 
+  trigger-remote-import:
+    needs: deploy-to-dev
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Trigger remote import workflow
+        id: trigger_import
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh workflow run import.yml \
+            --repo repasscloud/aethon-software-import-data \
+            --ref main
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.trigger_import.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Remote Import / Trigger workflow"
+            FAILED_RESULT="Failed to trigger repasscloud/aethon-software-import-data import.yml"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
   notify:
     needs:
       - metadata
@@ -299,6 +336,7 @@ jobs:
       - build-and-push-builder
       - build-and-push-web
       - deploy-to-dev
+      - trigger-remote-import
     if: always()
     runs-on: ubuntu-latest
 
@@ -333,6 +371,10 @@ jobs:
             PIPELINE_STATUS="failure"
             FAILED_STAGE="${{ needs.deploy-to-dev.outputs.failed_stage }}"
             FAILED_RESULT="${{ needs.deploy-to-dev.outputs.failed_result }}"
+          elif [[ "${{ needs.trigger-remote-import.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.trigger-remote-import.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.trigger-remote-import.outputs.failed_result }}"
           fi
 
           echo "pipeline_status=$PIPELINE_STATUS" >> "$GITHUB_OUTPUT"
