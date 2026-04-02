@@ -1,1 +1,0 @@
-API_HOST=https://dev-api.app.aethonsoftware.com IMPORT_API_KEY=23d9ac3306c4f7a7b601090b51fc131a3f5ca4789403c1d0a9803e110c469cd5 ./import-jobs.sh jobicy-import.json
