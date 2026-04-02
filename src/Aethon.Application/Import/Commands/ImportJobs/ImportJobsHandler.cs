@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Aethon.Application.Abstractions.Logging;
 using Aethon.Application.Abstractions.Settings;
 using Aethon.Application.Abstractions.Time;
 using Aethon.Application.Common.Results;
@@ -31,17 +32,20 @@ public sealed class ImportJobsHandler
     private readonly ISystemSettingsService _settings;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IDateTimeProvider _clock;
+    private readonly ISystemLogService _log;
 
     public ImportJobsHandler(
         AethonDbContext db,
         ISystemSettingsService settings,
         UserManager<ApplicationUser> userManager,
-        IDateTimeProvider clock)
+        IDateTimeProvider clock,
+        ISystemLogService log)
     {
-        _db       = db;
-        _settings = settings;
+        _db          = db;
+        _settings    = settings;
         _userManager = userManager;
-        _clock    = clock;
+        _clock       = clock;
+        _log         = log;
     }
 
     // ─── Single job ───────────────────────────────────────────────────────────
@@ -80,8 +84,17 @@ public sealed class ImportJobsHandler
         {
             var r = await IngestSingleAsync(dto, ct);
             if (r.Succeeded)
+            {
                 results.Add(r.Value!);
-            // Per-job failures are absorbed — continue processing remaining jobs.
+            }
+            else
+            {
+                await _log.WarnAsync(
+                    "ImportJobs",
+                    $"Record skipped — {r.ErrorCode}: {r.ErrorMessage}",
+                    details: $"SourceSite={dto.SourceSite}, ExternalId={dto.ExternalId}",
+                    ct: ct);
+            }
         }
 
         return Result<List<ImportJobResult>>.Success(results);

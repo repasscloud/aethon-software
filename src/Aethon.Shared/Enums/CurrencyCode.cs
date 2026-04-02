@@ -21,5 +21,6 @@ public enum CurrencyCode
     RUB = 17,
     ZAR = 18,
     TRY = 19,
-    BRL = 20
+    BRL = 20,
+    RON = 21
 }

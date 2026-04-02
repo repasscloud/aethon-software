@@ -1,6 +1,10 @@
+using System.Text.Json;
 using Aethon.Api.Common;
+using Aethon.Application.Abstractions.Logging;
 using Aethon.Application.Import.Commands.ImportJobs;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
 
 namespace Aethon.Api.Endpoints.Import;
 
@@ -25,14 +29,67 @@ public static class ImportEndpoints
             return result.ToMinimalApiResult();
         });
 
-        // POST /api/v1/import/jobs/bulk — ingest up to 500 jobs in a single call
+        // POST /api/v1/import/jobs/bulk — ingest up to 500 jobs in a single call.
+        //
+        // The body is parsed element-by-element so that a single malformed record
+        // (e.g. an unrecognised enum value) is skipped and logged rather than
+        // causing the entire batch to be rejected.
         group.MapPost("/jobs/bulk", async (
             HttpContext http,
             [FromServices] ImportJobsHandler handler,
-            [FromBody] List<ImportJobDto> dtos,
+            [FromServices] ISystemLogService log,
+            [FromServices] IOptions<HttpJsonOptions> jsonOpts,
             CancellationToken ct) =>
         {
             var apiKey = http.Request.Headers[ApiKeyHeader].ToString();
+
+            // Parse the raw body so we can iterate records individually.
+            JsonElement body;
+            try
+            {
+                using var doc = await JsonDocument.ParseAsync(http.Request.Body, cancellationToken: ct);
+                body = doc.RootElement.Clone();
+            }
+            catch (JsonException ex)
+            {
+                return Results.BadRequest(new { error = "Invalid JSON body.", detail = ex.Message });
+            }
+
+            if (body.ValueKind != JsonValueKind.Array)
+                return Results.BadRequest(new { error = "Request body must be a JSON array." });
+
+            var opts = jsonOpts.Value.SerializerOptions;
+            var dtos = new List<ImportJobDto>(body.GetArrayLength());
+            var index = 0;
+
+            foreach (var element in body.EnumerateArray())
+            {
+                try
+                {
+                    var dto = element.Deserialize<ImportJobDto>(opts);
+                    if (dto is not null)
+                        dtos.Add(dto);
+                }
+                catch (JsonException ex)
+                {
+                    var details = JsonSerializer.Serialize(new
+                    {
+                        batchIndex     = index,
+                        exceptionType  = ex.GetType().Name,
+                        exceptionMessage = ex.Message,
+                        raw            = element.GetRawText()
+                    });
+
+                    await log.WarnAsync(
+                        "ImportJobs",
+                        $"Batch record at index {index} could not be deserialized and was skipped.",
+                        details: details,
+                        ct: ct);
+                }
+
+                index++;
+            }
+
             var result = await handler.HandleBulkAsync(apiKey, dtos, ct);
             return result.ToMinimalApiResult();
         });
