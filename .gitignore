@@ -14,6 +14,9 @@ email-settings.env
 # TinyMCE self-hosted (downloaded at Docker build time)
 src/Aethon.Web/wwwroot/lib/tinymce/
 
+# Test files/folders
+aethon-software-import-data/
+
 # User-specific files
 *.rsuser
 *.suo

@@ -10,4 +10,7 @@ public sealed class ImportJobResult
 
     /// <summary>True when the job already existed and was skipped (no duplicate created).</summary>
     public bool WasDuplicate { get; init; }
+
+    /// <summary>True when an existing job record was found and updated with new data.</summary>
+    public bool WasUpdated { get; init; }
 }

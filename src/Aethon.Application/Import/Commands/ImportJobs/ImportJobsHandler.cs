@@ -20,8 +20,10 @@ namespace Aethon.Application.Import.Commands.ImportJobs;
 ///   1. Validates the API key.
 ///   2. Finds or creates the import organisation (ImportOrg_{sourceSite}_{companyName}).
 ///   3. Finds or creates a system user bound to that organisation.
-///   4. Skips the job if ExternalReference already exists (idempotent re-runs).
-///   5. Creates the job as Published / Public / Imported tier, never touching billing credits.
+///   4. Upserts the job keyed on (sourceSite + externalId) via ExternalReference.
+///      - If the record exists: updates all mutable fields.
+///        If publishedUtc moves to an earlier date, PostingExpiresUtc is always set to publishedUtc + 30 days.
+///      - If the record does not exist: creates it as Published / Public / Imported tier, never touching billing credits.
 /// </summary>
 public sealed class ImportJobsHandler
 {
@@ -110,23 +112,6 @@ public sealed class ImportJobsHandler
 
         var externalRef = BuildExternalReference(dto.SourceSite, dto.ExternalId);
 
-        // Idempotency — skip if already imported
-        var existing = await _db.Jobs
-            .AsNoTracking()
-            .Where(j => j.ExternalReference == externalRef && j.IsImported)
-            .Select(j => new { j.Id })
-            .FirstOrDefaultAsync(ct);
-
-        if (existing is not null)
-        {
-            return Result<ImportJobResult>.Success(new ImportJobResult
-            {
-                JobId             = existing.Id,
-                ExternalReference = externalRef,
-                WasDuplicate      = true
-            });
-        }
-
         var utcNow = _clock.UtcNow;
 
         // Find or create the import organisation
@@ -137,6 +122,71 @@ public sealed class ImportJobsHandler
 
         // Build summary: use provided summary, or auto-generate from description
         var summary = BuildSummary(dto.Summary, dto.Description);
+
+        // Upsert — update if already imported, create if new
+        var existingJob = await _db.Jobs
+            .Where(j => j.ExternalReference == externalRef && j.IsImported)
+            .FirstOrDefaultAsync(ct);
+
+        if (existingJob is not null)
+        {
+            var incomingPublished = dto.PublishedUtc ?? utcNow;
+
+            // If publishedUtc is being moved to an earlier date, always set expiry to 30 days from it.
+            // Otherwise honour the incoming expiry (or keep the existing one if none supplied).
+            DateTime? newExpiry;
+            if (existingJob.PublishedUtc.HasValue && incomingPublished < existingJob.PublishedUtc.Value)
+                newExpiry = incomingPublished.AddDays(30);
+            else
+                newExpiry = dto.PostingExpiresUtc ?? existingJob.PostingExpiresUtc;
+
+            existingJob.Title                  = dto.Title.Trim();
+            existingJob.Description            = dto.Description.Trim();
+            existingJob.Summary                = summary;
+            existingJob.Requirements           = Normalize(dto.Requirements);
+            existingJob.Benefits               = Normalize(dto.Benefits);
+            existingJob.Department             = Normalize(dto.Department);
+            existingJob.Keywords               = Normalize(dto.Keywords);
+            existingJob.WorkplaceType          = dto.WorkplaceType;
+            existingJob.EmploymentType         = dto.EmploymentType;
+            existingJob.Category               = dto.Category;
+            existingJob.ExternalApplicationUrl = dto.ExternalApplicationUrl.Trim();
+            existingJob.LocationText           = Normalize(dto.LocationText);
+            existingJob.LocationCity           = Normalize(dto.LocationCity);
+            existingJob.LocationState          = Normalize(dto.LocationState);
+            existingJob.LocationCountry        = Normalize(dto.LocationCountry);
+            existingJob.LocationCountryCode    = Normalize(dto.LocationCountryCode);
+            existingJob.LocationLatitude       = dto.LocationLatitude;
+            existingJob.LocationLongitude      = dto.LocationLongitude;
+            existingJob.LocationPlaceId        = Normalize(dto.LocationPlaceId);
+            existingJob.SalaryFrom             = dto.SalaryFrom;
+            existingJob.SalaryTo               = dto.SalaryTo;
+            existingJob.SalaryCurrency         = dto.SalaryCurrency;
+            existingJob.PublishedUtc           = incomingPublished;
+            existingJob.PostingExpiresUtc      = newExpiry;
+            existingJob.Regions                = dto.Regions.Count > 0
+                                                    ? JsonSerializer.Serialize(dto.Regions, _enumJson)
+                                                    : null;
+            existingJob.Countries              = dto.Countries.Count > 0
+                                                    ? JsonSerializer.Serialize(dto.Countries)
+                                                    : null;
+            existingJob.IncludeCompanyLogo     = !string.IsNullOrWhiteSpace(dto.CompanyLogoUrl);
+            existingJob.ShortUrlCode           = Normalize(dto.Slug);
+            existingJob.UpdatedUtc             = utcNow;
+            existingJob.UpdatedByUserId        = systemUser.Id;
+
+            await _db.SaveChangesAsync(ct);
+
+            return Result<ImportJobResult>.Success(new ImportJobResult
+            {
+                JobId             = existingJob.Id,
+                ExternalReference = externalRef,
+                WasDuplicate      = false,
+                WasUpdated        = true
+            });
+        }
+
+        var incomingPublishedNew = dto.PublishedUtc ?? utcNow;
 
         var job = new Job
         {
@@ -182,7 +232,7 @@ public sealed class ImportJobsHandler
             SalaryCurrency              = dto.SalaryCurrency,
 
             // Dates
-            PublishedUtc                = dto.PublishedUtc ?? utcNow,
+            PublishedUtc                = incomingPublishedNew,
             ApprovedUtc                 = utcNow,
             PostingExpiresUtc           = dto.PostingExpiresUtc,
 
@@ -218,7 +268,8 @@ public sealed class ImportJobsHandler
         {
             JobId             = job.Id,
             ExternalReference = externalRef,
-            WasDuplicate      = false
+            WasDuplicate      = false,
+            WasUpdated        = false
         });
     }
 
