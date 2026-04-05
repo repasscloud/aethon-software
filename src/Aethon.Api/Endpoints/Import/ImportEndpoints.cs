@@ -59,7 +59,9 @@ public static class ImportEndpoints
                 return Results.BadRequest(new { error = "Request body must be a JSON array." });
 
             var opts = jsonOpts.Value.SerializerOptions;
-            var dtos = new List<ImportJobDto>(body.GetArrayLength());
+            var totalElements = body.GetArrayLength();
+            var dtos = new List<ImportJobDto>(totalElements);
+            var parseFailures = new List<string>();
             var index = 0;
 
             foreach (var element in body.EnumerateArray())
@@ -69,28 +71,56 @@ public static class ImportEndpoints
                     var dto = element.Deserialize<ImportJobDto>(opts);
                     if (dto is not null)
                         dtos.Add(dto);
+                    else
+                        parseFailures.Add($"[{index}] deserialized as null");
                 }
                 catch (JsonException ex)
                 {
-                    var details = JsonSerializer.Serialize(new
-                    {
-                        batchIndex     = index,
-                        exceptionType  = ex.GetType().Name,
-                        exceptionMessage = ex.Message,
-                        raw            = element.GetRawText()
-                    });
+                    var rawSnippet = element.GetRawText();
+                    if (rawSnippet.Length > 200) rawSnippet = rawSnippet[..200] + "…";
+
+                    var failureDetail = $"[{index}] {ex.Message} | raw: {rawSnippet}";
+                    parseFailures.Add(failureDetail);
 
                     await log.WarnAsync(
                         "ImportJobs",
                         $"Batch record at index {index} could not be deserialized and was skipped.",
-                        details: details,
+                        details: JsonSerializer.Serialize(new
+                        {
+                            batchIndex       = index,
+                            exceptionMessage = ex.Message,
+                            raw              = element.GetRawText()
+                        }),
                         ct: ct);
                 }
 
                 index++;
             }
 
+            if (dtos.Count == 0)
+            {
+                var summary = parseFailures.Count > 0
+                    ? $"All {totalElements} record(s) failed to deserialize. First failure: {parseFailures[0]}"
+                    : "No jobs provided.";
+                return Results.BadRequest(new { code = "import.empty", message = summary });
+            }
+
             var result = await handler.HandleBulkAsync(apiKey, dtos, ct);
+
+            // Surface any parse failures alongside the normal result so CI logs show them
+            if (parseFailures.Count > 0 && result.Succeeded)
+            {
+                var value = result.Value!;
+                return Results.Ok(new
+                {
+                    imported         = value.Count(r => !r.WasDuplicate && !r.WasUpdated),
+                    updated          = value.Count(r => r.WasUpdated),
+                    duplicatesSkipped = value.Count(r => r.WasDuplicate),
+                    parseFailures    = parseFailures.Count,
+                    parseFailureDetails = parseFailures
+                });
+            }
+
             return result.ToMinimalApiResult();
         });
     }
