@@ -36,8 +36,8 @@ public sealed class GetPublicJobsQuery
     /// <summary>1-based page number. Defaults to 1.</summary>
     public int Page { get; init; } = 1;
 
-    /// <summary>Number of results per page. Clamped to 1–100. Defaults to 25.</summary>
-    public int PageSize { get; init; } = 25;
+    /// <summary>Number of results per page. Clamped to 1–100. Defaults to 24.</summary>
+    public int PageSize { get; init; } = 24;
 }
 
 public enum DateRangeFilter

@@ -195,7 +195,7 @@ public static class PublicEndpoints
                 ImmediateStart = immediateStart ?? false,
                 ViewerAgeGroup = viewerAgeGroup,
                 Page = page ?? 1,
-                PageSize = pageSize ?? 25
+                PageSize = pageSize ?? 24
             };
             var result = await handler.HandleAsync(query, ct);
             return result.ToMinimalApiResult();
