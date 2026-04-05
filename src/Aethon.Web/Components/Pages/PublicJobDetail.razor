@@ -60,7 +60,7 @@ else
                     <div class="flex-grow-1 min-w-0">
                         <h1 class="h3 fw-bold mb-1">@_job.Title</h1>
                         <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-                            <a class="text-decoration-none text-secondary small" href="/organisations/@_job.Organisation.Slug">@_job.Organisation.Name</a>
+                            <a class="text-decoration-none text-secondary small" href="/organisations/@_job.Organisation.Slug">@DisplayOrgName(_job.Organisation.Name)</a>
                             @if (_job.Organisation.IsVerified)
                             {
                                 @if (_job.Organisation.VerificationTier == VerificationTier.EnhancedTrusted)
@@ -261,7 +261,10 @@ else
         <!-- Description -->
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-body p-4">
-                <h2 class="h5 fw-bold mb-3">About the role</h2>
+                @if (!_job.IsImported)
+                {
+                    <h2 class="h5 fw-bold mb-3">About the role</h2>
+                }
                 <div class="rich-content">@((MarkupString)(_job.Description ?? ""))</div>
             </div>
         </div>
@@ -510,6 +513,15 @@ else
     {
         // Insert spaces before uppercase letters: "FullTime" → "Full Time"
         return Regex.Replace(value, @"(?<!^)([A-Z])", " $1");
+    }
+
+    /// <summary>Strips the "ImportOrg_{sourceSite}_" prefix from import org names.</summary>
+    private static string DisplayOrgName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+        if (!name.StartsWith("ImportOrg_")) return name;
+        var second = name.IndexOf('_', name.IndexOf('_') + 1);
+        return second >= 0 ? name[(second + 1)..] : name;
     }
 
     private static string FormatCategory(JobCategory c) => c switch
