@@ -15,5 +15,20 @@ window.aethon = {
                 { timeout: 10000 }
             );
         });
+    },
+
+    scrollToTop: function () {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
+    initScrollToTop: function (buttonId, showAfterPx) {
+        var btn = document.getElementById(buttonId);
+        if (!btn) return;
+        var threshold = showAfterPx || 300;
+        function onScroll() {
+            btn.style.display = window.scrollY > threshold ? 'flex' : 'none';
+        }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
     }
 };

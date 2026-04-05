@@ -142,6 +142,8 @@ public static class PublicEndpoints
             bool? verifiedOnly,
             WorkplaceType? workplaceType,
             bool? immediateStart,
+            int? page,
+            int? pageSize,
             CancellationToken ct) =>
         {
             // Resolve the viewer's age group so school-leaver-targeted jobs filter correctly.
@@ -172,7 +174,9 @@ public static class PublicEndpoints
                 VerifiedOnly = verifiedOnly ?? false,
                 WorkplaceType = workplaceType,
                 ImmediateStart = immediateStart ?? false,
-                ViewerAgeGroup = viewerAgeGroup
+                ViewerAgeGroup = viewerAgeGroup,
+                Page = page ?? 1,
+                PageSize = pageSize ?? 25
             };
             var result = await handler.HandleAsync(query, ct);
             return result.ToMinimalApiResult();

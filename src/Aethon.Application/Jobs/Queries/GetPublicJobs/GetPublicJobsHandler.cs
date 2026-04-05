@@ -17,7 +17,7 @@ public sealed class GetPublicJobsHandler
         _db = db;
     }
 
-    public async Task<Result<List<PublicJobListItemDto>>> HandleAsync(
+    public async Task<Result<PublicJobsPageDto>> HandleAsync(
         GetPublicJobsQuery? query = null,
         CancellationToken ct = default)
     {
@@ -113,107 +113,162 @@ public sealed class GetPublicJobsHandler
         if (q.ViewerAgeGroup != ApplicantAgeGroup.SchoolLeaver)
             dbQuery = dbQuery.Where(j => !j.IsSchoolLeaverTargeted);
 
-        var raw = await dbQuery
-            .OrderByDescending(j => j.StickyUntilUtc > DateTime.UtcNow)
-            .ThenByDescending(j => j.IsHighlighted)
-            .ThenByDescending(j => j.PublishedUtc)
-            .Take(500)
-            .Select(j => new
-            {
-                j.Id,
-                j.Title,
-                j.Summary,
-                OrganisationName = j.OwnedByOrganisation.Name,
-                OrganisationSlug = j.OwnedByOrganisation.Slug,
-                OrganisationLogoUrl = j.OwnedByOrganisation.LogoUrl,
-                OrganisationIsVerified = j.OwnedByOrganisation.VerificationTier != VerificationTier.None,
-                j.Department,
-                j.LocationText,
-                j.LocationLatitude,
-                j.LocationLongitude,
-                j.WorkplaceType,
-                j.EmploymentType,
-                j.SalaryFrom,
-                j.SalaryTo,
-                j.SalaryCurrency,
-                j.HasCommission,
-                j.OteFrom,
-                j.OteTo,
-                j.PublishedUtc,
-                j.Category,
-                j.Regions,
-                j.Countries,
-                j.BenefitsTags,
-                j.IsHighlighted,
-                j.IsImmediateStart,
-                j.IncludeCompanyLogo,
-                j.IsSuitableForSchoolLeavers,
-                j.IsSchoolLeaverTargeted,
-                j.IsImported
-            })
-            .ToListAsync(ct);
+        var pageSize = Math.Clamp(q.PageSize, 1, 100);
+        var page     = Math.Max(1, q.Page);
 
         var enumJson = new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } };
 
-        // Apply Haversine radius filter in memory (avoids EF translation issues)
-        var filtered = q.Latitude.HasValue && q.Longitude.HasValue
-            ? raw.Where(j =>
-                j.LocationLatitude.HasValue && j.LocationLongitude.HasValue &&
-                Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude.Value, j.LocationLongitude.Value) <= q.RadiusKm)
-              .OrderBy(j => Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude!.Value, j.LocationLongitude!.Value))
-              .Take(200)
-              .ToList()
-            : raw.Take(200).ToList();
+        var orderedQuery = dbQuery
+            .OrderByDescending(j => j.StickyUntilUtc > DateTime.UtcNow)
+            .ThenByDescending(j => j.IsHighlighted)
+            .ThenByDescending(j => j.PublishedUtc);
 
-        var jobs = filtered.Select(j =>
+        int totalCount;
+        List<PublicJobListItemDto> jobs;
+
+        if (q.Latitude.HasValue && q.Longitude.HasValue)
         {
-            var dto = new PublicJobListItemDto
-            {
-                Id = j.Id,
-                Title = j.Title,
-                Summary = j.Summary,
-                OrganisationName = j.OrganisationName,
-                OrganisationSlug = j.OrganisationSlug,
-                OrganisationLogoUrl = j.IncludeCompanyLogo ? j.OrganisationLogoUrl : null,
-                OrganisationIsVerified = j.OrganisationIsVerified,
-                Department = j.Department,
-                LocationText = j.LocationText,
-                LocationLatitude = j.LocationLatitude,
-                LocationLongitude = j.LocationLongitude,
-                WorkplaceType = j.WorkplaceType,
-                EmploymentType = j.EmploymentType,
-                SalaryFrom = j.SalaryFrom,
-                SalaryTo = j.SalaryTo,
-                SalaryCurrency = j.SalaryCurrency,
-                HasCommission = j.HasCommission,
-                OteFrom = j.OteFrom,
-                OteTo = j.OteTo,
-                PublishedUtc = j.PublishedUtc,
-                Category = j.Category,
-                Regions = j.Regions is not null
-                    ? JsonSerializer.Deserialize<List<JobRegion>>(j.Regions, enumJson) ?? []
-                    : [],
-                Countries = j.Countries is not null
-                    ? JsonSerializer.Deserialize<List<string>>(j.Countries) ?? []
-                    : [],
-                BenefitsTags = j.BenefitsTags is not null
-                    ? JsonSerializer.Deserialize<List<string>>(j.BenefitsTags) ?? []
-                    : [],
-                IsHighlighted = j.IsHighlighted,
-                IsImmediateStart = j.IsImmediateStart,
-                IncludeCompanyLogo = j.IncludeCompanyLogo,
-                IsSuitableForSchoolLeavers = j.IsSuitableForSchoolLeavers,
-                IsSchoolLeaverTargeted = j.IsSchoolLeaverTargeted,
-                IsImported = j.IsImported
-            };
+            // Radius search: fetch a large window and filter + paginate in memory.
+            var raw = await orderedQuery
+                .Take(500)
+                .Select(j => new
+                {
+                    j.Id, j.Title, j.Summary,
+                    OrganisationName       = j.OwnedByOrganisation.Name,
+                    OrganisationSlug       = j.OwnedByOrganisation.Slug,
+                    OrganisationLogoUrl    = j.OwnedByOrganisation.LogoUrl,
+                    OrganisationIsVerified = j.OwnedByOrganisation.VerificationTier != VerificationTier.None,
+                    j.Department, j.LocationText, j.LocationLatitude, j.LocationLongitude,
+                    j.WorkplaceType, j.EmploymentType,
+                    j.SalaryFrom, j.SalaryTo, j.SalaryCurrency, j.HasCommission, j.OteFrom, j.OteTo,
+                    j.PublishedUtc, j.Category, j.Regions, j.Countries, j.BenefitsTags,
+                    j.IsHighlighted, j.IsImmediateStart, j.IncludeCompanyLogo,
+                    j.IsSuitableForSchoolLeavers, j.IsSchoolLeaverTargeted, j.IsImported
+                })
+                .ToListAsync(ct);
 
-            if (q.Latitude.HasValue && q.Longitude.HasValue && j.LocationLatitude.HasValue && j.LocationLongitude.HasValue)
-                dto.DistanceKm = Math.Round(Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude.Value, j.LocationLongitude.Value), 1);
+            var filtered = raw
+                .Where(j => j.LocationLatitude.HasValue && j.LocationLongitude.HasValue &&
+                            Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude.Value, j.LocationLongitude.Value) <= q.RadiusKm)
+                .OrderBy(j => Haversine(q.Latitude.Value, q.Longitude.Value, j.LocationLatitude!.Value, j.LocationLongitude!.Value))
+                .ToList();
 
-            return dto;
-        }).ToList();
+            totalCount = filtered.Count;
 
-        return Result<List<PublicJobListItemDto>>.Success(jobs);
+            jobs = filtered
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(j =>
+                {
+                    var dto = BuildDto(j.Id, j.Title, j.Summary, j.OrganisationName, j.OrganisationSlug,
+                        j.OrganisationLogoUrl, j.OrganisationIsVerified, j.Department, j.LocationText,
+                        j.LocationLatitude, j.LocationLongitude, j.WorkplaceType, j.EmploymentType,
+                        j.SalaryFrom, j.SalaryTo, j.SalaryCurrency, j.HasCommission, j.OteFrom, j.OteTo,
+                        j.PublishedUtc, j.Category, j.Regions, j.Countries, j.BenefitsTags,
+                        j.IsHighlighted, j.IsImmediateStart, j.IncludeCompanyLogo,
+                        j.IsSuitableForSchoolLeavers, j.IsSchoolLeaverTargeted, j.IsImported, enumJson);
+                    dto.DistanceKm = Math.Round(Haversine(q.Latitude.Value, q.Longitude.Value,
+                        j.LocationLatitude!.Value, j.LocationLongitude!.Value), 1);
+                    return dto;
+                })
+                .ToList();
+        }
+        else
+        {
+            // Standard search: count in DB, fetch only the requested page.
+            totalCount = await dbQuery.CountAsync(ct);
+
+            var paged = await orderedQuery
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(j => new
+                {
+                    j.Id, j.Title, j.Summary,
+                    OrganisationName       = j.OwnedByOrganisation.Name,
+                    OrganisationSlug       = j.OwnedByOrganisation.Slug,
+                    OrganisationLogoUrl    = j.OwnedByOrganisation.LogoUrl,
+                    OrganisationIsVerified = j.OwnedByOrganisation.VerificationTier != VerificationTier.None,
+                    j.Department, j.LocationText, j.LocationLatitude, j.LocationLongitude,
+                    j.WorkplaceType, j.EmploymentType,
+                    j.SalaryFrom, j.SalaryTo, j.SalaryCurrency, j.HasCommission, j.OteFrom, j.OteTo,
+                    j.PublishedUtc, j.Category, j.Regions, j.Countries, j.BenefitsTags,
+                    j.IsHighlighted, j.IsImmediateStart, j.IncludeCompanyLogo,
+                    j.IsSuitableForSchoolLeavers, j.IsSchoolLeaverTargeted, j.IsImported
+                })
+                .ToListAsync(ct);
+
+            jobs = paged
+                .Select(j => BuildDto(j.Id, j.Title, j.Summary, j.OrganisationName, j.OrganisationSlug,
+                    j.OrganisationLogoUrl, j.OrganisationIsVerified, j.Department, j.LocationText,
+                    j.LocationLatitude, j.LocationLongitude, j.WorkplaceType, j.EmploymentType,
+                    j.SalaryFrom, j.SalaryTo, j.SalaryCurrency, j.HasCommission, j.OteFrom, j.OteTo,
+                    j.PublishedUtc, j.Category, j.Regions, j.Countries, j.BenefitsTags,
+                    j.IsHighlighted, j.IsImmediateStart, j.IncludeCompanyLogo,
+                    j.IsSuitableForSchoolLeavers, j.IsSchoolLeaverTargeted, j.IsImported, enumJson))
+                .ToList();
+        }
+
+        return Result<PublicJobsPageDto>.Success(new PublicJobsPageDto
+        {
+            Items      = jobs,
+            TotalCount = totalCount,
+            Page       = page,
+            PageSize   = pageSize
+        });
+    }
+
+    private static PublicJobListItemDto BuildDto(
+        Guid id, string title, string? summary,
+        string? orgName, string? orgSlug, string? orgLogoUrl, bool orgIsVerified,
+        string? department, string? locationText, double? locationLat, double? locationLon,
+        WorkplaceType workplaceType, EmploymentType employmentType,
+        decimal? salaryFrom, decimal? salaryTo, CurrencyCode? salaryCurrency,
+        bool hasCommission, decimal? oteFrom, decimal? oteTo,
+        DateTime? publishedUtc, JobCategory? category,
+        string? regionsJson, string? countriesJson, string? benefitsJson,
+        bool isHighlighted, bool isImmediateStart, bool includeCompanyLogo,
+        bool isSuitableForSchoolLeavers, bool isSchoolLeaverTargeted, bool isImported,
+        JsonSerializerOptions enumJson)
+    {
+        return new PublicJobListItemDto
+        {
+            Id                        = id,
+            Title                     = title,
+            Summary                   = summary,
+            OrganisationName          = orgName,
+            OrganisationSlug          = orgSlug,
+            OrganisationLogoUrl       = includeCompanyLogo ? orgLogoUrl : null,
+            OrganisationIsVerified    = orgIsVerified,
+            Department                = department,
+            LocationText              = locationText,
+            LocationLatitude          = locationLat,
+            LocationLongitude         = locationLon,
+            WorkplaceType             = workplaceType,
+            EmploymentType            = employmentType,
+            SalaryFrom                = salaryFrom,
+            SalaryTo                  = salaryTo,
+            SalaryCurrency            = salaryCurrency,
+            HasCommission             = hasCommission,
+            OteFrom                   = oteFrom,
+            OteTo                     = oteTo,
+            PublishedUtc              = publishedUtc,
+            Category                  = category,
+            Regions                   = regionsJson is not null
+                                            ? JsonSerializer.Deserialize<List<JobRegion>>(regionsJson, enumJson) ?? []
+                                            : [],
+            Countries                 = countriesJson is not null
+                                            ? JsonSerializer.Deserialize<List<string>>(countriesJson) ?? []
+                                            : [],
+            BenefitsTags              = benefitsJson is not null
+                                            ? JsonSerializer.Deserialize<List<string>>(benefitsJson) ?? []
+                                            : [],
+            IsHighlighted             = isHighlighted,
+            IsImmediateStart          = isImmediateStart,
+            IncludeCompanyLogo        = includeCompanyLogo,
+            IsSuitableForSchoolLeavers = isSuitableForSchoolLeavers,
+            IsSchoolLeaverTargeted    = isSchoolLeaverTargeted,
+            IsImported                = isImported
+        };
     }
 
     /// <summary>Haversine great-circle distance in kilometres.</summary>
