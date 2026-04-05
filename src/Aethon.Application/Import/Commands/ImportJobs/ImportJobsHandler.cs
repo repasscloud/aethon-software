@@ -64,40 +64,62 @@ public sealed class ImportJobsHandler
 
     // ─── Bulk jobs ────────────────────────────────────────────────────────────
 
-    public async Task<Result<List<ImportJobResult>>> HandleBulkAsync(
-        string providedApiKey,
+    /// <summary>
+    /// Process a pre-parsed list of import DTOs.
+    /// Auth must be validated by the caller via <see cref="ValidateApiKeyAsync"/> before calling this.
+    /// Returns a <see cref="BulkHandlerResult"/> with per-record successes and failures.
+    /// Never throws — per-record errors are collected and returned, not propagated.
+    /// </summary>
+    public async Task<BulkHandlerResult> HandleBulkAsync(
         List<ImportJobDto> dtos,
         CancellationToken ct = default)
     {
-        var authError = await ValidateApiKeyAsync(providedApiKey, ct);
-        if (authError is not null)
-            return Result<List<ImportJobResult>>.Failure("import.unauthorized", authError);
+        var succeeded = new List<ImportJobResult>(dtos.Count);
+        var failed    = new List<BulkHandlerFailure>(0);
 
-        if (dtos is null || dtos.Count == 0)
-            return Result<List<ImportJobResult>>.Failure("import.empty", "No jobs provided.");
-
-        if (dtos.Count > 500)
-            return Result<List<ImportJobResult>>.Failure("import.too_many", "Bulk import is limited to 500 jobs per request.");
-
-        var results = new List<ImportJobResult>(dtos.Count);
         foreach (var dto in dtos)
         {
-            var r = await IngestSingleAsync(dto, ct);
-            if (r.Succeeded)
+            try
             {
-                results.Add(r.Value!);
+                var r = await IngestSingleAsync(dto, ct);
+                if (r.Succeeded)
+                {
+                    succeeded.Add(r.Value!);
+                }
+                else
+                {
+                    failed.Add(new BulkHandlerFailure
+                    {
+                        SourceSite = dto.SourceSite,
+                        ExternalId = dto.ExternalId,
+                        Reason     = $"{r.ErrorCode}: {r.ErrorMessage}"
+                    });
+
+                    await _log.WarnAsync(
+                        "ImportJobs",
+                        $"Record skipped — {r.ErrorCode}: {r.ErrorMessage}",
+                        details: $"SourceSite={dto.SourceSite}, ExternalId={dto.ExternalId}",
+                        ct: ct);
+                }
             }
-            else
+            catch (Exception ex)
             {
+                failed.Add(new BulkHandlerFailure
+                {
+                    SourceSite = dto.SourceSite,
+                    ExternalId = dto.ExternalId,
+                    Reason     = $"Unexpected error: {ex.Message}"
+                });
+
                 await _log.WarnAsync(
                     "ImportJobs",
-                    $"Record skipped — {r.ErrorCode}: {r.ErrorMessage}",
-                    details: $"SourceSite={dto.SourceSite}, ExternalId={dto.ExternalId}",
+                    $"Record threw an unhandled exception and was skipped.",
+                    details: $"SourceSite={dto.SourceSite}, ExternalId={dto.ExternalId}, Error={ex}",
                     ct: ct);
             }
         }
 
-        return Result<List<ImportJobResult>>.Success(results);
+        return new BulkHandlerResult { Succeeded = succeeded, Failed = failed };
     }
 
     // ─── Core ingestion ───────────────────────────────────────────────────────
@@ -392,7 +414,11 @@ public sealed class ImportJobsHandler
 
     // ─── API key validation ───────────────────────────────────────────────────
 
-    private async Task<string?> ValidateApiKeyAsync(string providedKey, CancellationToken ct)
+    /// <summary>
+    /// Returns null if the key is valid, or an error message string if it is not.
+    /// Public so the bulk endpoint can perform a fast auth check before parsing the request body.
+    /// </summary>
+    public async Task<string?> ValidateApiKeyAsync(string providedKey, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(providedKey))
             return "Import API key is required.";

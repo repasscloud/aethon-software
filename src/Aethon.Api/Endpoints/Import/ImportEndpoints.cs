@@ -2,6 +2,7 @@ using System.Text.Json;
 using Aethon.Api.Common;
 using Aethon.Application.Abstractions.Logging;
 using Aethon.Application.Import.Commands.ImportJobs;
+using Aethon.Shared.Jobs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using HttpJsonOptions = Microsoft.AspNetCore.Http.Json.JsonOptions;
@@ -29,11 +30,16 @@ public static class ImportEndpoints
             return result.ToMinimalApiResult();
         });
 
-        // POST /api/v1/import/jobs/bulk — ingest up to 500 jobs in a single call.
+        // POST /api/v1/import/jobs/bulk
         //
-        // The body is parsed element-by-element so that a single malformed record
-        // (e.g. an unrecognised enum value) is skipped and logged rather than
-        // causing the entire batch to be rejected.
+        // Contract:
+        //   Request  — JSON array of ImportJobDto objects (up to 1 000 per call)
+        //   Response — always HTTP 200 with BulkImportResponseDto
+        //              per-record failures are in response.errors, never in HTTP status
+        //
+        // Non-200 codes only for:
+        //   401 — missing or invalid API key
+        //   400 — body is not valid JSON, or is not a JSON array
         group.MapPost("/jobs/bulk", async (
             HttpContext http,
             [FromServices] ImportJobsHandler handler,
@@ -43,7 +49,14 @@ public static class ImportEndpoints
         {
             var apiKey = http.Request.Headers[ApiKeyHeader].ToString();
 
-            // Parse the raw body so we can iterate records individually.
+            // Auth check before touching the body
+            var authError = await handler.ValidateApiKeyAsync(apiKey, ct);
+            if (authError is not null)
+                return Results.Json(
+                    new { code = "import.unauthorized", message = authError },
+                    statusCode: StatusCodes.Status401Unauthorized);
+
+            // Parse body
             JsonElement body;
             try
             {
@@ -52,76 +65,114 @@ public static class ImportEndpoints
             }
             catch (JsonException ex)
             {
-                return Results.BadRequest(new { error = "Invalid JSON body.", detail = ex.Message });
+                return Results.BadRequest(new { code = "import.invalid_json", message = ex.Message });
             }
 
             if (body.ValueKind != JsonValueKind.Array)
-                return Results.BadRequest(new { error = "Request body must be a JSON array." });
+                return Results.BadRequest(new
+                {
+                    code    = "import.not_array",
+                    message = "Request body must be a JSON array."
+                });
 
-            var opts = jsonOpts.Value.SerializerOptions;
-            var totalElements = body.GetArrayLength();
-            var dtos = new List<ImportJobDto>(totalElements);
-            var parseFailures = new List<string>();
-            var index = 0;
+            var opts          = jsonOpts.Value.SerializerOptions;
+            var totalReceived = body.GetArrayLength();
+            var dtos          = new List<ImportJobDto>(totalReceived);
+            var parseErrors   = new List<BulkImportErrorDto>(0);
+            var index         = 0;
 
+            // Deserialise element-by-element: one bad record never kills the batch
             foreach (var element in body.EnumerateArray())
             {
+                ImportJobDto? dto = null;
                 try
                 {
-                    var dto = element.Deserialize<ImportJobDto>(opts);
-                    if (dto is not null)
-                        dtos.Add(dto);
-                    else
-                        parseFailures.Add($"[{index}] deserialized as null");
+                    dto = element.Deserialize<ImportJobDto>(opts);
+                    if (dto is null)
+                    {
+                        parseErrors.Add(new BulkImportErrorDto
+                        {
+                            Index  = index,
+                            Reason = "Record deserialized as null."
+                        });
+                    }
                 }
                 catch (JsonException ex)
                 {
-                    var rawSnippet = element.GetRawText();
-                    if (rawSnippet.Length > 200) rawSnippet = rawSnippet[..200] + "…";
+                    var extId = TryReadString(element, "externalId");
+                    var site  = TryReadString(element, "sourceSite");
 
-                    var failureDetail = $"[{index}] {ex.Message} | raw: {rawSnippet}";
-                    parseFailures.Add(failureDetail);
+                    parseErrors.Add(new BulkImportErrorDto
+                    {
+                        Index      = index,
+                        ExternalId = extId,
+                        SourceSite = site,
+                        Reason     = $"Parse error: {ex.Message}"
+                    });
 
                     await log.WarnAsync(
                         "ImportJobs",
-                        $"Batch record at index {index} could not be deserialized and was skipped.",
+                        $"Batch record [{index}] could not be deserialized and was skipped.",
                         details: JsonSerializer.Serialize(new
                         {
-                            batchIndex       = index,
-                            exceptionMessage = ex.Message,
-                            raw              = element.GetRawText()
+                            batchIndex = index,
+                            sourceSite = site,
+                            externalId = extId,
+                            error      = ex.Message
                         }),
                         ct: ct);
                 }
 
+                if (dto is not null)
+                    dtos.Add(dto);
+
                 index++;
             }
 
-            if (dtos.Count == 0)
+            // Process whatever successfully parsed (may be empty — that's fine, returns all-zero counts)
+            var handlerResult = await handler.HandleBulkAsync(dtos, ct);
+
+            var imported = 0;
+            var updated  = 0;
+            var skipped  = 0;
+            foreach (var r in handlerResult.Succeeded)
             {
-                var summary = parseFailures.Count > 0
-                    ? $"All {totalElements} record(s) failed to deserialize. First failure: {parseFailures[0]}"
-                    : "No jobs provided.";
-                return Results.BadRequest(new { code = "import.empty", message = summary });
+                if      (r.WasUpdated)    updated++;
+                else if (r.WasDuplicate)  skipped++;
+                else                      imported++;
             }
 
-            var result = await handler.HandleBulkAsync(apiKey, dtos, ct);
-
-            // Surface any parse failures alongside the normal result so CI logs show them
-            if (parseFailures.Count > 0 && result.Succeeded)
+            // Merge handler-level failures into the errors list
+            var allErrors = new List<BulkImportErrorDto>(parseErrors);
+            foreach (var f in handlerResult.Failed)
             {
-                var value = result.Value!;
-                return Results.Ok(new
+                allErrors.Add(new BulkImportErrorDto
                 {
-                    imported         = value.Count(r => !r.WasDuplicate && !r.WasUpdated),
-                    updated          = value.Count(r => r.WasUpdated),
-                    duplicatesSkipped = value.Count(r => r.WasDuplicate),
-                    parseFailures    = parseFailures.Count,
-                    parseFailureDetails = parseFailures
+                    Index      = -1,
+                    ExternalId = f.ExternalId,
+                    SourceSite = f.SourceSite,
+                    Reason     = f.Reason
                 });
             }
 
-            return result.ToMinimalApiResult();
+            return Results.Ok(new BulkImportResponseDto
+            {
+                Received = totalReceived,
+                Imported = imported,
+                Updated  = updated,
+                Skipped  = skipped,
+                Failed   = allErrors.Count,
+                Errors   = allErrors
+            });
         });
+    }
+
+    private static string? TryReadString(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind == JsonValueKind.Object &&
+            element.TryGetProperty(propertyName, out var prop) &&
+            prop.ValueKind == JsonValueKind.String)
+            return prop.GetString();
+        return null;
     }
 }
