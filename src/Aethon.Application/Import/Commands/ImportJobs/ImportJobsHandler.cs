@@ -161,7 +161,7 @@ public sealed class ImportJobsHandler
             existingJob.Department             = Normalize(dto.Department);
             existingJob.Keywords               = Normalize(dto.Keywords);
             existingJob.WorkplaceType          = dto.WorkplaceType;
-            existingJob.EmploymentType         = dto.EmploymentType;
+            existingJob.EmploymentType         = dto.EmploymentType ?? EmploymentType.FullTime;
             existingJob.Category               = dto.Category;
             existingJob.ExternalApplicationUrl = dto.ExternalApplicationUrl.Trim();
             existingJob.LocationText           = Normalize(dto.LocationText);
@@ -223,7 +223,7 @@ public sealed class ImportJobsHandler
             Keywords                    = Normalize(dto.Keywords),
 
             WorkplaceType               = dto.WorkplaceType,
-            EmploymentType              = dto.EmploymentType,
+            EmploymentType              = dto.EmploymentType ?? EmploymentType.FullTime,
             Category                    = dto.Category,
 
             ExternalReference           = externalRef,

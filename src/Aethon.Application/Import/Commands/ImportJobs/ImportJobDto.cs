@@ -35,7 +35,7 @@ public sealed class ImportJobDto
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public WorkplaceType WorkplaceType { get; init; }
-    public EmploymentType EmploymentType { get; init; }
+    public EmploymentType? EmploymentType { get; init; }
 
     // ─── Classification ───────────────────────────────────────────────────────
 
