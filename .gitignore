@@ -15,7 +15,7 @@ email-settings.env
 src/Aethon.Web/wwwroot/lib/tinymce/
 
 # Test files/folders
-aethon-software-import-data/
+import-data/
 
 # User-specific files
 *.rsuser
