@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Aethon.Data.Migrations
 {
     [DbContext(typeof(AethonDbContext))]
-    [Migration("20260330105201_InitDb")]
+    [Migration("20260405070748_InitDb")]
     partial class InitDb
     {
         /// <inheritdoc />

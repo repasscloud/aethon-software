@@ -45,7 +45,11 @@ else
                             }
                             else if (_org.VerificationTier == "StandardEmployer")
                             {
-                                <span class="badge bg-success rounded-pill"><i class="bi bi-patch-check me-1"></i>Standard Employer Verification</span>
+                                <span class="badge bg-primary rounded-pill"><i class="bi bi-patch-check me-1"></i>Standard Employer Verification</span>
+                            }
+                            else if (_org.VerificationTier == "GovtVerified")
+                            {
+                                <span class="badge bg-secondary rounded-pill"><i class="bi bi-bank me-1"></i>Govt. Verified</span>
                             }
                         </div>
                     </div>
@@ -67,7 +71,7 @@ else
                         <span class="text-secondary small me-2">Current tier:</span>
                         <button class="btn btn-sm @(_selectedTier == VerificationTier.None ? "btn-dark" : "btn-outline-secondary") rounded-pill"
                                 @onclick='() => _selectedTier = VerificationTier.None'>None</button>
-                        <button class="btn btn-sm @(_selectedTier == VerificationTier.StandardEmployer ? "btn-success" : "btn-outline-success") rounded-pill"
+                        <button class="btn btn-sm @(_selectedTier == VerificationTier.StandardEmployer ? "btn-primary" : "btn-outline-primary") rounded-pill"
                                 @onclick='() => _selectedTier = VerificationTier.StandardEmployer'>
                             <i class="bi bi-patch-check me-1"></i>Standard Employer
                         </button>
@@ -75,6 +79,13 @@ else
                                 @onclick='() => _selectedTier = VerificationTier.EnhancedTrusted'>
                             <i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted
                         </button>
+                        @if (_isSuperAdmin || _isAdmin)
+                        {
+                            <button class="btn btn-sm @(_selectedTier == VerificationTier.GovtVerified ? "btn-secondary" : "btn-outline-secondary") rounded-pill"
+                                    @onclick='() => _selectedTier = VerificationTier.GovtVerified'>
+                                <i class="bi bi-bank me-1"></i>Govt. Verified
+                            </button>
+                        }
                         <button class="btn btn-sm btn-primary rounded-pill ms-2" @onclick="SaveVerification" disabled="@_saving">
                             @(_saving ? "Saving…" : "Save")
                         </button>

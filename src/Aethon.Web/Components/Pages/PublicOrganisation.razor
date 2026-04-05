@@ -56,6 +56,12 @@ else
                                         <i class="bi bi-patch-check-fill me-1"></i>Enhanced Trusted
                                     </a>
                                 }
+                                else if (_org.VerificationTier == VerificationTier.GovtVerified)
+                                {
+                                    <span class="badge bg-secondary rounded-pill" title="Government Verified">
+                                        <i class="bi bi-bank me-1"></i>Govt. Verified
+                                    </span>
+                                }
                                 else
                                 {
                                     <a href="/info/standard-verification" class="badge bg-primary rounded-pill text-decoration-none" title="Verified Employer">
