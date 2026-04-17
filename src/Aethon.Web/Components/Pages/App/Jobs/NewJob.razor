@@ -1,0 +1,1085 @@
+@page "/app/jobs/new"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using Aethon.Shared.Billing
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@inject AethonApiClient Api
+@inject NavigationManager NavigationManager
+
+<PageTitle>Create job | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-2">Create job</h1>
+            <p class="text-secondary mb-0">Create a new job posting for your organisation.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_pageError))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_pageError</div>
+    }
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <EditForm Model="_model" OnValidSubmit="CreateJobAsync">
+                <DataAnnotationsValidator />
+
+                <!-- ── Listing type ─────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-2">Listing type</h2>
+                <p class="text-secondary small mb-3">Choose how this job will be published. You can upgrade later.</p>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <div class="card rounded-4 h-100 @(_model.PostingTier == JobPostingTier.Standard ? "border-primary border-2" : "border") cursor-pointer"
+                             style="cursor:pointer;" @onclick='() => SetTier(JobPostingTier.Standard)'>
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <input type="radio" class="form-check-input mt-0" checked="@(_model.PostingTier == JobPostingTier.Standard)" @onchange='() => SetTier(JobPostingTier.Standard)' />
+                                    <span class="fw-bold">Standard</span>
+                                    <span class="badge bg-secondary rounded-pill ms-auto">@(_standardCredits > 0 ? $"{_standardCredits} credit{(_standardCredits == 1 ? "" : "s")} available" : "No credits")</span>
+                                </div>
+                                <ul class="small text-secondary mb-0 ps-3">
+                                    <li>Listed for up to 30 days</li>
+                                    <li>Standard search placement</li>
+                                    <li>Optional highlight colour add-on</li>
+                                    <li>Consumes 1 Standard credit</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card rounded-4 h-100 @(_model.PostingTier == JobPostingTier.Premium ? "border-primary border-2" : "border") cursor-pointer"
+                             style="cursor:pointer;" @onclick='() => SetTier(JobPostingTier.Premium)'>
+                            <div class="card-body p-3">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <input type="radio" class="form-check-input mt-0" checked="@(_model.PostingTier == JobPostingTier.Premium)" @onchange='() => SetTier(JobPostingTier.Premium)' />
+                                    <span class="fw-bold">Premium</span>
+                                    <span class="badge bg-primary rounded-pill ms-auto">@(_premiumCredits > 0 ? $"{_premiumCredits} credit{(_premiumCredits == 1 ? "" : "s")} available" : "No credits")</span>
+                                </div>
+                                <ul class="small text-secondary mb-0 ps-3">
+                                    <li>Listed for up to 60 days</li>
+                                    <li>Enhanced search visibility</li>
+                                    <li>Highlight colour included</li>
+                                    <li>AI candidate matching included</li>
+                                    <li>Consumes 1 Premium credit</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Core details ─────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Job details</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-8">
+                        <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+                        <InputText @bind-Value="_model.Title" class="form-control rounded-4" placeholder="e.g. Senior Software Engineer" />
+                        <ValidationMessage For="@(() => _model.Title)" />
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                        <InputSelect @bind-Value="_model.Category" class="form-select rounded-4">
+                            <option value="">Select category</option>
+                            <option value="@JobCategory.Accounting">Accounting</option>
+                            <option value="@JobCategory.AdminSecretarial">Admin &amp; Secretarial</option>
+                            <option value="@JobCategory.AdvertisingPR">Advertising &amp; PR</option>
+                            <option value="@JobCategory.Aerospace">Aerospace</option>
+                            <option value="@JobCategory.AgricultureFishingForestry">Agriculture, Fishing &amp; Forestry</option>
+                            <option value="@JobCategory.Arts">Arts</option>
+                            <option value="@JobCategory.Automobile">Automobile</option>
+                            <option value="@JobCategory.Banking">Banking</option>
+                            <option value="@JobCategory.BuildingConstruction">Building &amp; Construction</option>
+                            <option value="@JobCategory.Catering">Catering</option>
+                            <option value="@JobCategory.Charity">Charity</option>
+                            <option value="@JobCategory.CustomerService">Customer Service</option>
+                            <option value="@JobCategory.Design">Design</option>
+                            <option value="@JobCategory.Education">Education</option>
+                            <option value="@JobCategory.Engineering">Engineering</option>
+                            <option value="@JobCategory.ExecutiveManagement">Executive &amp; Management</option>
+                            <option value="@JobCategory.FinanceInsurance">Finance &amp; Insurance</option>
+                            <option value="@JobCategory.FoodBeverage">Food &amp; Beverage</option>
+                            <option value="@JobCategory.Government">Government</option>
+                            <option value="@JobCategory.GraduateRoles">Graduate Roles</option>
+                            <option value="@JobCategory.Healthcare">Healthcare</option>
+                            <option value="@JobCategory.Hospitality">Hospitality</option>
+                            <option value="@JobCategory.HumanResources">Human Resources</option>
+                            <option value="@JobCategory.ITSoftware">IT &amp; Software</option>
+                            <option value="@JobCategory.LegalServices">Legal Services</option>
+                            <option value="@JobCategory.Logistics">Logistics</option>
+                            <option value="@JobCategory.Manufacturing">Manufacturing</option>
+                            <option value="@JobCategory.Marketing">Marketing</option>
+                            <option value="@JobCategory.MediaJournalism">Media &amp; Journalism</option>
+                            <option value="@JobCategory.MiningResources">Mining &amp; Resources</option>
+                            <option value="@JobCategory.PartTimeTemp">Part-time &amp; Temp</option>
+                            <option value="@JobCategory.Pharmaceuticals">Pharmaceuticals</option>
+                            <option value="@JobCategory.PropertyRealEstate">Property &amp; Real Estate</option>
+                            <option value="@JobCategory.PublicRelations">Public Relations</option>
+                            <option value="@JobCategory.Recruitment">Recruitment</option>
+                            <option value="@JobCategory.Research">Research</option>
+                            <option value="@JobCategory.Retail">Retail</option>
+                            <option value="@JobCategory.Sales">Sales</option>
+                            <option value="@JobCategory.Science">Science</option>
+                            <option value="@JobCategory.SecurityIntelligence">Security &amp; Intelligence</option>
+                            <option value="@JobCategory.SocialWork">Social Work</option>
+                            <option value="@JobCategory.SportRecreation">Sport &amp; Recreation</option>
+                            <option value="@JobCategory.TelecommunicationsISP">Telecommunications &amp; ISP</option>
+                            <option value="@JobCategory.Tourism">Tourism</option>
+                            <option value="@JobCategory.TransportDistribution">Transport &amp; Distribution</option>
+                            <option value="@JobCategory.UtilitiesEnergy">Utilities &amp; Energy</option>
+                            <option value="@JobCategory.Veterinary">Veterinary</option>
+                            <option value="@JobCategory.Other">Other</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Summary <span class="text-danger">*</span></label>
+                        <InputTextArea @bind-Value="_model.Summary" class="form-control rounded-4" rows="3"
+                                       placeholder="A brief overview of the role that will appear in search results (50–300 characters)" maxlength="300" />
+                        <div class="d-flex justify-content-between">
+                            <ValidationMessage For="@(() => _model.Summary)" />
+                            <div class="form-text text-end">@(_model.Summary?.Length ?? 0)/300</div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Department</label>
+                        <InputText @bind-Value="_model.Department" class="form-control rounded-4" placeholder="e.g. Engineering, Finance, Marketing" />
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Location <span class="text-danger">*</span></label>
+                        <LocationPicker
+                            LocationText="@_model.LocationText"
+                            LocationTextChanged="v => _model.LocationText = v"
+                            LocationCity="@_model.LocationCity"
+                            LocationCityChanged="v => _model.LocationCity = v"
+                            LocationState="@_model.LocationState"
+                            LocationStateChanged="v => _model.LocationState = v"
+                            LocationCountry="@_model.LocationCountry"
+                            LocationCountryChanged="v => _model.LocationCountry = v"
+                            LocationCountryCode="@_model.LocationCountryCode"
+                            LocationCountryCodeChanged="v => _model.LocationCountryCode = v"
+                            LocationLatitude="@_model.LocationLatitude"
+                            LocationLatitudeChanged="v => _model.LocationLatitude = v"
+                            LocationLongitude="@_model.LocationLongitude"
+                            LocationLongitudeChanged="v => _model.LocationLongitude = v"
+                            LocationPlaceId="@_model.LocationPlaceId"
+                            LocationPlaceIdChanged="v => _model.LocationPlaceId = v"
+                            Placeholder="e.g. Sydney NSW" />
+                        <ValidationMessage For="@(() => _model.LocationText)" />
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Workplace type <span class="text-danger">*</span></label>
+                        <InputSelect @bind-Value="_model.WorkplaceType" class="form-select rounded-4">
+                            <option value="">Select workplace type</option>
+                            <option value="@WorkplaceType.OnSite">On-site</option>
+                            <option value="@WorkplaceType.Hybrid">Hybrid</option>
+                            <option value="@WorkplaceType.Remote">Remote</option>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => _model.WorkplaceType)" />
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Employment type <span class="text-danger">*</span></label>
+                        <InputSelect @bind-Value="_model.EmploymentType" class="form-select rounded-4">
+                            <option value="">Select employment type</option>
+                            <option value="@EmploymentType.FullTime">Full-time</option>
+                            <option value="@EmploymentType.PartTime">Part-time</option>
+                            <option value="@EmploymentType.Contract">Contract</option>
+                            <option value="@EmploymentType.Temporary">Temporary</option>
+                            <option value="@EmploymentType.Casual">Casual</option>
+                            <option value="@EmploymentType.Internship">Internship</option>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => _model.EmploymentType)" />
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.IsImmediateStart" class="form-check-input" id="immediateStartCheck" />
+                            <label class="form-check-label" for="immediateStartCheck">
+                                <span class="fw-semibold">Immediate Start</span>
+                                <span class="text-secondary ms-1 small">— this role is available to start right away (shown as a green badge on listings)</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Regions & countries ──────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Regions &amp; countries</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Regions</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var region in Enum.GetValues<JobRegion>())
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="region-@region"
+                                           checked="@_model.Regions.Contains(region)"
+                                           @onchange="e => ToggleRegion(region, (bool)(e.Value ?? false))" />
+                                    <label class="form-check-label" for="region-@region">@FormatRegion(region)</label>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (AvailableCountries().Any())
+                    {
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Countries <span class="text-secondary small">(select specific countries)</span></label>
+                            <div style="max-height:200px; overflow-y:auto; border:1px solid #dee2e6; border-radius:8px; padding:8px;">
+                                @foreach (var country in AvailableCountries())
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="country-@country.Replace(" ","-").Replace("'","")"
+                                               checked="@_model.Countries.Contains(country)"
+                                               @onchange="e => ToggleCountry(country, (bool)(e.Value ?? false))" />
+                                        <label class="form-check-label small" for="country-@country.Replace(" ","-").Replace("'","")">@country</label>
+                                    </div>
+                                }
+                            </div>
+                            <div class="form-text">Select all countries or leave blank to match all in the selected region(s).</div>
+                        </div>
+                    }
+                </div>
+
+                <!-- ── Description ──────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Content</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description <span class="text-danger">*</span></label>
+                        <RichTextEditor Value="@_model.Description" ValueChanged="v => _model.Description = v" />
+                        <ValidationMessage For="@(() => _model.Description)" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Requirements</label>
+                        <RichTextEditor Value="@(_model.Requirements ?? "")" ValueChanged="v => _model.Requirements = string.IsNullOrWhiteSpace(v) ? null : v" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Benefits (description)</label>
+                        <RichTextEditor Value="@(_model.Benefits ?? "")" ValueChanged="v => _model.Benefits = string.IsNullOrWhiteSpace(v) ? null : v" />
+                    </div>
+                </div>
+
+                <!-- ── Salary ────────────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Compensation</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary from</label>
+                        <InputNumber @bind-Value="_model.SalaryFrom" class="form-control rounded-4" placeholder="e.g. 80000" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Salary to</label>
+                        <InputNumber @bind-Value="_model.SalaryTo" class="form-control rounded-4" placeholder="e.g. 100000" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Currency</label>
+                        <InputSelect @bind-Value="_model.SalaryCurrency" class="form-select rounded-4">
+                            <option value="">Select currency</option>
+                            <option value="@CurrencyCode.AUD">AUD</option>
+                            <option value="@CurrencyCode.USD">USD</option>
+                            <option value="@CurrencyCode.EUR">EUR</option>
+                            <option value="@CurrencyCode.GBP">GBP</option>
+                            <option value="@CurrencyCode.NZD">NZD</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Status</label>
+                        <InputSelect @bind-Value="_model.Status" class="form-select rounded-4">
+                            <option value="@JobStatus.Draft">Draft</option>
+                            <option value="@JobStatus.Published">Published</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.HasCommission" class="form-check-input" id="commissionCheck" />
+                            <label class="form-check-label" for="commissionCheck">
+                                <span class="fw-semibold">This role includes commission / variable pay</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    @if (_model.HasCommission)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">OTE from <span class="text-secondary small">(On-Target Earnings)</span></label>
+                            <InputNumber @bind-Value="_model.OteFrom" class="form-control rounded-4" placeholder="e.g. 120000" />
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <label class="form-label fw-semibold">OTE to</label>
+                            <InputNumber @bind-Value="_model.OteTo" class="form-control rounded-4" placeholder="e.g. 160000" />
+                        </div>
+                        <div class="col-12 col-lg-4 d-flex align-items-end">
+                            <div class="form-text mb-2">OTE = base salary + full commission at target. Leave blank to just show "+ Commission".</div>
+                        </div>
+                    }
+                </div>
+
+                <!-- ── Benefits tags ─────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Benefit tags</h2>
+                @foreach (var group in _benefitGroups)
+                {
+                    <div class="mb-3">
+                        <div class="small fw-semibold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;">@group.Key</div>
+                        <div class="row g-1">
+                            @foreach (var benefit in group.Value)
+                            {
+                                var benefitId = $"benefit-{benefit.Replace(" ", "-").Replace("(", "").Replace(")", "").Replace("/", "").Replace("+", "").ToLower()}";
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="@benefitId"
+                                               checked="@_model.BenefitsTags.Contains(benefit)"
+                                               @onchange="e => ToggleBenefit(benefit, (bool)(e.Value ?? false))" />
+                                        <label class="form-check-label small" for="@benefitId">@benefit</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                <div class="mb-4"></div>
+
+                <!-- ── Application options ──────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Application options</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">External application URL</label>
+                        <InputText @bind-Value="_model.ExternalApplicationUrl" class="form-control rounded-4" placeholder="https://yoursite.com/apply" />
+                        <div class="form-text">Leave blank to use the internal ATS.</div>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Application email</label>
+                        <InputText @bind-Value="_model.ApplicationEmail" class="form-control rounded-4" placeholder="jobs@yourcompany.com" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Special requirements for applicants</label>
+                        <RichTextEditor Value="@(_model.ApplicationSpecialRequirements ?? "")" ValueChanged="v => _model.ApplicationSpecialRequirements = string.IsNullOrWhiteSpace(v) ? null : v" />
+                    </div>
+                </div>
+
+                <!-- ── ATS / internal ────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">ATS &amp; internal</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">Keywords</label>
+                        <InputText @bind-Value="_model.Keywords" class="form-control rounded-4" placeholder="e.g. React, TypeScript, AWS" />
+                        <div class="form-text">Used for candidate auto-matching and search.</div>
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">PO / Reference number</label>
+                        <InputText @bind-Value="_model.PoNumber" class="form-control rounded-4" placeholder="PO-2024-001" />
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Visibility</label>
+                        <InputSelect @bind-Value="_model.Visibility" class="form-select rounded-4">
+                            <option value="@JobVisibility.Public">Public</option>
+                            <option value="@JobVisibility.Private">Private</option>
+                        </InputSelect>
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label fw-semibold">Listing expiry date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control rounded-4"
+                               value="@(_expiryDate?.ToString("yyyy-MM-dd"))"
+                               min="@DateTime.Today.AddDays(1).ToString("yyyy-MM-dd")"
+                               max="@_expiryMax.ToString("yyyy-MM-dd")"
+                               @onchange="OnExpiryChanged" />
+                        <div class="form-text">Max @(_model.PostingTier == JobPostingTier.Premium ? 60 : 30) days for @(_model.PostingTier) listing.</div>
+                    </div>
+                </div>
+
+                <!-- ── Video ────────────────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-1">Video</h2>
+                <p class="text-secondary small mb-3">Embed a short video to showcase the role or your workplace. Only one video source can be used.</p>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-youtube me-1 text-danger"></i>YouTube video ID
+                            @if (_model.PostingTier == JobPostingTier.Standard)
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
+                        </label>
+                        <InputText @bind-Value="_model.VideoYouTubeId" class="form-control rounded-4" placeholder="e.g. dQw4w9WgXcQ"
+                                   disabled="@(!string.IsNullOrWhiteSpace(_model.VideoVimeoId))" />
+                        <div class="form-text">The ID from the YouTube URL: youtube.com/watch?v=<strong>ID</strong></div>
+                        <ValidationMessage For="@(() => _model.VideoYouTubeId)" />
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-camera-video me-1 text-info"></i>Vimeo video ID
+                            @if (_model.PostingTier == JobPostingTier.Standard)
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
+                        </label>
+                        <InputText @bind-Value="_model.VideoVimeoId" class="form-control rounded-4" placeholder="e.g. 123456789"
+                                   disabled="@(!string.IsNullOrWhiteSpace(_model.VideoYouTubeId))" />
+                        <div class="form-text">The numeric ID from the Vimeo URL: vimeo.com/<strong>ID</strong></div>
+                        <ValidationMessage For="@(() => _model.VideoVimeoId)" />
+                    </div>
+                </div>
+
+                <!-- ── Screening questions ───────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-1">Screening questions</h2>
+                <p class="text-secondary small mb-3">Configure questions applicants must answer when applying via the internal ATS. These questions do not appear for email or external URL applications.</p>
+
+                <div class="form-check form-switch mb-3">
+                    <input type="checkbox" class="form-check-input" id="sqAutoTag"
+                           checked="@_screening.AutoTagNotSuitable"
+                           @onchange="e => _screening.AutoTagNotSuitable = (bool)e.Value!" />
+                    <label class="form-check-label" for="sqAutoTag">Automatically tag applications that don't meet must-have requirements as "Not Suitable"</label>
+                </div>
+
+                @{
+                    var _sqCountry = _model.Countries?.Count == 1 ? _model.Countries[0] : "";
+                    var _sqIndustry = _model.Category.HasValue ? FormatCategory(_model.Category.Value) : "";
+                    var _sqWrLabel = string.IsNullOrEmpty(_sqCountry) ? "Right to work" : $"Right to work in {_sqCountry}";
+                    var _sqYeLabel = string.IsNullOrEmpty(_sqIndustry) ? "Years of experience" : $"Years of experience in {_sqIndustry}";
+                    var _sqQualLabel = string.IsNullOrEmpty(_sqIndustry) ? "Relevant qualification" : $"Qualification in {_sqIndustry}";
+                }
+
+                @SqSimpleBlock("sqWr", _sqWrLabel, _screening.WorkRights, _workRightsAnswers)
+                @SqSimpleBlock("sqYe", _sqYeLabel, _screening.YearsExperience, _yearsExpAnswers)
+
+                @* ── Salary (special: AcceptableMaxSalary) ── *@
+                <div class="border rounded-4 p-3 mb-2">
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                        <span class="fw-semibold small">Expected annual base salary</span>
+                        <div class="d-flex gap-3 flex-shrink-0">
+                            <div class="form-check form-switch mb-0">
+                                <input type="checkbox" class="form-check-input" id="sqSalEn"
+                                       checked="@_screening.Salary.Enabled"
+                                       @onchange="e => _screening.Salary.Enabled = (bool)e.Value!" />
+                                <label class="form-check-label small" for="sqSalEn">Include</label>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input type="checkbox" class="form-check-input" id="sqSalMh"
+                                       disabled="@(!_screening.Salary.Enabled)"
+                                       checked="@(_screening.Salary.Enabled && _screening.Salary.IsMustHave)"
+                                       @onchange="e => _screening.Salary.IsMustHave = (bool)e.Value!" />
+                                <label class="form-check-label small" for="sqSalMh">Must-have</label>
+                            </div>
+                        </div>
+                    </div>
+                    @if (_screening.Salary.Enabled && _screening.Salary.IsMustHave)
+                    {
+                        <div class="col-12 col-lg-4 mt-2">
+                            <label class="form-label small text-secondary">Maximum acceptable salary</label>
+                            <select class="form-select form-select-sm rounded-4"
+                                    value="@_screening.Salary.AcceptableMaxSalary"
+                                    @onchange="e => _screening.Salary.AcceptableMaxSalary = e.Value?.ToString()">
+                                <option value="">Select max salary</option>
+                                @foreach (var opt in _salaryOptions)
+                                {
+                                    <option value="@opt">@opt</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                @SqSimpleBlock("sqNp", "Notice period", _screening.NoticePeriod, _noticePeriodAnswers)
+                @SqSimpleBlock("sqPc", "Police check", _screening.PoliceCheck, _policeCheckAnswers)
+                @SqSimpleBlock("sqWwc", "Working with Children Check", _screening.WorkingWithChildren, _wwcAnswers)
+                @SqSimpleBlock("sqMed", "Pre-employment medical check", _screening.MedicalCheck, _yesNoAnswers)
+                @SqSimpleBlock("sqDl", "Driver's licence", _screening.DriversLicence, _yesNoAnswers)
+                @SqSimpleBlock("sqCar", "Access to a car", _screening.CarAccess, _yesNoAnswers)
+                @SqSimpleBlock("sqPh", "Available to work on public holidays", _screening.PublicHolidays, _yesNoAnswers)
+
+                @* ── Qualification (multi-select acceptable answers) ── *@
+                @SqSimpleBlock("sqQual", _sqQualLabel, _screening.Qualification, _qualificationAnswers(_sqIndustry))
+
+                <!-- ── Promotion options ─────────────────────────────────── -->
+                <h2 class="h5 fw-bold mb-3">Promotion</h2>
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-lg-4">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.IncludeCompanyLogo" class="form-check-input" id="includeLogoCheck" />
+                            <label class="form-check-label" for="includeLogoCheck">Show company logo on listing</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="_model.AllowAutoMatch" class="form-check-input" id="autoMatchCheck" />
+                            <label class="form-check-label" for="autoMatchCheck">Auto-match to candidate profiles</label>
+                        </div>
+                    </div>
+
+                    @* Highlight colour *@
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">
+                            Highlight colour
+                            @if (_model.PostingTier == JobPostingTier.Premium)
+                            {
+                                <span class="badge bg-primary rounded-pill ms-2 small">Included with Premium</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill ms-2 small">Add-on +A$9</span>
+                            }
+                        </label>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mt-1">
+                            <button type="button" class="btn btn-sm rounded-3 @(string.IsNullOrEmpty(_model.HighlightColour) ? "btn-secondary" : "btn-outline-secondary")"
+                                    @onclick='() => { _model.HighlightColour = null; _model.IsHighlighted = false; }'>None</button>
+                            @foreach (var c in _highlightColours)
+                            {
+                                <button type="button"
+                                        class="rounded-3 @(_model.HighlightColour == c.Hex ? "border border-dark border-2" : "border")"
+                                        style="width:2rem;height:2rem;background:@c.Hex;"
+                                        title="@c.Name"
+                                        @onclick="@(() => { _model.HighlightColour = c.Hex; _model.IsHighlighted = true; })">
+                                </button>
+                            }
+                            @if (!string.IsNullOrEmpty(_model.HighlightColour))
+                            {
+                                <span class="small text-secondary ms-1">Preview: <span style="background:@_model.HighlightColour;padding:1px 10px;border-radius:4px;border:1px solid #ccc;">Job listing</span></span>
+                            }
+                        </div>
+                        <div class="form-text">Applies a background tint to your listing card in search results.</div>
+                    </div>
+
+                    @* AI Candidate Matching *@
+                    <div class="col-12 col-lg-6">
+                        <div class="form-check form-switch">
+                            @if (_model.PostingTier == JobPostingTier.Premium)
+                            {
+                                <input type="checkbox" class="form-check-input" id="aiMatchCheck" checked disabled />
+                                <label class="form-check-label" for="aiMatchCheck">
+                                    AI candidate matching <span class="badge bg-primary rounded-pill ms-1 small">Included with Premium</span>
+                                </label>
+                            }
+                            else
+                            {
+                                <InputCheckbox @bind-Value="_model.HasAiCandidateMatching" class="form-check-input" id="aiMatchCheck" />
+                                <label class="form-check-label" for="aiMatchCheck">
+                                    AI candidate matching <span class="badge bg-warning text-dark rounded-pill ms-1 small">Add-on +A$9</span>
+                                </label>
+                            }
+                        </div>
+                        <div class="form-text">Automatically surface best-matched candidates from the talent pool.</div>
+                    </div>
+
+                    @* Sticky Top *@
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Sticky top</label>
+                        <div class="form-text mb-2">Pin to the top of search results. Uses a Sticky credit (separate from job posting credits).</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 0 ? "btn-secondary" : "btn-outline-secondary") rounded-3"
+                                    @onclick='() => _stickyDuration = 0'>None</button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 1 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 1'>
+                                24 hours @(_sticky24hCredits > 0 ? $"({_sticky24hCredits} credit{(_sticky24hCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 7 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 7'>
+                                7 days @(_sticky7dCredits > 0 ? $"({_sticky7dCredits} credit{(_sticky7dCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                            <button type="button" class="btn btn-sm @(_stickyDuration == 30 ? "btn-warning" : "btn-outline-warning") rounded-3"
+                                    @onclick='() => _stickyDuration = 30'>
+                                30 days @(_sticky30dCredits > 0 ? $"({_sticky30dCredits} credit{(_sticky30dCredits == 1 ? "" : "s")})" : "(no credits)")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                @* ── Publish cost summary ── *@
+                @if (_model.Status == JobStatus.Published)
+                {
+                    var isPremium = _model.PostingTier == JobPostingTier.Premium;
+                    var hasCredits = isPremium ? _premiumCredits > 0 : _standardCredits > 0;
+                    var tierLabel = isPremium ? "Premium" : "Standard";
+                    var hasHighlight = !string.IsNullOrEmpty(_model.HighlightColour) && !isPremium;
+                    var hasVideo = (!string.IsNullOrWhiteSpace(_model.VideoYouTubeId) || !string.IsNullOrWhiteSpace(_model.VideoVimeoId)) && !isPremium;
+                    var hasAi = _model.HasAiCandidateMatching && !isPremium;
+                    var stickyHas = _stickyDuration == 1 ? _sticky24hCredits > 0 : _stickyDuration == 7 ? _sticky7dCredits > 0 : _sticky30dCredits > 0;
+                    var stickyPrice = _stickyDuration == 1 ? "A$9" : _stickyDuration == 7 ? "A$19" : "A$39";
+                    var anyCharge = !hasCredits || hasHighlight || hasVideo || hasAi || (_stickyDuration > 0 && !stickyHas);
+                    <div class="alert @(anyCharge ? "alert-warning" : "alert-success") rounded-4 mb-3">
+                        <div class="fw-semibold mb-1"><i class="bi bi-credit-card me-2"></i>Publish cost</div>
+                        @if (hasCredits)
+                        {
+                            <div class="small">1× <strong>@tierLabel</strong> posting credit will be consumed on publish.</div>
+                        }
+                        else
+                        {
+                            <div class="small">No <strong>@tierLabel</strong> credits — <strong>A$@(isPremium ? "69" : "29")</strong> will be charged to your card. <a href="/app/organisation/billing" class="alert-link">Buy credits</a></div>
+                        }
+                        @if (hasHighlight)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> highlight colour add-on.</div>
+                        }
+                        @if (hasVideo)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> video embed add-on.</div>
+                        }
+                        @if (hasAi)
+                        {
+                            <div class="small mt-1">+ <strong>A$9</strong> AI candidate matching add-on.</div>
+                        }
+                        @if (_stickyDuration > 0)
+                        {
+                            var stickyType = _stickyDuration == 1 ? "24h" : _stickyDuration == 7 ? "7d" : "30d";
+                            @if (stickyHas)
+                            {
+                                <div class="small mt-1">+ 1× <strong>Sticky @stickyType</strong> credit will be consumed.</div>
+                            }
+                            else
+                            {
+                                <div class="small mt-1">+ <strong>@stickyPrice</strong> sticky @stickyType (no credits available).</div>
+                            }
+                        }
+                        @if (anyCharge && !hasCredits)
+                        {
+                            <div class="small text-muted mt-2">You will be redirected to Stripe to complete payment. Your card will be saved for future charges.</div>
+                        }
+                        else if (hasHighlight || hasVideo || hasAi || (_stickyDuration > 0 && !stickyHas))
+                        {
+                            <div class="small text-muted mt-2">Add-on charges will be collected via Stripe Checkout after publish.</div>
+                        }
+                    </div>
+                }
+
+                <div class="d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Saving…</span>
+                        }
+                        else if (_model.Status == JobStatus.Published)
+                        {
+                            <span>Publish job</span>
+                        }
+                        else
+                        {
+                            <span>Save as draft</span>
+                        }
+                    </button>
+                    <a class="btn btn-outline-secondary rounded-4 px-4" href="/app/jobs">Cancel</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CreateJobRequestDto _model = new()
+    {
+        Status = JobStatus.Draft,
+        SalaryCurrency = CurrencyCode.AUD,
+        Visibility = JobVisibility.Public
+    };
+
+    private bool _saving;
+    private string? _pageError;
+    private int _stickyDuration; // 0 = none, 1 = 24h, 7 = 7d, 30 = 30d
+    private DateOnly? _expiryDate;
+
+    // Credits available (loaded on init)
+    private int _standardCredits;
+    private int _premiumCredits;
+    private int _sticky24hCredits;
+    private int _sticky7dCredits;
+    private int _sticky30dCredits;
+
+    private DateTime _expiryMax => _model.PostingTier == JobPostingTier.Premium
+        ? DateTime.Today.AddDays(60)
+        : DateTime.Today.AddDays(30);
+
+    private static readonly (string Hex, string Name)[] _highlightColours =
+    [
+        ("#FFF9C4", "Yellow"),
+        ("#E3F2FD", "Blue"),
+        ("#E8F5E9", "Green"),
+        ("#FCE4EC", "Pink"),
+        ("#EDE7F6", "Purple"),
+        ("#FFF3E0", "Orange"),
+    ];
+
+    // ── Screening questions ─────────────────────────────────────────────
+    private readonly ScreeningConfig _screening = new();
+
+    private static readonly string[] _workRightsAnswers =
+    [
+        "I have permanent work rights with no restrictions",
+        "I have temporary work rights with no restrictions",
+        "I have temporary work rights limited to designated locations",
+        "I have temporary work rights with limitations on work hours",
+        "I have temporary work rights limited to specific industries",
+        "I require sponsorship to work for a new employer"
+    ];
+
+    private static readonly string[] _yearsExpAnswers =
+        ["No experience", "Less than 1 year", "1 year", "2 years", "3 years", "4 years", "5 years", "5+ years"];
+
+    private static readonly string[] _salaryOptions =
+    [
+        "$30,000","$35,000","$40,000","$45,000","$50,000","$55,000","$60,000","$65,000","$70,000",
+        "$80,000","$90,000","$100,000","$110,000","$120,000","$130,000","$140,000","$150,000",
+        "$170,000","$200,000","$250,000","$300,000","$350,000","$350,000+"
+    ];
+
+    private static readonly string[] _noticePeriodAnswers =
+        ["None, I can start immediately", "1 week", "2 weeks", "3 weeks", "4 weeks", "5 weeks", "5 or more weeks"];
+
+    private static readonly string[] _policeCheckAnswers =
+        ["Yes, I have a current police check", "I am willing to undertake a police check", "No"];
+
+    private static readonly string[] _wwcAnswers =
+        ["Yes, I have a current Working with Children Check", "I am willing to undertake a Working with Children Check", "No"];
+
+    private static readonly string[] _yesNoAnswers = ["Yes", "No"];
+
+    private static string[] _qualificationAnswers(string industry) =>
+    [
+        "Yes, Bachelor degree",
+        "Yes, Bachelor degree with honours",
+        "Yes, Graduate certificate",
+        "Yes, Graduate diploma",
+        "Yes, Master's degree",
+        "Yes, Doctoral degree",
+        string.IsNullOrEmpty(industry) ? "I have a relevant qualification that is not listed" : $"I have a qualification in {industry} that is not listed",
+        string.IsNullOrEmpty(industry) ? "I do not have a relevant qualification" : $"I do not have a qualification in {industry}"
+    ];
+
+    private static void ToggleAcceptable(ScreeningQuestion q, string answer, bool selected)
+    {
+        if (selected && !q.AcceptableAnswers.Contains(answer))
+            q.AcceptableAnswers.Add(answer);
+        else if (!selected)
+            q.AcceptableAnswers.Remove(answer);
+    }
+
+    private static string FormatCategory(JobCategory c) => c switch
+    {
+        JobCategory.AdminSecretarial => "Admin & Secretarial",
+        JobCategory.AdvertisingPR => "Advertising & PR",
+        JobCategory.AgricultureFishingForestry => "Agriculture, Fishing & Forestry",
+        JobCategory.BuildingConstruction => "Building & Construction",
+        JobCategory.CustomerService => "Customer Service",
+        JobCategory.ExecutiveManagement => "Executive & Management",
+        JobCategory.FinanceInsurance => "Finance & Insurance",
+        JobCategory.FoodBeverage => "Food & Beverage",
+        JobCategory.GraduateRoles => "Graduate Roles",
+        JobCategory.HumanResources => "Human Resources",
+        JobCategory.ITSoftware => "IT & Software",
+        JobCategory.LegalServices => "Legal Services",
+        JobCategory.MediaJournalism => "Media & Journalism",
+        JobCategory.MiningResources => "Mining & Resources",
+        JobCategory.PartTimeTemp => "Part-time & Temp",
+        JobCategory.PropertyRealEstate => "Property & Real Estate",
+        JobCategory.PublicRelations => "Public Relations",
+        JobCategory.SecurityIntelligence => "Security & Intelligence",
+        JobCategory.SocialWork => "Social Work",
+        JobCategory.SportRecreation => "Sport & Recreation",
+        JobCategory.TelecommunicationsISP => "Telecommunications & ISP",
+        JobCategory.TransportDistribution => "Transport & Distribution",
+        JobCategory.UtilitiesEnergy => "Utilities & Energy",
+        _ => c.ToString()
+    };
+
+    private RenderFragment SqSimpleBlock(string idPrefix, string label, ScreeningQuestion q, string[] answers) => __builder =>
+    {
+        <div class="border rounded-4 p-3 mb-2">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                <span class="fw-semibold small">@label</span>
+                <div class="d-flex gap-3 flex-shrink-0">
+                    <div class="form-check form-switch mb-0">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}En")"
+                               checked="@q.Enabled"
+                               @onchange="e => { q.Enabled = (bool)e.Value!; StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}En")">Include</label>
+                    </div>
+                    <div class="form-check form-switch mb-0">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}Mh")"
+                               disabled="@(!q.Enabled)"
+                               checked="@(q.Enabled && q.IsMustHave)"
+                               @onchange="e => { q.IsMustHave = (bool)e.Value!; StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}Mh")">Must-have</label>
+                    </div>
+                </div>
+            </div>
+            @if (q.Enabled && q.IsMustHave)
+            {
+                <div class="text-secondary small mb-1">Acceptable answers:</div>
+                @foreach (var ans in answers)
+                {
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="@($"{idPrefix}{ans.GetHashCode()}")"
+                               checked="@q.AcceptableAnswers.Contains(ans)"
+                               @onchange="e => { ToggleAcceptable(q, ans, (bool)e.Value!); StateHasChanged(); }" />
+                        <label class="form-check-label small" for="@($"{idPrefix}{ans.GetHashCode()}")">@ans</label>
+                    </div>
+                }
+            }
+        </div>;
+    };
+
+    private static readonly Dictionary<string, string[]> _benefitGroups = new()
+    {
+        ["Compensation & Financial"] = ["401(k)", "401(k) matching", "Profit sharing", "Equity compensation", "Performance bonus", "Annual bonus", "Signing bonus", "Referral bonus", "Employee stock purchase plan", "Salary packaging", "Commissions", "Overtime pay", "Cryptocurrency payment option"],
+        ["Health & Wellness"] = ["Medical insurance", "Dental insurance", "Vision insurance", "Mental wellness budget", "Free gym membership", "Wellness allowance", "Employee assistance program", "Life insurance", "Income protection insurance", "Disability insurance", "Paid parental leave", "Fertility support", "Health reimbursement arrangement"],
+        ["Time Off & Flexibility"] = ["Paid time off", "Unlimited vacation", "4-day workweek", "Flexible schedule", "Flexible hours", "Compressed workweek", "Public holiday flexibility", "Birthday leave", "Volunteer leave", "Study leave", "Carer's leave", "Paid sick leave", "Sabbatical leave"],
+        ["Remote Work & Equipment"] = ["Remote-first team", "Hybrid work options", "Home office budget", "Coworking budget", "Company retreats", "Work-from-anywhere policy", "Distributed team", "Office equipment provided", "Laptop provided", "Internet allowance", "Phone allowance", "Relocation support", "Travel stipend"],
+        ["Learning & Growth"] = ["Learning budget", "Training budget", "Conference budget", "Certification support", "Paid training", "Mentorship program", "Career progression pathways", "Internal promotion opportunities", "Professional development leave", "Leadership development program"],
+        ["Hiring Process"] = ["No whiteboard interview", "Take-home assessment", "Fast interview process", "Transparent hiring process", "Skills-based assessment", "Portfolio-friendly applications", "Practical interview process", "Interview feedback provided", "No unpaid trial work", "Paid trial project"],
+        ["Culture & Workplace"] = ["No employee monitoring", "Privacy-friendly workplace", "Age-inclusive hiring", "Equal opportunity employer", "Inclusive workplace", "Diverse team", "Accessible workplace", "Respectful workplace", "Low-meeting culture", "Asynchronous work culture", "Documentation-first culture", "Results-focused workplace", "Family-friendly workplace", "Pet-friendly office", "Social impact mission", "Values-driven company", "LGBTQ+ inclusive workplace", "Neurodiversity-inclusive workplace", "Disability-inclusive workplace"],
+    };
+
+    private static readonly Dictionary<JobRegion, string[]> _regionCountries = new()
+    {
+        [JobRegion.Africa] = ["Algeria","Angola","Benin","Botswana","Burkina Faso","Burundi","Cameroon","Cape Verde","Central African Republic","Chad","Comoros","Congo","DR Congo","Djibouti","Egypt","Equatorial Guinea","Eritrea","Eswatini","Ethiopia","Gabon","Gambia","Ghana","Guinea","Guinea-Bissau","Ivory Coast","Kenya","Lesotho","Liberia","Libya","Madagascar","Malawi","Mali","Mauritania","Mauritius","Morocco","Mozambique","Namibia","Niger","Nigeria","Rwanda","São Tomé and Príncipe","Senegal","Seychelles","Sierra Leone","Somalia","South Africa","South Sudan","Sudan","Tanzania","Togo","Tunisia","Uganda","Zambia","Zimbabwe"],
+        [JobRegion.Asia] = ["Afghanistan","Armenia","Azerbaijan","Bahrain","Bangladesh","Bhutan","Brunei","Cambodia","China","Cyprus","Georgia","India","Indonesia","Iran","Iraq","Israel","Japan","Jordan","Kazakhstan","Kuwait","Kyrgyzstan","Laos","Lebanon","Malaysia","Maldives","Mongolia","Myanmar","Nepal","North Korea","Oman","Pakistan","Palestine","Philippines","Qatar","Saudi Arabia","Singapore","South Korea","Sri Lanka","Syria","Taiwan","Tajikistan","Thailand","Timor-Leste","Turkey","Turkmenistan","United Arab Emirates","Uzbekistan","Vietnam","Yemen"],
+        [JobRegion.Europe] = ["Albania","Andorra","Austria","Belarus","Belgium","Bosnia and Herzegovina","Bulgaria","Croatia","Cyprus","Czech Republic","Denmark","Estonia","Finland","France","Germany","Greece","Hungary","Iceland","Ireland","Italy","Kosovo","Latvia","Liechtenstein","Lithuania","Luxembourg","Malta","Moldova","Monaco","Montenegro","Netherlands","North Macedonia","Norway","Poland","Portugal","Romania","Russia","San Marino","Serbia","Slovakia","Slovenia","Spain","Sweden","Switzerland","Ukraine","United Kingdom","Vatican City"],
+        [JobRegion.LatinAmerica] = ["Argentina","Belize","Bolivia","Brazil","Chile","Colombia","Costa Rica","Cuba","Dominican Republic","Ecuador","El Salvador","Guatemala","Guyana","Haiti","Honduras","Jamaica","Mexico","Nicaragua","Panama","Paraguay","Peru","Puerto Rico","Suriname","Trinidad and Tobago","Uruguay","Venezuela"],
+        [JobRegion.MiddleEast] = ["Bahrain","Egypt","Iran","Iraq","Israel","Jordan","Kuwait","Lebanon","Oman","Palestine","Qatar","Saudi Arabia","Syria","Turkey","United Arab Emirates","Yemen"],
+        [JobRegion.NorthAmerica] = ["Canada","Mexico","United States"],
+        [JobRegion.Oceania] = ["Australia","Fiji","Kiribati","Marshall Islands","Micronesia","Nauru","New Zealand","Palau","Papua New Guinea","Samoa","Solomon Islands","Tonga","Tuvalu","Vanuatu"],
+        [JobRegion.Worldwide] = []
+    };
+
+    private IEnumerable<string> AvailableCountries()
+    {
+        if (_model.Regions.Count == 0) return [];
+        if (_model.Regions.Contains(JobRegion.Worldwide))
+            return _regionCountries.Where(kv => kv.Key != JobRegion.Worldwide).SelectMany(kv => kv.Value).Distinct().OrderBy(c => c);
+        return _model.Regions.SelectMany(r => _regionCountries.TryGetValue(r, out var c) ? c : []).Distinct().OrderBy(c => c);
+    }
+
+    private void ToggleRegion(JobRegion region, bool selected)
+    {
+        if (selected && !_model.Regions.Contains(region))
+            _model.Regions.Add(region);
+        else if (!selected)
+            _model.Regions.Remove(region);
+
+        // Remove countries no longer in available set
+        var available = AvailableCountries().ToHashSet();
+        _model.Countries.RemoveAll(c => !available.Contains(c));
+    }
+
+    private void ToggleCountry(string country, bool selected)
+    {
+        if (selected && !_model.Countries.Contains(country))
+            _model.Countries.Add(country);
+        else if (!selected)
+            _model.Countries.Remove(country);
+    }
+
+    private static string FormatRegion(JobRegion r) => r switch
+    {
+        JobRegion.LatinAmerica => "Latin America",
+        JobRegion.MiddleEast => "Middle East",
+        JobRegion.NorthAmerica => "North America",
+        _ => r.ToString()
+    };
+
+    private void ToggleBenefit(string benefit, bool selected)
+    {
+        if (selected && !_model.BenefitsTags.Contains(benefit))
+            _model.BenefitsTags.Add(benefit);
+        else if (!selected)
+            _model.BenefitsTags.Remove(benefit);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            var credits = await client.GetFromJsonAsync<List<CreditBalanceItemDto>>(
+                "/api/v1/billing/me/credits", AethonApiClient.JsonOptions);
+
+            if (credits is not null)
+            {
+                var now = DateTime.UtcNow;
+                _standardCredits  = credits.Where(c => c.CreditType == CreditType.JobPostingStandard  && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _premiumCredits   = credits.Where(c => c.CreditType == CreditType.JobPostingPremium   && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky24hCredits = credits.Where(c => c.CreditType == CreditType.StickyTop24h        && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky7dCredits  = credits.Where(c => c.CreditType == CreditType.StickyTop7d         && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+                _sticky30dCredits = credits.Where(c => c.CreditType == CreditType.StickyTop30d        && c.QuantityRemaining > 0 && (c.ExpiresAt == null || c.ExpiresAt > now)).Sum(c => c.QuantityRemaining);
+            }
+        }
+        catch
+        {
+            // non-fatal — credit counts will show 0
+        }
+    }
+
+    private void SetTier(JobPostingTier tier)
+    {
+        _model.PostingTier = tier;
+
+        // Premium includes AI matching — force it on; Standard reverts to user choice
+        if (tier == JobPostingTier.Premium)
+            _model.HasAiCandidateMatching = true;
+
+        // Clamp expiry date to the new max
+        if (_expiryDate.HasValue)
+        {
+            var max = DateOnly.FromDateTime(_expiryMax);
+            if (_expiryDate.Value > max)
+                _expiryDate = max;
+        }
+    }
+
+    private void OnExpiryChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var parsed))
+        {
+            var max = DateOnly.FromDateTime(_expiryMax);
+            _expiryDate = parsed > max ? max : parsed;
+        }
+        else
+        {
+            _expiryDate = null;
+        }
+    }
+
+    private async Task CreateJobAsync()
+    {
+        _saving = true;
+        _pageError = null;
+
+        // Ensure Premium jobs always have AI matching enabled
+        if (_model.PostingTier == JobPostingTier.Premium)
+            _model.HasAiCandidateMatching = true;
+
+        // Map sticky duration to a UTC datetime
+        _model.StickyUntilUtc = _stickyDuration > 0
+            ? DateTime.UtcNow.AddDays(_stickyDuration)
+            : null;
+
+        _model.PostingExpiresUtc = _expiryDate.HasValue
+            ? DateTime.SpecifyKind(_expiryDate.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc)
+            : null;
+
+        _model.ScreeningQuestionsJson = System.Text.Json.JsonSerializer.Serialize(_screening);
+
+        // For Standard-tier publish: strip add-ons from create payload.
+        // They are sent to /billing/job-publish-checkout so they can be bundled
+        // into one Stripe Checkout session (or published free if credits cover everything).
+        string? pendingHighlightColour = null;
+        bool pendingAiMatching = false;
+        string? pendingYouTubeId = null;
+        string? pendingVimeoId = null;
+
+        if (_model.PostingTier == JobPostingTier.Standard && _model.Status == JobStatus.Published)
+        {
+            pendingHighlightColour = _model.HighlightColour;
+            pendingAiMatching      = _model.HasAiCandidateMatching;
+            pendingYouTubeId       = _model.VideoYouTubeId;
+            pendingVimeoId         = _model.VideoVimeoId;
+
+            _model.HighlightColour        = null;
+            _model.IsHighlighted          = false;
+            _model.HasAiCandidateMatching = false;
+            _model.VideoYouTubeId         = null;
+            _model.VideoVimeoId           = null;
+        }
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync("/api/v1/jobs", _model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(_pageError))
+                    _pageError = "Job could not be created.";
+                return;
+            }
+
+            var jobId = await response.Content.ReadFromJsonAsync<Guid>(AethonApiClient.JsonOptions);
+
+            if (_model.Status == JobStatus.Published)
+            {
+                // Use the new unified checkout endpoint — handles credit consumption,
+                // add-on line items, and Stripe Checkout redirect in one call.
+                var checkoutRequest = new JobPublishCheckoutRequestDto
+                {
+                    JobId           = jobId,
+                    AddHighlight    = !string.IsNullOrEmpty(pendingHighlightColour),
+                    HighlightColour = pendingHighlightColour,
+                    AddVideo        = !string.IsNullOrWhiteSpace(pendingYouTubeId) || !string.IsNullOrWhiteSpace(pendingVimeoId),
+                    VideoYouTubeId  = pendingYouTubeId,
+                    VideoVimeoId    = pendingVimeoId,
+                    AddAiMatching   = pendingAiMatching,
+                    StickyDuration  = _stickyDuration
+                };
+
+                var checkoutResp = await client.PostAsJsonAsync("/api/v1/billing/job-publish-checkout", checkoutRequest);
+
+                if (checkoutResp.IsSuccessStatusCode)
+                {
+                    var result = await checkoutResp.Content.ReadFromJsonAsync<JobPublishCheckoutResponseDto>(AethonApiClient.JsonOptions);
+
+                    if (result?.Published == true)
+                    {
+                        NavigationManager.NavigateTo($"/app/jobs/{jobId}", forceLoad: false);
+                        return;
+                    }
+
+                    if (!string.IsNullOrEmpty(result?.CheckoutUrl))
+                    {
+                        NavigationManager.NavigateTo(result.CheckoutUrl, forceLoad: true);
+                        return;
+                    }
+                }
+
+                var statusCode = (int)checkoutResp.StatusCode;
+                if (statusCode == 402)
+                {
+                    NavigationManager.NavigateTo("/app/organisation/billing?reason=no_payment_method", forceLoad: false);
+                    return;
+                }
+
+                // Try to surface the actual error message from the API
+                try
+                {
+                    var errBody = await checkoutResp.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>(AethonApiClient.JsonOptions);
+                    _pageError = errBody.TryGetProperty("message", out var msg) ? msg.GetString() : $"Checkout failed (HTTP {statusCode}).";
+                }
+                catch
+                {
+                    _pageError = $"Checkout failed (HTTP {statusCode}). Check the API logs for details.";
+                }
+
+                // Don't navigate away — keep the user on the form so they can see the error
+                _saving = false;
+                return;
+            }
+
+            NavigationManager.NavigateTo($"/app/jobs/{jobId}", forceLoad: false);
+        }
+        catch
+        {
+            _pageError = "Job could not be created.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

@@ -1,0 +1,89 @@
+services:
+
+  api:
+    image: repasscloud/aethon-api:dev
+    build:
+      context: .
+      dockerfile: src/Aethon.Api/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__DefaultConnection: "Host=${POSTGRES_HOST};Port=${POSTGRES_PORT:-5432};Database=${POSTGRES_DB:-postgres};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Require;Trust Server Certificate=true;Search Path=aethon,public"
+      Auth__JwtKey: "${Auth__JwtKey:-}"
+      Auth__Issuer: "${Auth__Issuer:-aethon-api}"
+      Auth__Audience: "${Auth__Audience:-aethon-web}"
+      Email__MailerSendApiKey: "${Email__MailerSendApiKey:-}"
+      Email__FromEmail: "${Email__FromEmail:-}"
+      Email__FromName: "${Email__FromName:-Aethon}"
+      Email__WebBaseUrl: "${Email__WebBaseUrl:-}"
+      Email__FromEmailSupport: "${Email__FromEmailSupport:-}"
+      Claude__ApiKey: "${Claude__ApiKey:-}"
+      Ollama__BaseUrl: "http://ollama:11434"
+      Ollama__Model: "${Ollama__Model:-mistral:7b}"
+      Ollama__TimeoutSeconds: "${Ollama__TimeoutSeconds:-120}"
+      Stripe__SecretKey: "${Stripe__SecretKey:-}"
+      LinkedIn__ClientId: "${LinkedIn__ClientId:-}"
+      LinkedIn__ClientSecret: "${LinkedIn__ClientSecret:-}"
+      LinkedIn__RedirectUri: "${LinkedIn__RedirectUri:-}"
+      Seed__AdminEmail: "${Seed__AdminEmail:-}"
+      Seed__AdminPassword: "${Seed__AdminPassword:-}"
+      IMPORT_API_KEY: "${IMPORT_API_KEY:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-}"
+    volumes:
+      - api_uploads:/app/uploads
+      - dp_keys:/keys
+
+  web:
+    image: repasscloud/aethon-web:dev
+    build:
+      context: .
+      dockerfile: src/Aethon.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      # Tell ASP.NET Core to trust X-Forwarded-* headers from Caddy
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ApiBaseUrl: "http://api:8080"
+      PublicApiBaseUrl: "${PublicApiBaseUrl:-}"
+      DataProtection__CertBase64: "${DataProtection__CertBase64:-}"
+      DataProtection__KeysPath: /keys
+      DataProtection__ApplicationName: Aethon
+      GooglePlaces__ApiKey: "${GooglePlaces__ApiKey:-}"
+      SiteBaseUrl: "${SiteBaseUrl:-}"
+    volumes:
+      - dp_keys:/keys
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+  
+  maintenance-web:
+    image: repasscloud/aethon-web-maintenance:dev
+    build:
+      context: .
+      dockerfile: src/Maintenance/Dockerfile
+    restart: unless-stopped
+    profiles: ["maintenance"]
+
+volumes:
+  api_uploads:
+  dp_keys:
+  caddy_data:
+  caddy_config:

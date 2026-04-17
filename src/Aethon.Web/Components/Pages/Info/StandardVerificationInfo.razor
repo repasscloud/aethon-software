@@ -1,0 +1,69 @@
+@page "/info/standard-verification"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Standard Verification | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4" style="max-width:720px; margin:0 auto;">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span style="font-size:2.5rem;"><i class="bi bi-patch-check-fill text-primary"></i></span>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Verified Employer</h1>
+                    <div class="text-secondary">What Standard Verification means</div>
+                </div>
+            </div>
+
+            <p class="lead text-secondary mb-4">
+                Confirms the employer is a real, operating business with a valid online presence and reachable contact details.
+            </p>
+
+            <h2 class="h5 fw-bold mb-3">Checks performed</h2>
+
+            <h3 class="h6 fw-semibold mb-2">Business registration validation</h3>
+            <ul class="mb-3">
+                <li>Verify ABN / ACN (AU) or equivalent registry in other countries</li>
+                <li>Confirm business name matches registration records</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Domain ownership verification</h3>
+            <ul class="mb-3">
+                <li>Employer email domain must match company domain</li>
+                <li>Verification via email link or DNS record</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Website presence review</h3>
+            <ul class="mb-3">
+                <li>Active company website required</li>
+                <li>Website content aligns with business activity</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Contact information validation</h3>
+            <ul class="mb-3">
+                <li>Valid business email (no generic domains unless justified)</li>
+                <li>Business phone number format checked</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Basic fraud and risk screening</h3>
+            <ul class="mb-4">
+                <li>Check against known scam patterns</li>
+                <li>Duplicate or suspicious account detection</li>
+                <li>Light review to confirm legitimacy signals are consistent</li>
+            </ul>
+
+            <div class="alert alert-primary rounded-4 mb-0">
+                <div class="fw-semibold mb-1"><i class="bi bi-patch-check-fill me-2"></i>Outcome</div>
+                <ul class="mb-0">
+                    <li>Business exists and is registered</li>
+                    <li>Contact details are real and reachable</li>
+                    <li>Job postings are from a legitimate source (baseline trust)</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="text-center">
+        <button onclick="history.back()" class="btn btn-outline-dark rounded-4 px-4"><i class="bi bi-arrow-left me-2"></i>Go back</button>
+    </div>
+</div>

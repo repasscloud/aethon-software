@@ -1,0 +1,711 @@
+# .github/workflows/docker-publish.yml
+name: Dev Docker Publish and Deploy
+
+on:
+  push:
+    branches: [ "dev" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APPLICATION: Aethon
+  DEPLOY_ENVIRONMENT: Development
+  RESULT_SUCCESS: Deployment finished and service is healthy
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      commit_short: ${{ steps.meta.outputs.commit_short }}
+      branch_name: ${{ steps.meta.outputs.branch_name }}
+      pipeline_url: ${{ steps.meta.outputs.pipeline_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Read metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f VERSION_INFO ]]; then
+            echo "VERSION_INFO file not found" >&2
+            exit 1
+          fi
+
+          VERSION="$(head -n 1 VERSION_INFO | tr -d '\r')"
+          COMMIT_SHORT="${GITHUB_SHA::7}"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          PIPELINE_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit_short=$COMMIT_SHORT" >> "$GITHUB_OUTPUT"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "pipeline_url=$PIPELINE_URL" >> "$GITHUB_OUTPUT"
+
+  build-and-push-api:
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to Docker Hub
+        id: docker_login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push API
+        id: api_build_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./src/Aethon.Api/Dockerfile
+          push: true
+          tags: repasscloud/aethon-api:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="API / Checkout"
+            FAILED_RESULT="Repository checkout failed"
+          elif [[ "${{ steps.docker_login.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="API / Docker login"
+            FAILED_RESULT="Failed to authenticate to Docker Hub"
+          elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="API / Buildx"
+            FAILED_RESULT="Failed to initialise Docker Buildx"
+          elif [[ "${{ steps.api_build_push.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="API / Build and push"
+            FAILED_RESULT="Failed building or pushing ./src/Aethon.Api/Dockerfile"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  build-and-push-builder:
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to Docker Hub
+        id: docker_login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Ensure builder image exists
+        id: ensure_builder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! docker pull repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0; then
+            chmod +x .docker/build.sh
+            .docker/build.sh
+          fi
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Builder / Checkout"
+            FAILED_RESULT="Repository checkout failed"
+          elif [[ "${{ steps.docker_login.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Builder / Docker login"
+            FAILED_RESULT="Failed to authenticate to Docker Hub"
+          elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Builder / Buildx"
+            FAILED_RESULT="Failed to initialise Docker Buildx"
+          elif [[ "${{ steps.ensure_builder.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Builder / Ensure builder image exists"
+            FAILED_RESULT="Failed pulling or building repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  build-and-push-web:
+    needs: build-and-push-builder
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to Docker Hub
+        id: docker_login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Ensure builder image exists
+        id: ensure_builder
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! docker pull repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0; then
+            chmod +x .docker/build.sh
+            .docker/build.sh
+          fi
+
+      - name: Build and push Web
+        id: web_build_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./src/Aethon.Web/Dockerfile
+          push: true
+          tags: repasscloud/aethon-web:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Web / Checkout"
+            FAILED_RESULT="Repository checkout failed"
+          elif [[ "${{ steps.docker_login.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Web / Docker login"
+            FAILED_RESULT="Failed to authenticate to Docker Hub"
+          elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Web / Buildx"
+            FAILED_RESULT="Failed to initialise Docker Buildx"
+          elif [[ "${{ steps.ensure_builder.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Web / Ensure builder image exists"
+            FAILED_RESULT="Failed pulling or building repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0"
+          elif [[ "${{ steps.web_build_push.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Web / Build and push"
+            FAILED_RESULT="Failed building or pushing ./src/Aethon.Web/Dockerfile"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  build-and-push-maintenance:
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Log in to Docker Hub
+        id: docker_login
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push Dev Maintenance Page
+        id: dev_maintenance_build_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./src/Maintenance/Dockerfile
+          push: true
+          tags: repasscloud/aethon-web-maintenance:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Maintenance / Checkout"
+            FAILED_RESULT="Repository checkout failed"
+          elif [[ "${{ steps.docker_login.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Maintenance / Docker login"
+            FAILED_RESULT="Failed to authenticate to Docker Hub"
+          elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Maintenance / Buildx"
+            FAILED_RESULT="Failed to initialise Docker Buildx"
+          elif [[ "${{ steps.dev_maintenance_build_push.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Maintenance / Build and push"
+            FAILED_RESULT="Failed building or pushing ./src/Maintenance/Dockerfile"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  deploy-to-dev:
+    needs: [build-and-push-api, build-and-push-web, build-and-push-maintenance]
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Deploy via SSHx
+        id: deploy_sshx
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ARG=""
+          if grep -qi "^refresh$" .deployment 2>/dev/null; then
+            DEPLOY_ARG="refresh"
+          fi
+
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > private_key
+          chmod 600 private_key
+
+          ssh -i private_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash ${{ secrets.DEPLOY_SCRIPT_PATH }} $DEPLOY_ARG"
+
+          rm -f private_key
+
+      - name: Deploy via SSH
+        id: deploy_ssh
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          DEPLOY_SCRIPT_PATH: ${{ secrets.DEPLOY_SCRIPT_PATH }}
+          SEED_LOGIN_USER: ${{ secrets.SEED_LOGIN_USER }}
+          SEED_LOGIN_PASSWORD: ${{ secrets.SEED_LOGIN_PASSWORD }}
+          SUPABASE_PGSQL_ADMIN_PASSWORD: ${{ secrets.SUPABASE_PGSQL_ADMIN_PASSWORD }}
+          SEED_REPO_DIR: ${{ secrets.SEED_REPO_DIR }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_MODE=""
+          if [[ -f .deployment ]]; then
+            DEPLOY_MODE="$(head -n 1 .deployment | tr -d '\r' | xargs)"
+          fi
+
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' > private_key
+          chmod 600 private_key
+
+          if [[ "${DEPLOY_MODE,,}" == "refresh" ]]; then
+            ssh -i private_key \
+              -o StrictHostKeyChecking=no \
+              "$SSH_USER@$SSH_HOST" \
+              "/bin/bash \"$DEPLOY_SCRIPT_PATH\" \
+                --refresh \
+                --branch dev \
+                --repo-dir \"$SEED_REPO_DIR\" \
+                --username \"$SEED_LOGIN_USER\" \
+                --password \"$SEED_LOGIN_PASSWORD\" \
+                --sql-password \"$SUPABASE_PGSQL_ADMIN_PASSWORD\" \
+                --api-base-url \"https://dev-api.aethonjobs.com/api/v1\" \
+                --stripe-api-base-url \"https://dev-api.aethonsoftware.com/api/v1\" \
+                --email-settings-file \"$SEED_REPO_DIR/email-settings.env\" \
+                --stripe-settings-file \"$SEED_REPO_DIR/stripe-settings.env\" \
+                --locations-file \"$SEED_REPO_DIR/src/Aethon.Web/wwwroot/_data/_geodata/AU.geoname.json\""
+          else
+            ssh -i private_key \
+              -o StrictHostKeyChecking=no \
+              "$SSH_USER@$SSH_HOST" \
+              "/bin/bash \"$DEPLOY_SCRIPT_PATH\" \
+                --branch dev \
+                --repo-dir \"$SEED_REPO_DIR\""
+          fi
+
+          rm -f private_key
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Deploy / Checkout"
+            FAILED_RESULT="Repository checkout failed"
+          elif [[ "${{ steps.deploy_ssh.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Deploy / SSH"
+            FAILED_RESULT="Remote deployment script failed over SSH"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  trigger-remote-import:
+    needs: deploy-to-dev
+    runs-on: ubuntu-latest
+    outputs:
+      failed_stage: ${{ steps.capture.outputs.failed_stage }}
+      failed_result: ${{ steps.capture.outputs.failed_result }}
+    steps:
+      - name: Trigger remote import workflow
+        id: trigger_import
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh workflow run import.yml \
+            --repo repasscloud/aethon-software-import-data \
+            --ref main
+
+      - name: Capture failure metadata
+        id: capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ steps.trigger_import.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Remote Import / Trigger workflow"
+            FAILED_RESULT="Failed to trigger repasscloud/aethon-software-import-data import.yml"
+          fi
+
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+  notify:
+    needs:
+      - metadata
+      - build-and-push-api
+      - build-and-push-builder
+      - build-and-push-web
+      - build-and-push-maintenance
+      - deploy-to-dev
+      - trigger-remote-import
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Evaluate pipeline result
+        id: evaluate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PIPELINE_STATUS="success"
+          FAILED_STAGE=""
+          FAILED_RESULT=""
+
+          if [[ "${{ needs.metadata.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="Metadata / Read VERSION_INFO"
+            FAILED_RESULT="Failed reading VERSION_INFO or git metadata"
+          elif [[ "${{ needs.build-and-push-api.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.build-and-push-api.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.build-and-push-api.outputs.failed_result }}"
+          elif [[ "${{ needs.build-and-push-builder.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.build-and-push-builder.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.build-and-push-builder.outputs.failed_result }}"
+          elif [[ "${{ needs.build-and-push-web.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.build-and-push-web.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.build-and-push-web.outputs.failed_result }}"
+          elif [[ "${{ needs.build-and-push-maintenance.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.build-and-push-maintenance.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.build-and-push-maintenance.outputs.failed_result }}"
+          elif [[ "${{ needs.deploy-to-dev.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.deploy-to-dev.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.deploy-to-dev.outputs.failed_result }}"
+          elif [[ "${{ needs.trigger-remote-import.result }}" == "failure" ]]; then
+            PIPELINE_STATUS="failure"
+            FAILED_STAGE="${{ needs.trigger-remote-import.outputs.failed_stage }}"
+            FAILED_RESULT="${{ needs.trigger-remote-import.outputs.failed_result }}"
+          fi
+
+          echo "pipeline_status=$PIPELINE_STATUS" >> "$GITHUB_OUTPUT"
+          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
+          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
+
+      - name: Send success adaptive card to Power Automate webhook
+        if: steps.evaluate.outputs.pipeline_status == 'success'
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_MSTEAMS_DEPLOY_NOTIFY }}
+        run: |
+          set -euo pipefail
+
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data-binary @- <<EOF
+          {
+            "type": "AdaptiveCard",
+            "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4",
+            "msteams": {
+              "width": "Full"
+            },
+            "body": [
+              {
+                "type": "Container",
+                "style": "emphasis",
+                "bleed": true,
+                "items": [
+                  {
+                    "type": "ColumnSet",
+                    "columns": [
+                      {
+                        "type": "Column",
+                        "width": "auto",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "↗",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "color": "Accent"
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      },
+                      {
+                        "type": "Column",
+                        "width": "stretch",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "Deployment Notification",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "wrap": true
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      },
+                      {
+                        "type": "Column",
+                        "width": "auto",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "Completed",
+                            "color": "Accent",
+                            "weight": "Bolder",
+                            "horizontalAlignment": "Right"
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "Container",
+                "spacing": "Medium",
+                "items": [
+                  {
+                    "type": "FactSet",
+                    "facts": [
+                      { "title": "Application", "value": "${APPLICATION}" },
+                      { "title": "Environment", "value": "${DEPLOY_ENVIRONMENT}" },
+                      { "title": "Version", "value": "${{ needs.metadata.outputs.version }}" },
+                      { "title": "Branch", "value": "${{ needs.metadata.outputs.branch_name }}" },
+                      { "title": "Commit", "value": "${{ needs.metadata.outputs.commit_short }}" },
+                      { "title": "Result", "value": "${RESULT_SUCCESS}" }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "actions": [
+              {
+                "type": "Action.OpenUrl",
+                "title": "Pipeline",
+                "url": "${{ needs.metadata.outputs.pipeline_url }}"
+              }
+            ]
+          }
+          EOF
+
+      - name: Send failure adaptive card to Power Automate webhook
+        if: steps.evaluate.outputs.pipeline_status == 'failure'
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_MSTEAMS_DEPLOY_NOTIFY }}
+        run: |
+          set -euo pipefail
+
+          curl -sS -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            --data-binary @- <<EOF
+          {
+            "type": "AdaptiveCard",
+            "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4",
+            "msteams": {
+              "width": "Full"
+            },
+            "body": [
+              {
+                "type": "Container",
+                "style": "attention",
+                "bleed": true,
+                "items": [
+                  {
+                    "type": "ColumnSet",
+                    "columns": [
+                      {
+                        "type": "Column",
+                        "width": "auto",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "!",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "color": "Warning"
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      },
+                      {
+                        "type": "Column",
+                        "width": "stretch",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "Deployment Failed",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "wrap": true
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      },
+                      {
+                        "type": "Column",
+                        "width": "auto",
+                        "items": [
+                          {
+                            "type": "TextBlock",
+                            "text": "Action required",
+                            "color": "Warning",
+                            "weight": "Bolder",
+                            "horizontalAlignment": "Right"
+                          }
+                        ],
+                        "verticalContentAlignment": "Center"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "Container",
+                "spacing": "Medium",
+                "items": [
+                  {
+                    "type": "TextBlock",
+                    "text": "The pipeline completed with a failure state. Deployment did not finish successfully and requires review before retrying.",
+                    "wrap": true
+                  },
+                  {
+                    "type": "FactSet",
+                    "facts": [
+                      { "title": "Application", "value": "${APPLICATION}" },
+                      { "title": "Environment", "value": "${DEPLOY_ENVIRONMENT}" },
+                      { "title": "Version", "value": "${{ needs.metadata.outputs.version }}" },
+                      { "title": "Branch", "value": "${{ needs.metadata.outputs.branch_name }}" },
+                      { "title": "Commit", "value": "${{ needs.metadata.outputs.commit_short }}" },
+                      { "title": "Stage", "value": "${{ steps.evaluate.outputs.failed_stage }}" },
+                      { "title": "Result", "value": "${{ steps.evaluate.outputs.failed_result }}" }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "actions": [
+              {
+                "type": "Action.OpenUrl",
+                "title": "View Pipeline",
+                "url": "${{ needs.metadata.outputs.pipeline_url }}"
+              }
+            ]
+          }
+          EOF
+
+      - name: Fail workflow after notification
+        if: steps.evaluate.outputs.pipeline_status == 'failure'
+        shell: bash
+        run: |
+          echo "Pipeline failed at stage: ${{ steps.evaluate.outputs.failed_stage }}" >&2
+          exit 1

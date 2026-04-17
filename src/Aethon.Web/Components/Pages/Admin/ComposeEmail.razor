@@ -1,0 +1,331 @@
+@page "/admin/compose-email"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Compose Email | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h4 class="fw-bold mb-1">Compose Email</h4>
+                <p class="text-secondary small mb-0">Send a custom email to any user using the Aethon branded template.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_resultMsg))
+        {
+            <div class="alert @(_resultSuccess ? "alert-success" : "alert-danger") rounded-4 py-3">
+                @_resultMsg
+            </div>
+        }
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+
+                <!-- Recipient -->
+                <div>
+                    <label class="form-label fw-semibold small mb-1">Recipient</label>
+                    @if (_locked && _selectedUser is not null)
+                    {
+                        <div class="d-flex align-items-center gap-2 p-2 border rounded-3 bg-light">
+                            <i class="bi bi-lock-fill text-secondary small"></i>
+                            <span class="fw-semibold">@_selectedUser.DisplayName</span>
+                            <span class="text-secondary small">@_selectedUser.Email</span>
+                            <span class="badge @UserTypeBadgeClass(_selectedUser.UserType) ms-1">@_selectedUser.UserType</span>
+                            @if (!string.IsNullOrEmpty(_selectedUser.OrganisationName))
+                            {
+                                <span class="text-muted small">· @_selectedUser.OrganisationName</span>
+                            }
+                        </div>
+                    }
+                    else if (_selectedUser is not null)
+                    {
+                        <div class="d-flex align-items-center gap-2 p-2 border rounded-3 bg-light">
+                            <span class="fw-semibold">@_selectedUser.DisplayName</span>
+                            <span class="text-secondary small">@_selectedUser.Email</span>
+                            <span class="badge @UserTypeBadgeClass(_selectedUser.UserType) ms-1">@_selectedUser.UserType</span>
+                            @if (!string.IsNullOrEmpty(_selectedUser.OrganisationName))
+                            {
+                                <span class="text-muted small">· @_selectedUser.OrganisationName</span>
+                            }
+                            <button type="button" class="btn-close ms-auto" style="font-size:0.7rem;" @onclick="ClearRecipient"></button>
+                        </div>
+                    }
+                    else
+                    {
+                        <input type="text" class="form-control form-control-sm rounded-3"
+                               placeholder="Search by name or email…"
+                               value="@_searchTerm"
+                               @oninput="OnSearchInput" />
+
+                        @if (_searchResults.Count > 0)
+                        {
+                            <div class="border rounded-3 mt-1 shadow-sm" style="max-height:260px;overflow-y:auto;">
+                                @foreach (var u in _searchResults)
+                                {
+                                    <button type="button"
+                                            class="d-flex align-items-center gap-2 w-100 text-start px-3 py-2 border-0 bg-white hover-bg-light"
+                                            style="cursor:pointer;"
+                                            @onclick="() => SelectUser(u)">
+                                        <div>
+                                            <div class="fw-semibold small">@u.DisplayName</div>
+                                            <div class="text-secondary" style="font-size:0.78rem;">@u.Email</div>
+                                        </div>
+                                        <span class="badge @UserTypeBadgeClass(u.UserType) ms-1">@u.UserType</span>
+                                        @if (!string.IsNullOrEmpty(u.OrganisationName))
+                                        {
+                                            <span class="text-muted ms-1" style="font-size:0.78rem;">· @u.OrganisationName</span>
+                                        }
+                                        @if (!u.IsEnabled)
+                                        {
+                                            <span class="badge bg-danger ms-auto">Disabled</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else if (_searchTerm.Length >= 2 && !_searching)
+                        {
+                            <div class="text-secondary small mt-1 ps-1">No users found.</div>
+                        }
+                    }
+                </div>
+
+                <!-- Subject -->
+                <div>
+                    <label class="form-label fw-semibold small mb-1">Subject</label>
+                    <input type="text" class="form-control form-control-sm rounded-3"
+                           placeholder="Email subject…"
+                           maxlength="200"
+                           @bind="_subject" />
+                </div>
+
+                <!-- Body -->
+                <div>
+                    <label class="form-label fw-semibold small mb-1">Message</label>
+                    <textarea id="compose-email-body"
+                              class="form-control rounded-3"
+                              rows="12"
+                              @bind="_htmlBody"
+                              style="font-family:monospace;font-size:0.85rem;"></textarea>
+                    <div class="text-secondary small mt-1">HTML is supported. The message will be wrapped in the standard Aethon email template.</div>
+                </div>
+
+                <!-- Send -->
+                <div class="d-flex align-items-center gap-3 pt-2">
+                    <button class="btn btn-dark rounded-3"
+                            @onclick="Send"
+                            disabled="@(_sending || _selectedUser is null || string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_htmlBody))">
+                        @if (_sending)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        <i class="bi bi-send me-1"></i> Send Email
+                    </button>
+                    @if (_selectedUser is not null && !_locked)
+                    {
+                        <span class="text-secondary small">To: <strong>@_selectedUser.Email</strong></span>
+                    }
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery] public Guid? UserId { get; set; }
+
+    private bool _isStaff;
+    private string _searchTerm = "";
+    private bool _searching;
+    private List<UserItem> _searchResults = [];
+    private UserItem? _selectedUser;
+    private bool _locked;
+
+    private string _subject = "";
+    private string _htmlBody = "";
+
+    private bool _sending;
+    private string? _resultMsg;
+    private bool _resultSuccess;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var appType = (user.FindFirstValue(AppClaimTypes.AppType) ?? "").Trim().ToLowerInvariant();
+        _isStaff = appType is "superadmin" or "admin" or "support";
+
+        if (!_isStaff) return;
+
+        if (UserId.HasValue && UserId.Value != Guid.Empty)
+        {
+            var client = await Api.CreateAsync();
+            try
+            {
+                var result = await client.GetFromJsonAsync<UserDetailDto>($"/api/v1/admin/users/{UserId.Value}");
+                if (result is not null)
+                {
+                    _selectedUser = new UserItem
+                    {
+                        Id               = result.Id,
+                        Email            = result.Email ?? "",
+                        DisplayName      = result.DisplayName ?? "",
+                        UserType         = result.UserType ?? "",
+                        IsEnabled        = result.IsEnabled,
+                        OrganisationName = result.Memberships?.FirstOrDefault()?.OrganisationName
+                    };
+                    _locked = true;
+                }
+            }
+            catch { /* user not found — leave picker empty */ }
+        }
+    }
+
+    private System.Threading.CancellationTokenSource? _searchCts;
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _searchTerm = e.Value?.ToString() ?? "";
+        _searchResults = [];
+
+        if (_searchTerm.Length < 2) return;
+
+        _searchCts?.Cancel();
+        _searchCts = new System.Threading.CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        await Task.Delay(250, token).ContinueWith(async t =>
+        {
+            if (t.IsCanceled) return;
+            _searching = true;
+            await InvokeAsync(StateHasChanged);
+            try
+            {
+                var client = await Api.CreateAsync();
+                var resp = await client.GetFromJsonAsync<UserListDto>(
+                    $"/api/v1/admin/users?search={Uri.EscapeDataString(_searchTerm)}&page=1", token);
+                if (resp?.Items is not null)
+                    _searchResults = resp.Items.Take(10).ToList();
+            }
+            catch { _searchResults = []; }
+            finally
+            {
+                _searching = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }, TaskScheduler.Default);
+    }
+
+    private void SelectUser(UserItem u)
+    {
+        _selectedUser = u;
+        _searchTerm = "";
+        _searchResults = [];
+    }
+
+    private void ClearRecipient()
+    {
+        _selectedUser = null;
+        _searchTerm = "";
+        _searchResults = [];
+    }
+
+    private async Task Send()
+    {
+        if (_selectedUser is null) return;
+        _sending = true;
+        _resultMsg = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var resp = await client.PostAsJsonAsync("/api/v1/admin/compose-email", new
+            {
+                UserId   = _selectedUser.Id,
+                Subject  = _subject,
+                HtmlBody = _htmlBody
+            });
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _resultSuccess = true;
+                _resultMsg = $"Email sent to {_selectedUser.DisplayName} ({_selectedUser.Email}).";
+                _subject = "";
+                _htmlBody = "";
+                if (!_locked) _selectedUser = null;
+            }
+            else
+            {
+                var body = await resp.Content.ReadAsStringAsync();
+                _resultSuccess = false;
+                _resultMsg = resp.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable
+                    ? "Support From Email is not configured. Set it in Admin → Settings."
+                    : $"Failed to send email ({(int)resp.StatusCode}). {body}";
+            }
+        }
+        catch
+        {
+            _resultSuccess = false;
+            _resultMsg = "An error occurred while sending. Please try again.";
+        }
+        finally { _sending = false; }
+    }
+
+    private static string UserTypeBadgeClass(string? userType) => (userType ?? "").ToLowerInvariant() switch
+    {
+        "superadmin" => "bg-danger",
+        "admin"      => "bg-warning text-dark",
+        "support"    => "bg-secondary",
+        "company"    => "bg-primary",
+        "recruiter"  => "bg-info text-dark",
+        "jobseeker"  => "bg-success",
+        _            => "bg-light text-dark"
+    };
+
+    private sealed class UserItem
+    {
+        public Guid   Id               { get; set; }
+        public string Email            { get; set; } = "";
+        public string DisplayName      { get; set; } = "";
+        public string UserType         { get; set; } = "";
+        public bool   IsEnabled        { get; set; }
+        public string? OrganisationName { get; set; }
+    }
+
+    private sealed class UserListDto
+    {
+        public List<UserItem> Items { get; set; } = [];
+    }
+
+    private sealed class UserDetailDto
+    {
+        public Guid    Id          { get; set; }
+        public string? Email       { get; set; }
+        public string? DisplayName { get; set; }
+        public string? UserType    { get; set; }
+        public bool    IsEnabled   { get; set; }
+        public List<MembershipDto>? Memberships { get; set; }
+    }
+
+    private sealed class MembershipDto
+    {
+        public string? OrganisationName { get; set; }
+    }
+}

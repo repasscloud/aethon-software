@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="80" x2="1000" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0e2430"/>
+      <stop offset="1" stop-color="#0072a8"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="360" y1="220" x2="720" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7ae0ff"/>
+      <stop offset="1" stop-color="#36b7ff"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="1080" rx="80" fill="url(#bg)"/>
+  <rect x="45" y="45" width="990" height="990" rx="55" stroke="rgba(255,255,255,0.10)" stroke-width="4"/>
+  <circle cx="540" cy="370" r="190" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="540" cy="370" r="145" fill="#7ae0ff" opacity="0.12" filter="url(#softGlow)"/>
+
+  
+  <g>
+    <rect x="365" y="235" width="290" height="220" rx="38" fill="url(#accent)"/>
+    <path d="M500 293L590 345L500 397V293Z" fill="#F8F7F2"/>
+    <path d="M655 295L750 245V445L655 395V295Z" fill="url(#accent)" opacity="0.86"/>
+  </g>
+
+
+  <text x="540" y="790" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="500" fill="#F5F4EF" letter-spacing="-1">VIDEO</text>
+  <text x="540" y="865" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="400" fill="#EAE7DD" letter-spacing="4">ATTACHMENT</text>
+</svg>

@@ -1,0 +1,269 @@
+@page "/account/setup-mfa"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Two-Factor Authentication | Aethon</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="h4 fw-bold mb-1">Two-Factor Authentication</h2>
+
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert-danger rounded-3 mt-3">@_error</div>
+                    }
+                    @if (!string.IsNullOrEmpty(_success))
+                    {
+                        <div class="alert alert-success rounded-3 mt-3">@_success</div>
+                    }
+
+                    @if (_loading)
+                    {
+                        <p class="text-secondary mt-3">Loading...</p>
+                    }
+                    else if (_mfaEnabled && !_showSetup)
+                    {
+                        <p class="text-secondary mb-4">Two-factor authentication is currently <strong class="text-success">enabled</strong>.</p>
+                        <button class="btn btn-outline-danger rounded-3" @onclick="DisableMfa" disabled="@_saving">
+                            @(_saving ? "Disabling..." : "Disable Two-Factor Auth")
+                        </button>
+                    }
+                    else
+                    {
+                        @if (_mustEnable)
+                        {
+                            <div class="alert alert-warning rounded-3 mt-3">
+                                You are required to enable two-factor authentication before continuing.
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-secondary mb-4">
+                                Secure your account with an authenticator app (e.g. Google Authenticator, Authy).
+                            </p>
+                        }
+
+                        @if (!string.IsNullOrEmpty(_qrCodeBase64))
+                        {
+                            <div class="mb-3">
+                                <p class="fw-semibold mb-2">1. Scan this QR code with your authenticator app:</p>
+                                <div class="border rounded-3 p-3 d-inline-block bg-white">
+                                    <img src="data:image/png;base64,@_qrCodeBase64" alt="TOTP QR code" style="width: 200px; height: 200px;" />
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <p class="fw-semibold mb-2">2. Enter the 6-digit code from your app:</p>
+                                <input type="text"
+                                       class="form-control rounded-3"
+                                       style="max-width: 200px; letter-spacing: 0.2em; font-size: 1.2rem;"
+                                       maxlength="6"
+                                       inputmode="numeric"
+                                       placeholder="000000"
+                                       @bind="_totpCode" />
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-dark rounded-3" @onclick="VerifyAndEnable" disabled="@_saving">
+                                    @(_saving ? "Verifying..." : "Enable Two-Factor Auth")
+                                </button>
+                                @if (!_mustEnable)
+                                {
+                                    <button class="btn btn-outline-secondary rounded-3" @onclick="CancelSetup">Cancel</button>
+                                }
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-link btn-sm text-secondary p-0" @onclick="RegenerateKey" disabled="@_saving">
+                                    QR code not working? Generate a new one
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button class="btn btn-dark rounded-3" @onclick="StartSetup" disabled="@_saving">
+                                @(_saving ? "Loading..." : "Set up Two-Factor Auth")
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private bool _mfaEnabled;
+    private bool _mustEnable;
+    private bool _showSetup;
+    private string? _qrCodeBase64;
+    private string _totpCode = "";
+    private string? _error;
+    private string? _success;
+    private string? _token;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _mustEnable = user.FindFirstValue(AppClaimTypes.MustEnableMfa) == "true";
+        _token = user.FindFirstValue("access_token");
+
+        // Check current MFA status from API
+        try
+        {
+            var client = CreateApiClient();
+            var resp = await client.GetFromJsonAsync<MfaStatusResponse>("/api/v1/auth/mfa/status");
+            _mfaEnabled = resp?.TwoFactorEnabled == true;
+        }
+        catch
+        {
+            _mfaEnabled = false;
+        }
+
+        if (_mustEnable && !_mfaEnabled)
+            await StartSetup();
+
+        _loading = false;
+    }
+
+    private async Task StartSetup()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var client = CreateApiClient();
+            var resp = await client.GetFromJsonAsync<MfaSetupResponse>("/api/v1/auth/mfa/setup");
+            if (resp is not null)
+            {
+                _qrCodeBase64 = resp.QrCodeBase64;
+                _showSetup = true;
+            }
+        }
+        catch
+        {
+            _error = "Unable to load MFA setup. Please try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task VerifyAndEnable()
+    {
+        if (string.IsNullOrWhiteSpace(_totpCode))
+        {
+            _error = "Please enter the 6-digit code.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var client = CreateApiClient();
+            var response = await client.PostAsJsonAsync("/api/v1/auth/mfa/setup", new { code = _totpCode });
+            if (response.IsSuccessStatusCode)
+            {
+                _success = "Two-factor authentication enabled. You will be signed out to refresh your session.";
+                await Task.Delay(1500);
+                NavigationManager.NavigateTo("/account/signout?reason=" + Uri.EscapeDataString("MFA enabled. Please sign in again."), forceLoad: true);
+            }
+            else
+            {
+                _error = "Invalid code. Please try again.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to verify code. Please try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DisableMfa()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var client = CreateApiClient();
+            var response = await client.DeleteAsync("/api/v1/auth/mfa");
+            if (response.IsSuccessStatusCode)
+            {
+                _success = "Two-factor authentication disabled.";
+                _mfaEnabled = false;
+                _showSetup = false;
+            }
+            else
+            {
+                _error = "Failed to disable two-factor authentication.";
+            }
+        }
+        catch
+        {
+            _error = "Unable to reach authentication service.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task RegenerateKey()
+    {
+        _saving = true;
+        _error = null;
+        _totpCode = "";
+        try
+        {
+            var client = CreateApiClient();
+            await client.PostAsync("/api/v1/auth/mfa/setup/reset-key", null);
+            // Now fetch the fresh key + QR code
+            var resp = await client.GetFromJsonAsync<MfaSetupResponse>("/api/v1/auth/mfa/setup");
+            if (resp is not null)
+                _qrCodeBase64 = resp.QrCodeBase64;
+        }
+        catch
+        {
+            _error = "Unable to regenerate key. Please try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void CancelSetup()
+    {
+        _qrCodeBase64 = null;
+        _totpCode = "";
+        _showSetup = false;
+        _error = null;
+    }
+
+    private System.Net.Http.HttpClient CreateApiClient()
+    {
+        var client = HttpClientFactory.CreateClient("AethonApiBase");
+        if (!string.IsNullOrEmpty(_token))
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _token);
+        return client;
+    }
+
+    private record MfaStatusResponse(bool TwoFactorEnabled);
+    private record MfaSetupResponse(string QrCodeBase64, string ManualEntryKey);
+}

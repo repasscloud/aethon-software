@@ -1,0 +1,238 @@
+@page "/company/recruiters/pending"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Aethon.Shared.CompanyRecruiters
+@using Aethon.Shared.RecruiterCompanies
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
+
+<PageTitle>Pending recruiter requests | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-1">Pending recruiter requests</h1>
+            <p class="text-secondary mb-0">Review inbound requests from recruiter agencies.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_pageError))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_pageError</div>
+    }
+
+    @if (_items is null)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">Loading…</div>
+        </div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <p class="text-secondary mb-0">No pending recruiter requests.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        @foreach (var item in _items)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-1">@item.RecruiterOrganisationName</h5>
+                    @if (!string.IsNullOrWhiteSpace(item.Notes))
+                    {
+                        <p class="text-secondary mb-3">@item.Notes</p>
+                    }
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-lg-6">
+                            <h6 class="fw-semibold mb-2">Grant permissions</h6>
+                            @foreach (var (label, getter, setter) in GetPermissions(item))
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           checked="@getter()"
+                                           @onchange="e => setter((bool)(e.Value ?? false))" />
+                                    <label class="form-check-label">@label</label>
+                                </div>
+                            }
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Approval notes (optional)</label>
+                                <textarea class="form-control rounded-3" rows="2"
+                                          @bind="item.ApprovalNotes"></textarea>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold">Rejection reason (optional)</label>
+                                <textarea class="form-control rounded-3" rows="2"
+                                          @bind="item.RejectReason"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-dark rounded-4 px-4"
+                                @onclick="() => ApproveAsync(item)"
+                                disabled="@_busy">
+                            Approve
+                        </button>
+                        <button class="btn btn-outline-danger rounded-4 px-4"
+                                @onclick="() => RejectAsync(item)"
+                                disabled="@_busy">
+                            Reject
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<RowModel>? _items;
+    private string? _pageError;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _pageError = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<List<RecruiterCompanyRelationshipDto>>("/api/v1/company/recruiters/pending", AethonApiClient.JsonOptions) ?? [];
+
+            _items = result.Select(x => new RowModel
+            {
+                Id = x.Id,
+                RecruiterOrganisationName = x.RecruiterOrganisationName,
+                Notes = x.Notes,
+                RecruiterCanCreateUnclaimedCompanyJobs = x.RecruiterCanCreateUnclaimedCompanyJobs,
+                RecruiterCanPublishJobs = x.RecruiterCanPublishJobs,
+                RecruiterCanManageCandidates = x.RecruiterCanManageCandidates
+            }).ToList();
+        }
+        catch
+        {
+            _pageError = "Could not load pending recruiter requests.";
+            _items = [];
+        }
+    }
+
+    private async Task ApproveAsync(RowModel item)
+    {
+        _busy = true;
+        _pageError = null;
+        try
+        {
+            var request = new ApproveRecruiterCompanyRequestDto
+            {
+                AllowCreateDraftJobs = item.AllowCreateDraftJobs,
+                AllowSubmitJobsForApproval = item.AllowSubmitJobsForApproval,
+                AllowManageApprovedJobs = item.AllowManageApprovedJobs,
+                AllowViewCandidates = item.AllowViewCandidates,
+                AllowSubmitCandidates = item.AllowSubmitCandidates,
+                AllowCommunicateWithCandidates = item.AllowCommunicateWithCandidates,
+                AllowScheduleInterviews = item.AllowScheduleInterviews,
+                AllowPublishJobs = item.AllowPublishJobs,
+                RecruiterCanCreateUnclaimedCompanyJobs = item.RecruiterCanCreateUnclaimedCompanyJobs,
+                RecruiterCanPublishJobs = item.RecruiterCanPublishJobs,
+                RecruiterCanManageCandidates = item.RecruiterCanManageCandidates,
+                Notes = item.ApprovalNotes
+            };
+
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync($"/api/v1/company/recruiters/{item.Id}/approve", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = "Could not approve request.";
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch
+        {
+            _pageError = "Could not approve request.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RejectAsync(RowModel item)
+    {
+        _busy = true;
+        _pageError = null;
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync(
+                $"/api/v1/company/recruiters/{item.Id}/reject",
+                new RejectRecruiterCompanyRequestDto { Reason = item.RejectReason });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _pageError = "Could not reject request.";
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch
+        {
+            _pageError = "Could not reject request.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static IEnumerable<(string Label, Func<bool> Getter, Action<bool> Setter)> GetPermissions(RowModel item)
+    {
+        yield return ("Create draft jobs", () => item.AllowCreateDraftJobs, v => item.AllowCreateDraftJobs = v);
+        yield return ("Submit jobs for approval", () => item.AllowSubmitJobsForApproval, v => item.AllowSubmitJobsForApproval = v);
+        yield return ("Manage approved jobs", () => item.AllowManageApprovedJobs, v => item.AllowManageApprovedJobs = v);
+        yield return ("View candidates", () => item.AllowViewCandidates, v => item.AllowViewCandidates = v);
+        yield return ("Submit candidates", () => item.AllowSubmitCandidates, v => item.AllowSubmitCandidates = v);
+        yield return ("Communicate with candidates", () => item.AllowCommunicateWithCandidates, v => item.AllowCommunicateWithCandidates = v);
+        yield return ("Schedule interviews", () => item.AllowScheduleInterviews, v => item.AllowScheduleInterviews = v);
+        yield return ("Publish jobs", () => item.AllowPublishJobs, v => item.AllowPublishJobs = v);
+        yield return ("Create unclaimed company jobs", () => item.RecruiterCanCreateUnclaimedCompanyJobs, v => item.RecruiterCanCreateUnclaimedCompanyJobs = v);
+        yield return ("Agency can publish jobs", () => item.RecruiterCanPublishJobs, v => item.RecruiterCanPublishJobs = v);
+        yield return ("Agency can manage candidates", () => item.RecruiterCanManageCandidates, v => item.RecruiterCanManageCandidates = v);
+    }
+
+    private sealed class RowModel
+    {
+        public Guid Id { get; set; }
+        public string RecruiterOrganisationName { get; set; } = string.Empty;
+        public string? Notes { get; set; }
+
+        public bool AllowCreateDraftJobs { get; set; }
+        public bool AllowSubmitJobsForApproval { get; set; }
+        public bool AllowManageApprovedJobs { get; set; }
+        public bool AllowViewCandidates { get; set; }
+        public bool AllowSubmitCandidates { get; set; }
+        public bool AllowCommunicateWithCandidates { get; set; }
+        public bool AllowScheduleInterviews { get; set; }
+        public bool AllowPublishJobs { get; set; }
+
+        public bool RecruiterCanCreateUnclaimedCompanyJobs { get; set; }
+        public bool RecruiterCanPublishJobs { get; set; }
+        public bool RecruiterCanManageCandidates { get; set; }
+
+        public string? ApprovalNotes { get; set; }
+        public string? RejectReason { get; set; }
+    }
+}
+

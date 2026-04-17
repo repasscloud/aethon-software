@@ -1,0 +1,82 @@
+@page "/login/two-factor"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@inject NavigationManager NavigationManager
+
+<PageTitle>Verify Identity | Aethon</PageTitle>
+
+<div class="container-fluid login-shell py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-sm-10 col-md-7 col-lg-5 col-xl-4">
+            <div class="card border-0 shadow-lg rounded-4">
+                <div class="card-body p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
+                             style="width: 64px; height: 64px; font-size: 1.4rem; font-weight: 700;">
+                            A
+                        </div>
+                        <h2 class="h4 fw-bold mb-1">Two-Factor Verification</h2>
+                        <p class="text-secondary small mb-0">Enter the 6-digit code from your authenticator app.</p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert-danger rounded-3 mb-3">@_error</div>
+                    }
+
+                    <form method="post" action="/account/verify-2fa">
+                        <input type="hidden" name="ticket" value="@_ticket" />
+                        <input type="hidden" name="returnPath" value="@_returnPath" />
+
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Verification Code</label>
+                            <input name="code"
+                                   type="text"
+                                   inputmode="numeric"
+                                   maxlength="6"
+                                   autocomplete="one-time-code"
+                                   class="form-control form-control-lg rounded-4 text-center"
+                                   style="letter-spacing: 0.3em; font-size: 1.4rem; min-height: 58px;"
+                                   placeholder="000000"
+                                   required />
+                        </div>
+
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-dark btn-lg rounded-4" style="min-height: 58px;">
+                                Verify
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center">
+                        <a href="/login" class="small text-secondary text-decoration-none">Back to sign in</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _ticket = "";
+    private string _returnPath = "";
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("ticket", out var ticket))
+            _ticket = ticket.ToString();
+        if (query.TryGetValue("returnPath", out var rp))
+            _returnPath = rp.ToString();
+        if (query.TryGetValue("error", out var error))
+            _error = error.ToString();
+
+        if (string.IsNullOrEmpty(_ticket))
+            NavigationManager.NavigateTo("/login");
+    }
+}

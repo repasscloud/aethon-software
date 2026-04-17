@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="80" x2="1000" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2b2020"/>
+      <stop offset="1" stop-color="#7c3333"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="360" y1="220" x2="720" y2="620" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffb388"/>
+      <stop offset="1" stop-color="#ff7a7a"/>
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="1080" rx="80" fill="url(#bg)"/>
+  <rect x="45" y="45" width="990" height="990" rx="55" stroke="rgba(255,255,255,0.10)" stroke-width="4"/>
+  <circle cx="540" cy="370" r="190" fill="rgba(255,255,255,0.06)"/>
+  <circle cx="540" cy="370" r="145" fill="#ffb388" opacity="0.12" filter="url(#softGlow)"/>
+
+  
+  <g>
+    <path d="M620 220C620 185 592 157 557 157H523C488 157 460 185 460 220V258L412 332C401 349 413 372 433 372H647C667 372 679 349 668 332L620 258V220Z" fill="url(#accent)"/>
+    <path d="M540 372V562" stroke="#F8F7F2" stroke-width="28" stroke-linecap="round"/>
+    <circle cx="540" cy="560" r="34" fill="#F8F7F2"/>
+  </g>
+
+
+  <text x="540" y="790" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="500" fill="#F5F4EF" letter-spacing="-1">STICKY</text>
+  <text x="540" y="865" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="400" fill="#EAE7DD" letter-spacing="4">UNVERIFIED POST</text>
+</svg>

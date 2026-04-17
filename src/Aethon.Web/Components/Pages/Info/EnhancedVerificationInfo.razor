@@ -1,0 +1,101 @@
+@page "/info/enhanced-verification"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Enhanced Trusted Employer | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4" style="max-width:720px; margin:0 auto;">
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span style="font-size:2.5rem;"><i class="bi bi-shield-fill-check text-success"></i></span>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">Enhanced Trusted Employer</h1>
+                    <div class="text-secondary">What Enhanced Verification means</div>
+                </div>
+            </div>
+
+            <p class="lead text-secondary mb-4">
+                Provides a higher level of trust by confirming not just the business, but also the individuals
+                and operational legitimacy behind it.
+            </p>
+
+            <div class="alert alert-secondary rounded-4 mb-4 small">
+                Includes everything in <a href="/info/standard-verification" class="fw-semibold">Standard Verification</a>, plus the following additional checks.
+            </div>
+
+            <h2 class="h5 fw-bold mb-3">Additional checks</h2>
+
+            <h3 class="h6 fw-semibold mb-2">Additional business validation</h3>
+            <ul class="mb-3">
+                <li>Cross-check business registration with multiple data sources</li>
+                <li>Validate business status (active, not deregistered or struck off)</li>
+                <li>Review business history (age of entity, industry alignment)</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Representative identity verification</h3>
+            <ul class="mb-3">
+                <li>Verify identity of the person posting jobs (government ID or equivalent)</li>
+                <li>Confirm association with the business (email domain, role, or documentation)</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Operational legitimacy checks</h3>
+            <ul class="mb-3">
+                <li>Confirm company has real hiring activity</li>
+                <li>Validate consistency between job postings and business operations</li>
+                <li>Review company footprint (website depth, services, presence)</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Reputation and risk review</h3>
+            <ul class="mb-3">
+                <li>Check for negative signals (scam reports, complaints, blacklist indicators)</li>
+                <li>Monitor unusual hiring behaviour patterns</li>
+                <li>Flag inconsistencies for manual review</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Ongoing monitoring</h3>
+            <ul class="mb-3">
+                <li>Periodic re-checks of business status</li>
+                <li>Alerts for suspicious activity after approval</li>
+                <li>Ability to revoke badge if risk changes</li>
+            </ul>
+
+            <h3 class="h6 fw-semibold mb-2">Priority manual review</h3>
+            <ul class="mb-4">
+                <li>Human review before approval (not purely automated)</li>
+                <li>Faster support and escalation handling</li>
+            </ul>
+
+            <div class="alert alert-success rounded-4 mb-4">
+                <div class="fw-semibold mb-1"><i class="bi bi-shield-fill-check me-2"></i>Outcome</div>
+                <ul class="mb-0">
+                    <li>Business and representative identities are verified</li>
+                    <li>Employer has passed deeper trust and risk checks</li>
+                    <li>Higher confidence for applicants when engaging</li>
+                </ul>
+            </div>
+
+            <h2 class="h5 fw-bold mb-3">What this means for you as a candidate</h2>
+            <div class="d-flex flex-column gap-2">
+                <div class="border rounded-4 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-primary rounded-pill"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
+                        <span class="fw-semibold small">Standard</span>
+                    </div>
+                    <div class="text-secondary small">"This is a real, registered business you can contact."</div>
+                </div>
+                <div class="border rounded-4 p-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-success rounded-pill"><i class="bi bi-shield-fill-check me-1"></i>Enhanced Trusted</span>
+                        <span class="fw-semibold small">Enhanced</span>
+                    </div>
+                    <div class="text-secondary small">"This is a verified business with confirmed representatives and additional trust checks. Lower risk of fraud or misleading postings."</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="text-center">
+        <button onclick="history.back()" class="btn btn-outline-dark rounded-4 px-4"><i class="bi bi-arrow-left me-2"></i>Go back</button>
+    </div>
+</div>

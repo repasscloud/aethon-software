@@ -1,0 +1,99 @@
+@page "/recruiter/jobs"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>My jobs | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4 d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 fw-bold mb-1">My jobs</h1>
+                <p class="text-secondary mb-0">Draft and submitted jobs you manage for client companies.</p>
+            </div>
+            <button class="btn btn-dark rounded-4 px-4" @onclick="CreateNew">New draft job</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
+
+    @if (_items is null)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">Loading…</div>
+        </div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <p class="text-secondary mb-0">No jobs yet. Create a draft to get started.</p>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Company</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _items)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@item.Title</td>
+                                    <td>@item.OrganisationName</td>
+                                    <td><span class="badge bg-secondary rounded-pill">@item.Status</span></td>
+                                    <td>
+                                        <a class="btn btn-outline-secondary btn-sm rounded-3"
+                                           href="/recruiter/jobs/edit/@item.Id">
+                                            Edit
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<JobSummaryDto>? _items;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            _items = await client.GetFromJsonAsync<List<JobSummaryDto>>("/api/v1/recruiter/jobs", AethonApiClient.JsonOptions) ?? [];
+        }
+        catch
+        {
+            _error = "Could not load jobs.";
+            _items = [];
+        }
+    }
+
+    private void CreateNew() => Nav.NavigateTo("/recruiter/jobs/create");
+}

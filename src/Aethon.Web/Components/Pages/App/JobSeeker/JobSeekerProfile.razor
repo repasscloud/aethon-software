@@ -1,0 +1,1125 @@
+@page "/app/jobseeker/profile"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using Aethon.Shared.Candidates
+@using Aethon.Shared.Enums
+@using Aethon.Shared.Files
+@using Aethon.Shared.Jobs
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@inject AethonApiClient Api
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IConfiguration Configuration
+
+<PageTitle>Job seeker profile | Aethon</PageTitle>
+
+@if (!_loaded)
+{
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">Loading profile…</div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-3">
+                    <div>
+                        <h1 class="h3 fw-bold mb-1">Job seeker profile</h1>
+                        <p class="text-secondary mb-0">Manage your profile and resume.</p>
+                    </div>
+                    @if (_model.OpenToWork)
+                    {
+                        <span class="badge bg-success rounded-pill ms-auto" style="font-size:.85rem;">
+                            <i class="bi bi-briefcase-fill me-1"></i>Open to work
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_message))
+        {
+            <div class="alert alert-success rounded-4 mb-0">@_message</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+        }
+
+        <!-- LinkedIn verification -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div>
+                        <h2 class="h5 fw-bold mb-1">LinkedIn verification</h2>
+                        @if (_profile?.LinkedInVerifiedAt.HasValue == true)
+                        {
+                            <p class="text-secondary small mb-0">
+                                <i class="bi bi-patch-check-fill text-primary me-1"></i>
+                                Verified via LinkedIn on @_profile.LinkedInVerifiedAt.Value.ToLocalTime().ToString("dd MMM yyyy")
+                                @if (!string.IsNullOrWhiteSpace(_profile.LinkedInId))
+                                {
+                                    <span class="text-muted ms-1">(ID: @_profile.LinkedInId)</span>
+                                }
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="text-secondary small mb-0">Connect your LinkedIn account to verify your identity and auto-fill your name.</p>
+                        }
+                    </div>
+                    <button class="btn p-0 border-0 bg-transparent" @onclick="ConnectLinkedInAsync" disabled="@_connectingLinkedIn" style="line-height:0;">
+                        <img src="/img/LinkedIn-Sign-in-Small---Default-146.png"
+                             srcset="/img/LinkedIn-Sign-in-Small---Default-146.png 1x, /img/LinkedIn-Sign-In-Small---Default-292.png 2x"
+                             width="146" height="21"
+                             alt="Sign in with LinkedIn"
+                             style="cursor:pointer;" />
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile details -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Profile details</h2>
+                <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Headline</label>
+                            <InputText @bind-Value="_model.Headline" class="form-control rounded-4" placeholder="e.g. Senior .NET Developer | Azure | Blazor" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Summary</label>
+                            <RichTextEditor Value="@(_model.Summary ?? "")" ValueChanged="v => _model.Summary = string.IsNullOrWhiteSpace(v) ? null : v" />
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Current location</label>
+                            <LocationPicker
+                                LocationText="@_model.CurrentLocation"
+                                LocationTextChanged="v => _model.CurrentLocation = v"
+                                Placeholder="Start typing a city or location…" />
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">Preferred location</label>
+                            <LocationPicker
+                                LocationText="@_model.PreferredLocation"
+                                LocationTextChanged="v => _model.PreferredLocation = v"
+                                Placeholder="Start typing a preferred location…" />
+                        </div>
+
+                        <div class="col-12 col-lg-6">
+                            <label class="form-label fw-semibold">LinkedIn URL</label>
+                            <InputText @bind-Value="_model.LinkedInUrl" class="form-control rounded-4" placeholder="https://linkedin.com/in/yourprofile" />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-check">
+                                <InputCheckbox @bind-Value="_model.OpenToWork" class="form-check-input" id="openToWorkCheck" />
+                                <label class="form-check-label" for="openToWorkCheck">
+                                    Open to work
+                                    <span class="text-secondary small ms-2">— displays a badge on your public/unlisted profile</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Desired salary from</label>
+                            <InputNumber @bind-Value="_model.DesiredSalaryFrom" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Desired salary to</label>
+                            <InputNumber @bind-Value="_model.DesiredSalaryTo" class="form-control rounded-4" />
+                        </div>
+
+                        <div class="col-12 col-lg-3">
+                            <label class="form-label fw-semibold">Currency</label>
+                            <InputSelect @bind-Value="_model.DesiredSalaryCurrency" class="form-select rounded-4">
+                                <option value="">Select currency</option>
+                                <option value="@CurrencyCode.AUD">AUD</option>
+                                <option value="@CurrencyCode.USD">USD</option>
+                                <option value="@CurrencyCode.EUR">EUR</option>
+                                <option value="@CurrencyCode.GBP">GBP</option>
+                                <option value="@CurrencyCode.NZD">NZD</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_savingProfile">
+                            @(_savingProfile ? "Saving..." : "Save profile")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+
+        <!-- Privacy & public profile -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-1">Privacy &amp; public profile</h2>
+                <p class="text-secondary small mb-3">Control who can see your profile.</p>
+
+                <div class="row g-3">
+                    <div class="col-12 col-lg-4">
+                        <label class="form-label fw-semibold">Profile visibility</label>
+                        <select class="form-select rounded-4" @bind="_model.ProfileVisibility">
+                            <option value="@ProfileVisibility.Private">Private — only you and Aethon staff</option>
+                            <option value="@ProfileVisibility.Unlisted">Unlisted — employers &amp; recruiters via job applications</option>
+                            @if (_slugConfirmed)
+                            {
+                                <option value="@ProfileVisibility.Public">Public — anyone with the link or URL</option>
+                            }
+                        </select>
+                        @if (_model.ProfileVisibility == ProfileVisibility.Public && !_slugConfirmed)
+                        {
+                            <div class="form-text text-warning"><i class="bi bi-exclamation-triangle me-1"></i>You must confirm a profile URL before setting your profile to Public.</div>
+                        }
+                        <div class="form-text text-secondary mt-2">
+                            @if (_model.ProfileVisibility == ProfileVisibility.Private)
+                            {
+                                <span><i class="bi bi-lock-fill me-1"></i>Your profile is private and cannot be viewed by anyone else.</span>
+                            }
+                            else if (_model.ProfileVisibility == ProfileVisibility.Unlisted)
+                            {
+                                <span><i class="bi bi-eye-slash-fill me-1"></i>Your profile is accessible at <code>/job-seeker/@_profile?.UserId</code> — employers and recruiters can view it from your job applications.</span>
+                            }
+                            else if (_model.ProfileVisibility == ProfileVisibility.Public && _slugConfirmed)
+                            {
+                                <span><i class="bi bi-globe2 me-1"></i>Your public profile URL: <a href="/job-seeker/@_model.Slug" target="_blank">/job-seeker/@_model.Slug</a></span>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-5">
+                        <label class="form-label fw-semibold">Profile URL slug <span class="text-secondary fw-normal">(required for Public)</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text rounded-start-4 text-secondary" style="font-size:.85rem;">/job-seeker/</span>
+                            <input type="text" class="form-control"
+                                   placeholder="your-name"
+                                   value="@_model.Slug"
+                                   @oninput="OnSlugInput"
+                                   style="text-transform:lowercase;" />
+                            <button class="btn btn-outline-secondary rounded-end-4"
+                                    type="button"
+                                    @onclick="CheckSlugAsync"
+                                    disabled="@(string.IsNullOrWhiteSpace(_model.Slug) || _checkingSlug)">
+                                @(_checkingSlug ? "Checking…" : "Check availability")
+                            </button>
+                        </div>
+                        @if (_slugMessage is not null)
+                        {
+                            <div class="form-text @(_slugConfirmed ? "text-success" : "text-danger")">
+                                @if (_slugConfirmed)
+                                {
+                                    <i class="bi bi-check-circle-fill me-1"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-x-circle-fill me-1"></i>
+                                }
+                                @_slugMessage
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-text text-secondary">Use lowercase letters, numbers, and hyphens only.</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button class="btn btn-dark rounded-4 px-4" @onclick="SavePrivacyAsync" disabled="@_savingPrivacy">
+                        @(_savingPrivacy ? "Saving..." : "Save privacy settings")
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resume -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Resume</h2>
+
+                @if (_resumeFile is not null)
+                {
+                    <div class="mb-3">
+                        <div class="fw-semibold">@_resumeFile.OriginalFileName</div>
+                        <a href="@_resumeFile.DownloadUrl" target="_blank">Download current resume</a>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <InputFile OnChange="HandleResumeSelected" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                </div>
+
+                <button class="btn btn-outline-dark rounded-4 px-4" @onclick="UploadResumeAsync" disabled="@(_selectedResume is null || _uploadingResume)">
+                    @(_uploadingResume ? "Uploading..." : "Upload resume")
+                </button>
+            </div>
+        </div>
+
+        <!-- Work Experience -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Work experience</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddWorkExperience">+ Add</button>
+                </div>
+
+                @if (_workExperiences.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No work experience added yet.</p>
+                }
+
+                @foreach (var (we, idx) in _workExperiences.Select((x, i) => (x, i)))
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Job title</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="we.JobTitle" placeholder="e.g. Senior Developer" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Employer</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="we.EmployerName" placeholder="e.g. Acme Corp" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Start month</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="we.StartMonth">
+                                    <option value="0">Month</option>
+                                    @foreach (var m in Enumerable.Range(1, 12))
+                                    {
+                                        <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Start year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="we.StartYear">
+                                    <option value="0">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 50, 51).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (!we.IsCurrent)
+                            {
+                                <div class="col-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">End month</label>
+                                    <select class="form-select form-select-sm rounded-3" @bind="we.EndMonth">
+                                        <option value="">Month</option>
+                                        @foreach (var m in Enumerable.Range(1, 12))
+                                        {
+                                            <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-6 col-lg-3">
+                                    <label class="form-label small fw-semibold">End year</label>
+                                    <select class="form-select form-select-sm rounded-3" @bind="we.EndYear">
+                                        <option value="">Year</option>
+                                        @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 50, 51).Reverse())
+                                        {
+                                            <option value="@y">@y</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="current_@idx" @bind="we.IsCurrent" />
+                                    <label class="form-check-label small" for="current_@idx">Currently working here</label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-semibold">Description <span class="text-secondary fw-normal">(optional)</span></label>
+                                <textarea class="form-control form-control-sm rounded-3" rows="2" @bind="we.Description" placeholder="Brief description of responsibilities…"></textarea>
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveWorkExperienceAsync(we)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteWorkExperienceAsync(we)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Skills -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Skills</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddSkill">+ Add</button>
+                </div>
+
+                @if (_skills.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No skills added yet.</p>
+                }
+
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var skill in _skills)
+                    {
+                        <div class="d-flex align-items-center gap-1 border rounded-pill px-3 py-1">
+                            <input type="text" class="border-0 bg-transparent form-control form-control-sm p-0" style="min-width:80px;max-width:150px;" @bind="skill.Name" placeholder="Skill name" />
+                            <select class="border-0 bg-transparent form-select form-select-sm p-0" style="max-width:90px;" @bind="skill.SkillLevel">
+                                <option value="">Level</option>
+                                <option value="@SkillLevel.Beginner">Beginner</option>
+                                <option value="@SkillLevel.Intermediate">Intermediate</option>
+                                <option value="@SkillLevel.Advanced">Advanced</option>
+                                <option value="@SkillLevel.Expert">Expert</option>
+                            </select>
+                            <button class="btn btn-link btn-sm p-0 ms-1 text-success" @onclick="() => SaveSkillAsync(skill)" title="Save"><i class="bi bi-check-lg"></i></button>
+                            <button class="btn btn-link btn-sm p-0 text-danger" @onclick="() => DeleteSkillAsync(skill)" title="Remove"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Qualifications -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Qualifications</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddQualification">+ Add</button>
+                </div>
+
+                @if (_qualifications.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No qualifications added yet.</p>
+                }
+
+                @foreach (var q in _qualifications)
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Title</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="q.Title" placeholder="e.g. Bachelor of Computer Science" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Institution</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="q.Institution" placeholder="e.g. University of Sydney" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Completed year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="q.CompletedYear">
+                                    <option value="">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 60, 61).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveQualificationAsync(q)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteQualificationAsync(q)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Certificates -->
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0">Certificates</h2>
+                    <button class="btn btn-sm btn-outline-dark rounded-3" @onclick="AddCertificate">+ Add</button>
+                </div>
+
+                @if (_certificates.Count == 0)
+                {
+                    <p class="text-secondary small mb-0">No certificates added yet.</p>
+                }
+
+                @foreach (var c in _certificates)
+                {
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Certificate name</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="c.Name" placeholder="e.g. AWS Solutions Architect" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Issuing organisation</label>
+                                <input type="text" class="form-control form-control-sm rounded-3" @bind="c.IssuingOrganisation" placeholder="e.g. Amazon Web Services" />
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Issued month</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.IssuedMonth">
+                                    <option value="">Month</option>
+                                    @foreach (var m in Enumerable.Range(1, 12))
+                                    {
+                                        <option value="@m">@System.Globalization.CultureInfo.InvariantCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Issued year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.IssuedYear">
+                                    <option value="">Year</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year - 30, 31).Reverse())
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label class="form-label small fw-semibold">Expiry year</label>
+                                <select class="form-select form-select-sm rounded-3" @bind="c.ExpiryYear">
+                                    <option value="">No expiry</option>
+                                    @foreach (var y in Enumerable.Range(DateTime.UtcNow.Year, 20))
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label small fw-semibold">Credential URL <span class="text-secondary fw-normal">(optional)</span></label>
+                                <input type="url" class="form-control form-control-sm rounded-3" @bind="c.CredentialUrl" placeholder="https://..." />
+                            </div>
+                            <div class="col-12 d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-dark rounded-3" @onclick="() => SaveCertificateAsync(c)">Save</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-3" @onclick="() => DeleteCertificateAsync(c)">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_activeResumeId.HasValue)
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h5 fw-bold mb-0">Resume intelligence</h2>
+                        <button class="btn btn-sm btn-outline-secondary rounded-3"
+                                @onclick="TriggerAnalysisAsync"
+                                disabled="@_triggeringAnalysis">
+                            @(_triggeringAnalysis ? "Queued…" : "Re-analyse")
+                        </button>
+                    </div>
+
+                    @if (_analysis is null)
+                    {
+                        <p class="text-secondary mb-0">No analysis yet. Analysis runs automatically after upload, or click Re-analyse.</p>
+                    }
+                    else if (_analysis.Status == ResumeAnalysisStatus.Pending || _analysis.Status == ResumeAnalysisStatus.Processing)
+                    {
+                        <div class="d-flex align-items-center gap-2 text-secondary">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <span>Analysis in progress…</span>
+                        </div>
+                    }
+                    else if (_analysis.Status == ResumeAnalysisStatus.Failed)
+                    {
+                        <div class="alert alert-warning rounded-4 mb-0">Analysis failed. Click Re-analyse to retry.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-3">
+                            @if (!string.IsNullOrWhiteSpace(_analysis.HeadlineSuggestion))
+                            {
+                                <div>
+                                    <div class="small fw-semibold text-secondary mb-1">Suggested headline</div>
+                                    <div>@_analysis.HeadlineSuggestion</div>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_analysis.SummaryExtract))
+                            {
+                                <div>
+                                    <div class="small fw-semibold text-secondary mb-1">Summary</div>
+                                    <div class="text-secondary">@_analysis.SummaryExtract</div>
+                                </div>
+                            }
+
+                            @if (_analysis.Skills.Count > 0)
+                            {
+                                <div>
+                                    <div class="small fw-semibold text-secondary mb-2">Skills detected</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach (var skill in _analysis.Skills)
+                                        {
+                                            <span class="badge bg-light text-dark border rounded-pill px-3 py-2">@skill</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="row g-3">
+                                @if (!string.IsNullOrWhiteSpace(_analysis.ExperienceLevel))
+                                {
+                                    <div class="col-auto">
+                                        <div class="small fw-semibold text-secondary">Experience level</div>
+                                        <div>@_analysis.ExperienceLevel</div>
+                                    </div>
+                                }
+                                @if (_analysis.YearsExperience.HasValue)
+                                {
+                                    <div class="col-auto">
+                                        <div class="small fw-semibold text-secondary">Years experience</div>
+                                        <div>@_analysis.YearsExperience</div>
+                                    </div>
+                                }
+                                @if (_analysis.AnalysedUtc.HasValue)
+                                {
+                                    <div class="col-auto">
+                                        <div class="small fw-semibold text-secondary">Analysed</div>
+                                        <div class="small text-secondary">@_analysis.AnalysedUtc.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _loaded;
+    private bool _savingProfile;
+    private bool _savingPrivacy;
+    private bool _uploadingResume;
+    private bool _triggeringAnalysis;
+    private bool _checkingSlug;
+    private bool _slugConfirmed;
+    private bool _connectingLinkedIn;
+    private string? _message;
+    private string? _error;
+    private string? _slugMessage;
+    private CandidateProfileDto? _profile;
+    private UpdateJobSeekerProfileRequestDto _model = new();
+    private StoredFileDto? _resumeFile;
+    private IBrowserFile? _selectedResume;
+    private Guid? _activeResumeId;
+    private ResumeAnalysisDto? _analysis;
+
+    // Extended profile sections
+    private List<JobSeekerWorkExperienceDto> _workExperiences = new();
+    private List<JobSeekerQualificationDto> _qualifications = new();
+    private List<JobSeekerCertificateDto> _certificates = new();
+    private List<JobSeekerSkillDto> _skills = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+
+        // Check for LinkedIn callback result in the URL
+        var uri = new Uri(NavigationManager.Uri);
+        var qsStr = uri.Query.TrimStart('?');
+        var qsParts = qsStr.Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Split('=', 2))
+            .Where(p => p.Length == 2)
+            .ToDictionary(p => Uri.UnescapeDataString(p[0]), p => Uri.UnescapeDataString(p[1]));
+
+        if (qsParts.TryGetValue("linkedin_connected", out var lc) && lc == "1")
+        {
+            _message = "LinkedIn connected! Your name and profile picture have been updated.";
+            NavigationManager.NavigateTo("/app/jobseeker/profile", replace: true);
+        }
+        else if (qsParts.TryGetValue("linkedin_error", out var lerr) && !string.IsNullOrWhiteSpace(lerr))
+        {
+            _error = $"LinkedIn connection failed: {lerr}";
+            NavigationManager.NavigateTo("/app/jobseeker/profile", replace: true);
+        }
+    }
+
+    private async Task ConnectLinkedInAsync()
+    {
+        _connectingLinkedIn = true;
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var token = authState.User.FindFirstValue("access_token");
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                _error = "Could not retrieve your session token. Please log in again.";
+                return;
+            }
+
+            // Navigate the browser to the API LinkedIn connect endpoint with the JWT.
+            // PublicApiBaseUrl is the externally-accessible API URL (e.g. https://dev-api.app.aethonsoftware.com).
+            // ApiBaseUrl is the internal server-to-server URL (e.g. http://api:8080) and must NOT be used here.
+            var client = await Api.CreateAsync();
+            var apiBaseUrl = (Configuration["PublicApiBaseUrl"]
+                ?? client.BaseAddress?.ToString()
+                ?? "http://localhost:5100").TrimEnd('/');
+            NavigationManager.NavigateTo($"{apiBaseUrl}/api/v1/auth/linkedin/connect?token={Uri.EscapeDataString(token)}", forceLoad: true);
+        }
+        catch
+        {
+            _error = "Could not initiate LinkedIn connection.";
+            _connectingLinkedIn = false;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            _profile = await client.GetFromJsonAsync<CandidateProfileDto>("/api/v1/me/profile", AethonApiClient.JsonOptions);
+
+            if (_profile is not null)
+            {
+                _workExperiences = _profile.WorkExperiences.ToList();
+                _qualifications = _profile.Qualifications.ToList();
+                _certificates = _profile.Certificates.ToList();
+                _skills = _profile.Skills.ToList();
+
+                _model = new UpdateJobSeekerProfileRequestDto
+                {
+                    Headline             = _profile.Headline,
+                    Summary              = _profile.Summary,
+                    CurrentLocation      = _profile.CurrentLocation,
+                    PreferredLocation    = _profile.PreferredLocation,
+                    LinkedInUrl          = _profile.LinkedInUrl,
+                    OpenToWork           = _profile.OpenToWork,
+                    DesiredSalaryFrom    = _profile.DesiredSalaryFrom,
+                    DesiredSalaryTo      = _profile.DesiredSalaryTo,
+                    DesiredSalaryCurrency = _profile.DesiredSalaryCurrency,
+                    IsPublicProfileEnabled = _profile.IsPublicProfileEnabled,
+                    IsSearchable         = _profile.IsSearchable,
+                    Slug                 = _profile.Slug,
+                    ProfileVisibility    = _profile.ProfileVisibility
+                };
+
+                // A slug loaded from the server is already confirmed
+                _slugConfirmed = !string.IsNullOrWhiteSpace(_profile.Slug);
+                if (_slugConfirmed)
+                    _slugMessage = $"'{_profile.Slug}' is your current profile URL.";
+
+                var resume = _profile.Resumes.FirstOrDefault(r => r.IsDefault && r.IsActive)
+                             ?? _profile.Resumes.FirstOrDefault(r => r.IsActive);
+                if (resume is not null)
+                {
+                    _resumeFile = new StoredFileDto
+                    {
+                        Id = resume.StoredFileId,
+                        OriginalFileName = resume.OriginalFileName,
+                        ContentType = resume.ContentType,
+                        LengthBytes = resume.LengthBytes,
+                        DownloadUrl = $"/api/v1/files/{resume.StoredFileId}/download"
+                    };
+                    _activeResumeId = resume.Id;
+                    await LoadAnalysisAsync(client, resume.Id);
+                }
+            }
+        }
+        catch
+        {
+            _error = "Could not load job seeker profile.";
+        }
+        finally
+        {
+            _loaded = true;
+        }
+    }
+
+    private void OnSlugInput(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? "";
+        // Normalise: lowercase, replace spaces with hyphens, strip other invalid chars
+        _model.Slug = System.Text.RegularExpressions.Regex.Replace(raw.ToLowerInvariant().Replace(' ', '-'), @"[^a-z0-9\-]", "");
+        _slugConfirmed = false;
+        _slugMessage = null;
+    }
+
+    private async Task CheckSlugAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_model.Slug)) return;
+        _checkingSlug = true;
+        _slugMessage = null;
+        _slugConfirmed = false;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var result = await client.GetFromJsonAsync<SlugCheckResult>(
+                $"/api/v1/me/profile/check-slug?slug={Uri.EscapeDataString(_model.Slug)}",
+                AethonApiClient.JsonOptions);
+
+            if (result?.Available == true)
+            {
+                _slugConfirmed = true;
+                _model.Slug = result.Slug; // use server-normalised value
+                _slugMessage = $"'{result.Slug}' is available!";
+            }
+            else
+            {
+                _slugMessage = $"'{_model.Slug}' is already taken. Please choose a different URL.";
+            }
+        }
+        catch
+        {
+            _slugMessage = "Could not check slug availability. Please try again.";
+        }
+        finally
+        {
+            _checkingSlug = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _savingProfile = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            // Only save profile fields (not privacy settings) — include slug/visibility for round-trip
+            var response = await client.PutAsJsonAsync("/api/v1/me/profile", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Profile saved.";
+                return;
+            }
+
+            _error = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_error)) _error = "Could not save profile.";
+        }
+        catch
+        {
+            _error = "Could not save profile.";
+        }
+        finally
+        {
+            _savingProfile = false;
+        }
+    }
+
+    private async Task SavePrivacyAsync()
+    {
+        if (_model.ProfileVisibility == ProfileVisibility.Public && !_slugConfirmed)
+        {
+            _error = "Please confirm your profile URL before setting your profile to Public.";
+            return;
+        }
+
+        _savingPrivacy = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PutAsJsonAsync("/api/v1/me/profile", _model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _message = "Privacy settings saved.";
+                await LoadAsync();
+                return;
+            }
+
+            _error = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(_error)) _error = "Could not save privacy settings.";
+        }
+        catch
+        {
+            _error = "Could not save privacy settings.";
+        }
+        finally
+        {
+            _savingPrivacy = false;
+        }
+    }
+
+    private async Task LoadAnalysisAsync(HttpClient client, Guid resumeId)
+    {
+        try
+        {
+            var response = await client.GetAsync($"/api/v1/me/resumes/{resumeId}/analysis");
+            if (response.IsSuccessStatusCode)
+                _analysis = await response.Content.ReadFromJsonAsync<ResumeAnalysisDto>(AethonApiClient.JsonOptions);
+            else
+                _analysis = null;
+        }
+        catch
+        {
+            _analysis = null;
+        }
+    }
+
+    private async Task TriggerAnalysisAsync()
+    {
+        if (!_activeResumeId.HasValue) return;
+        _triggeringAnalysis = true;
+        try
+        {
+            var client = await Api.CreateAsync();
+            await client.PostAsync($"/api/v1/me/resumes/{_activeResumeId}/analysis/trigger", null);
+            _message = "Analysis queued. Refresh in a moment to see results.";
+            await LoadAnalysisAsync(client, _activeResumeId.Value);
+        }
+        catch { }
+        finally { _triggeringAnalysis = false; }
+    }
+
+    // ── Work Experience ──────────────────────────────────────────────────────────
+
+    private void AddWorkExperience() =>
+        _workExperiences.Add(new JobSeekerWorkExperienceDto { StartYear = DateTime.UtcNow.Year, StartMonth = DateTime.UtcNow.Month });
+
+    private async Task SaveWorkExperienceAsync(JobSeekerWorkExperienceDto we)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (we.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/work-experiences", we);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    we.Id = created?.Id ?? Guid.Empty;
+                    _message = "Work experience saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/work-experiences/{we.Id}", we);
+                _message = "Work experience updated.";
+            }
+        }
+        catch { _error = "Could not save work experience."; }
+    }
+
+    private async Task DeleteWorkExperienceAsync(JobSeekerWorkExperienceDto we)
+    {
+        try
+        {
+            if (we.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/work-experiences/{we.Id}");
+            }
+            _workExperiences.Remove(we);
+        }
+        catch { _error = "Could not remove work experience."; }
+    }
+
+    // ── Skills ───────────────────────────────────────────────────────────────────
+
+    private void AddSkill() => _skills.Add(new JobSeekerSkillDto());
+
+    private async Task SaveSkillAsync(JobSeekerSkillDto skill)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (skill.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/skills", skill);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    skill.Id = created?.Id ?? Guid.Empty;
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/skills/{skill.Id}", skill);
+            }
+        }
+        catch { _error = "Could not save skill."; }
+    }
+
+    private async Task DeleteSkillAsync(JobSeekerSkillDto skill)
+    {
+        try
+        {
+            if (skill.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/skills/{skill.Id}");
+            }
+            _skills.Remove(skill);
+        }
+        catch { _error = "Could not remove skill."; }
+    }
+
+    // ── Qualifications ───────────────────────────────────────────────────────────
+
+    private void AddQualification() => _qualifications.Add(new JobSeekerQualificationDto());
+
+    private async Task SaveQualificationAsync(JobSeekerQualificationDto q)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (q.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/qualifications", q);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    q.Id = created?.Id ?? Guid.Empty;
+                    _message = "Qualification saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/qualifications/{q.Id}", q);
+                _message = "Qualification updated.";
+            }
+        }
+        catch { _error = "Could not save qualification."; }
+    }
+
+    private async Task DeleteQualificationAsync(JobSeekerQualificationDto q)
+    {
+        try
+        {
+            if (q.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/qualifications/{q.Id}");
+            }
+            _qualifications.Remove(q);
+        }
+        catch { _error = "Could not remove qualification."; }
+    }
+
+    // ── Certificates ─────────────────────────────────────────────────────────────
+
+    private void AddCertificate() => _certificates.Add(new JobSeekerCertificateDto());
+
+    private async Task SaveCertificateAsync(JobSeekerCertificateDto c)
+    {
+        try
+        {
+            var client = await Api.CreateAsync();
+            if (c.Id == Guid.Empty)
+            {
+                var resp = await client.PostAsJsonAsync("/api/v1/me/profile/certificates", c);
+                if (resp.IsSuccessStatusCode)
+                {
+                    var created = await resp.Content.ReadFromJsonAsync<IdResult>(AethonApiClient.JsonOptions);
+                    c.Id = created?.Id ?? Guid.Empty;
+                    _message = "Certificate saved.";
+                }
+            }
+            else
+            {
+                await client.PutAsJsonAsync($"/api/v1/me/profile/certificates/{c.Id}", c);
+                _message = "Certificate updated.";
+            }
+        }
+        catch { _error = "Could not save certificate."; }
+    }
+
+    private async Task DeleteCertificateAsync(JobSeekerCertificateDto c)
+    {
+        try
+        {
+            if (c.Id != Guid.Empty)
+            {
+                var client = await Api.CreateAsync();
+                await client.DeleteAsync($"/api/v1/me/profile/certificates/{c.Id}");
+            }
+            _certificates.Remove(c);
+        }
+        catch { _error = "Could not remove certificate."; }
+    }
+
+    private sealed record IdResult(Guid Id);
+
+    private void HandleResumeSelected(InputFileChangeEventArgs e)
+    {
+        _selectedResume = e.File;
+        _message = null;
+        _error = null;
+    }
+
+    private async Task UploadResumeAsync()
+    {
+        if (_selectedResume is null) return;
+
+        _uploadingResume = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+
+            using var content = new MultipartFormDataContent();
+            await using var stream = _selectedResume.OpenReadStream(10_000_000);
+            using var fileContent = new StreamContent(stream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(_selectedResume.ContentType);
+            content.Add(fileContent, "file", _selectedResume.Name);
+
+            var uploadResponse = await client.PostAsync("/api/v1/files", content);
+            if (!uploadResponse.IsSuccessStatusCode)
+            {
+                _error = "Resume upload failed.";
+                return;
+            }
+
+            var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadFileResultDto>(AethonApiClient.JsonOptions);
+            if (uploaded is null)
+            {
+                _error = "Resume upload failed.";
+                return;
+            }
+
+            var linkResponse = await client.PostAsync($"/api/v1/me/profile/resume/{uploaded.Id}", null);
+            if (!linkResponse.IsSuccessStatusCode)
+            {
+                _error = "Resume uploaded but could not be linked to your profile.";
+                return;
+            }
+
+            _resumeFile = new StoredFileDto
+            {
+                Id = uploaded.Id,
+                OriginalFileName = uploaded.OriginalFileName,
+                ContentType = uploaded.ContentType,
+                LengthBytes = uploaded.LengthBytes,
+                DownloadUrl = uploaded.DownloadUrl
+            };
+
+            await LoadAsync();
+            _message = "Resume uploaded. Analysis has been queued automatically.";
+            _selectedResume = null;
+        }
+        catch
+        {
+            _error = "Resume upload failed.";
+        }
+        finally
+        {
+            _uploadingResume = false;
+        }
+    }
+
+    private sealed record SlugCheckResult(bool Available, string Slug);
+}

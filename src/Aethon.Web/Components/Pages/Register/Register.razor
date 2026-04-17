@@ -1,0 +1,410 @@
+@page "/register"
+@layout EmptyLayout
+@rendermode InteractiveServer
+@attribute [AllowAnonymous]
+@using System.ComponentModel.DataAnnotations
+@using System.Net.Http.Json
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+
+<PageTitle>Register | Aethon</PageTitle>
+
+<div class="container-fluid login-shell login-page-wrap py-4 py-lg-5">
+    <div class="row justify-content-center align-items-center w-100 m-0">
+        <div class="col-12 col-xl-10">
+            <div class="row g-0 shadow-lg rounded-4 overflow-hidden border bg-white">
+                <div class="col-lg-5 d-none d-lg-flex flex-column justify-content-between p-5 text-white"
+                     style="background: linear-gradient(160deg, #111827 0%, #212529 100%); min-height: 600px;">
+                    <div>
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle border border-light border-opacity-25 mb-4"
+                             style="width: 72px; height: 72px; background: rgba(255,255,255,0.08); font-size: 1.6rem; font-weight: 700;">
+                            A
+                        </div>
+
+                        <div class="text-uppercase small fw-semibold text-white-50 mb-3" style="letter-spacing: 0.14em;">
+                            Aethon Registration
+                        </div>
+
+                        <h1 class="display-6 fw-bold lh-sm mb-3">
+                            Start with the account type that matches how you work.
+                        </h1>
+
+                        <p class="mb-0 text-white-50 fs-6" style="max-width: 28rem;">
+                            Employers create their organisation, recruiters create their agency, and job seekers create a personal profile.
+                        </p>
+                    </div>
+
+                    <div class="pt-4">
+                        <div class="d-flex align-items-start mb-3">
+                            <span class="rounded-circle bg-light me-3 mt-1" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">The first employer or recruiter becomes the owner of that organisation.</span>
+                        </div>
+                        <div class="d-flex align-items-start mb-3">
+                            <span class="rounded-circle bg-light me-3 mt-1" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">Business email domains are used to identify organisations.</span>
+                        </div>
+                        <div class="d-flex align-items-start">
+                            <span class="rounded-circle bg-light me-3 mt-1" style="width: 10px; height: 10px; opacity: 0.9;"></span>
+                            <span class="text-white-50">Job seekers register without creating an organisation.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-7">
+                    <div class="p-4 p-md-5 p-xl-5">
+                        <div class="d-lg-none text-center mb-4">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-dark text-white mb-3"
+                                 style="width: 64px; height: 64px; font-size: 1.4rem; font-weight: 700;">
+                                A
+                            </div>
+                            <div class="small text-uppercase fw-semibold text-secondary mb-2" style="letter-spacing: 0.12em;">
+                                Aethon
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h2 class="h2 fw-bold mb-2" style="color: var(--aethon-text-strong);">Create your account</h2>
+                            <p class="text-secondary mb-0 fs-6">Choose how you want to register in Aethon</p>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(FormError))
+                        {
+                            <div class="alert alert-danger rounded-4 mb-4" role="alert">
+                                @FormError
+                            </div>
+                        }
+
+                        <EditForm EditContext="_editContext" OnValidSubmit="HandleValidSubmitAsync">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold mb-2">Register as</label>
+                                <div class="btn-group w-100 rounded-3 overflow-hidden border" role="group">
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "company" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2"
+                                            @onclick='@(() => SetRegistrationType("company"))'>
+                                        Company
+                                    </button>
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "recruiter" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2 border-start border-end"
+                                            style="border-color: #dee2e6 !important;"
+                                            @onclick='@(() => SetRegistrationType("recruiter"))'>
+                                        Recruiter
+                                    </button>
+                                    <button type="button"
+                                            class="btn @(Model.RegistrationType == "jobseeker" ? "btn-dark" : "btn-outline-secondary border-0") fw-semibold py-2"
+                                            @onclick='@(() => SetRegistrationType("jobseeker"))'>
+                                        Job seeker
+                                    </button>
+                                </div>
+                                <div class="form-text mt-1">
+                                    @(Model.RegistrationType switch {
+                                        "company"   => "Create and manage your company account, users, and job listings.",
+                                        "recruiter" => "Create your recruitment agency and manage client jobs.",
+                                        _           => "Create a personal profile to search and apply for jobs."
+                                    })
+                                </div>
+                                <ValidationMessage For="@(() => Model.RegistrationType)" />
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label for="firstName" class="form-label fw-semibold mb-1">First name</label>
+                                    <InputText id="firstName"
+                                               @bind-Value="Model.FirstName"
+                                               autocomplete="given-name"
+                                               class="form-control rounded-3"
+                                               placeholder="First name" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                </div>
+
+                                <div class="col-6">
+                                    <label for="lastName" class="form-label fw-semibold mb-1">Last name</label>
+                                    <InputText id="lastName"
+                                               @bind-Value="Model.LastName"
+                                               autocomplete="family-name"
+                                               class="form-control rounded-3"
+                                               placeholder="Last name" />
+                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                </div>
+
+                                @if (RequiresOrganisationName)
+                                {
+                                    <div class="col-12">
+                                        <label for="organisationName" class="form-label fw-semibold mb-1">
+                                            @(Model.RegistrationType == "company" ? "Company name" : "Organisation name")
+                                        </label>
+                                        <InputText id="organisationName"
+                                                   @bind-Value="Model.OrganisationName"
+                                                   autocomplete="organization"
+                                                   class="form-control rounded-3"
+                                                   placeholder="@(Model.RegistrationType == "company" ? "Your company name" : "Your agency name")" />
+                                        <ValidationMessage For="@(() => Model.OrganisationName)" />
+                                    </div>
+                                }
+
+                                <div class="col-12">
+                                    <label for="email" class="form-label fw-semibold mb-1">Email</label>
+                                    <InputText id="email"
+                                               @bind-Value="Model.Email"
+                                               autocomplete="username"
+                                               class="form-control rounded-3"
+                                               placeholder="@(RequiresOrganisationName ? "name@company.com" : "name@example.com")" />
+                                    @if (RequiresOrganisationName)
+                                    {
+                                        <div class="form-text">Use your business email — the domain identifies your organisation.</div>
+                                    }
+                                    <ValidationMessage For="@(() => Model.Email)" />
+                                </div>
+
+                                <div class="col-6">
+                                    <label for="password" class="form-label fw-semibold mb-1">Password</label>
+                                    <InputText id="password"
+                                               @bind-Value="Model.Password"
+                                               type="password"
+                                               autocomplete="new-password"
+                                               class="form-control rounded-3"
+                                               placeholder="Create a password" />
+                                    <ValidationMessage For="@(() => Model.Password)" />
+                                </div>
+
+                                <div class="col-6">
+                                    <label for="confirmPassword" class="form-label fw-semibold mb-1">Confirm</label>
+                                    <InputText id="confirmPassword"
+                                               @bind-Value="Model.ConfirmPassword"
+                                               type="password"
+                                               autocomplete="new-password"
+                                               class="form-control rounded-3"
+                                               placeholder="Confirm password" />
+                                    <ValidationMessage For="@(() => Model.ConfirmPassword)" />
+                                </div>
+                            </div>
+
+                            @if (Model.RegistrationType == "jobseeker")
+                            {
+                                <div class="col-12 mt-2">
+                                    <div class="form-check">
+                                        <InputCheckbox id="ageConfirmed"
+                                                       @bind-Value="Model.AgeConfirmed"
+                                                       class="form-check-input" />
+                                        <label for="ageConfirmed" class="form-check-label">
+                                            I confirm I am 16 years of age or older.
+                                        </label>
+                                    </div>
+                                    <ValidationMessage For="@(() => Model.AgeConfirmed)" />
+                                </div>
+                            }
+
+                            <div class="d-grid mt-3">
+                                <button type="submit" class="btn btn-dark btn-lg rounded-3" disabled="@IsSubmitting">
+                                    @(IsSubmitting ? "Creating account..." : "Create account")
+                                </button>
+                            </div>
+                        </EditForm>
+
+                        <div class="position-relative text-center my-4">
+                            <hr class="my-0" />
+                            <span class="position-absolute top-50 start-50 translate-middle px-3 bg-white text-secondary small">
+                                Already registered?
+                            </span>
+                        </div>
+
+                        <div class="text-center">
+                            <a class="btn btn-outline-dark rounded-4 px-4 py-3" href="/login">Sign in</a>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-center gap-3 mt-3 flex-wrap">
+                            <a href="/info/privacy" class="d-inline-flex align-items-center gap-1 text-secondary text-decoration-none small">
+                                <img src="/img/ccpa-icons/privacyoptions29x14.svg"
+                                     alt="California Consumer Privacy Act (CCPA) Opt-Out Icon"
+                                     width="29" height="14" />
+                                <span>Your Privacy Choices</span>
+                            </a>
+                            <span class="text-secondary" aria-hidden="true">·</span>
+                            <a href="https://repasscloud.com/legal/privacy-policy/aethonsoftware"
+                               target="_blank" rel="noopener noreferrer"
+                               class="text-secondary text-decoration-none small">Privacy Policy</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly RegisterRequestDto Model = new();
+    private EditContext _editContext = default!;
+    private ValidationMessageStore _messageStore = default!;
+    private string ReturnPath = "/";
+    private string? FormError;
+    private bool IsSubmitting;
+
+    private bool RequiresOrganisationName =>
+        Model.RegistrationType is "company" or "recruiter";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _editContext = new EditContext(Model);
+        _messageStore = new ValidationMessageStore(_editContext);
+
+        _editContext.OnValidationRequested += (_, _) => _messageStore.Clear();
+        _editContext.OnFieldChanged += (_, args) =>
+        {
+            _messageStore.Clear(args.FieldIdentifier);
+        };
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            NavigationManager.NavigateTo("/", forceLoad: true);
+            return;
+        }
+
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        var rawReturnUrl =
+            query.TryGetValue("ReturnUrl", out var upperReturnUrl) ? upperReturnUrl.ToString() :
+            query.TryGetValue("returnUrl", out var lowerReturnUrl) ? lowerReturnUrl.ToString() :
+            null;
+
+        if (!string.IsNullOrWhiteSpace(rawReturnUrl) && rawReturnUrl.StartsWith('/'))
+        {
+            ReturnPath = rawReturnUrl;
+        }
+
+        if (query.TryGetValue("type", out var type))
+        {
+            var requestedType = type.ToString();
+
+            if (requestedType.Equals("company", StringComparison.OrdinalIgnoreCase))
+            {
+                Model.RegistrationType = "company";
+            }
+            else if (requestedType.Equals("recruiter", StringComparison.OrdinalIgnoreCase))
+            {
+                Model.RegistrationType = "recruiter";
+            }
+            else
+            {
+                Model.RegistrationType = "jobseeker";
+            }
+        }
+        else
+        {
+            Model.RegistrationType = "company";
+        }
+    }
+
+    private void SetRegistrationType(string registrationType)
+    {
+        Model.RegistrationType = registrationType;
+
+        if (!RequiresOrganisationName)
+        {
+            Model.OrganisationName = null;
+        }
+
+        FormError = null;
+        _messageStore.Clear();
+        _editContext.NotifyValidationStateChanged();
+        StateHasChanged();
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        FormError = null;
+        IsSubmitting = true;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync("/api/v1/auth/register", Model);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var email = Uri.EscapeDataString(Model.Email);
+                NavigationManager.NavigateTo($"/register/check-email?email={email}", forceLoad: true);
+                return;
+            }
+
+            var rawBody = await response.Content.ReadAsStringAsync();
+
+            if (response.Content.Headers.ContentType?.MediaType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                try
+                {
+                    var problem = System.Text.Json.JsonSerializer.Deserialize<ValidationProblemDetailsResponse>(
+                        rawBody, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (problem?.Errors is { Count: > 0 })
+                    {
+                        _messageStore.Clear();
+
+                        foreach (var error in problem.Errors)
+                        {
+                            foreach (var message in error.Value)
+                            {
+                                var propertyName = ToModelPropertyName(error.Key);
+
+                                if (!string.IsNullOrWhiteSpace(propertyName))
+                                {
+                                    _messageStore.Add(new FieldIdentifier(Model, propertyName), message);
+                                }
+                                else
+                                {
+                                    FormError ??= message;
+                                }
+                            }
+                        }
+
+                        _editContext.NotifyValidationStateChanged();
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Fall through to generic error
+                }
+            }
+
+            FormError = !string.IsNullOrWhiteSpace(rawBody)
+                ? $"Registration could not be completed. {rawBody}"
+                : "Registration could not be completed.";
+        }
+        catch (HttpRequestException)
+        {
+            FormError = "The registration service is currently unavailable.";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private static string ToModelPropertyName(string key)
+    {
+        return key switch
+        {
+            nameof(RegisterRequestDto.Email) => nameof(RegisterRequestDto.Email),
+            nameof(RegisterRequestDto.Password) => nameof(RegisterRequestDto.Password),
+            nameof(RegisterRequestDto.ConfirmPassword) => nameof(RegisterRequestDto.ConfirmPassword),
+            nameof(RegisterRequestDto.FirstName) => nameof(RegisterRequestDto.FirstName),
+            nameof(RegisterRequestDto.LastName) => nameof(RegisterRequestDto.LastName),
+            nameof(RegisterRequestDto.RegistrationType) => nameof(RegisterRequestDto.RegistrationType),
+            nameof(RegisterRequestDto.OrganisationName) => nameof(RegisterRequestDto.OrganisationName),
+            nameof(RegisterRequestDto.AgeConfirmed) => nameof(RegisterRequestDto.AgeConfirmed),
+            _ => string.Empty
+        };
+    }
+
+    private sealed class ValidationProblemDetailsResponse
+    {
+        public Dictionary<string, string[]> Errors { get; set; } = [];
+    }
+}

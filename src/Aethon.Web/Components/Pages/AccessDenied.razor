@@ -1,0 +1,18 @@
+@page "/access-denied"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Access Denied | Aethon</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh;">
+    <div class="text-center">
+        <p class="text-secondary fw-semibold mb-2" style="font-size:4rem; line-height:1;">403</p>
+        <h1 class="h3 fw-bold mb-2">Access denied</h1>
+        <p class="text-secondary mb-4">You do not have permission to view this page.</p>
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="/login" class="btn btn-dark rounded-4 px-4">Sign in</a>
+            <a href="/jobs" class="btn btn-outline-secondary rounded-4 px-4">Browse jobs</a>
+        </div>
+    </div>
+</div>

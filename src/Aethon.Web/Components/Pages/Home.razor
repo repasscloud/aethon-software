@@ -1,0 +1,54 @@
+@page "/"
+@attribute [Authorize]
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Aethon</PageTitle>
+
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+        <h1 class="h3 fw-bold mb-2">Loading your workspace</h1>
+        <p class="text-secondary mb-0">Routing you to the correct Aethon dashboard.</p>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            NavigationManager.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        var appType = user.FindFirstValue(AppClaimTypes.AppType);
+
+        if (string.Equals(appType, "recruiter", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/recruiter", forceLoad: false);
+            return;
+        }
+
+        if (string.Equals(appType, "employer", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/employer", forceLoad: false);
+            return;
+        }
+
+        if (string.Equals(appType, "jobseeker", StringComparison.OrdinalIgnoreCase))
+        {
+            NavigationManager.NavigateTo("/app/jobseeker", forceLoad: false);
+            return;
+        }
+
+        // Admin / support / superadmin
+        NavigationManager.NavigateTo("/admin", forceLoad: false);
+    }
+}

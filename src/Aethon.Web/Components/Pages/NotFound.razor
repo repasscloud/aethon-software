@@ -1,0 +1,18 @@
+﻿@page "/not-found"
+@layout PublicLayout
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Page Not Found | Aethon</PageTitle>
+
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh;">
+    <div class="text-center">
+        <p class="text-secondary fw-semibold mb-2" style="font-size:4rem; line-height:1;">404</p>
+        <h1 class="h3 fw-bold mb-2">Page not found</h1>
+        <p class="text-secondary mb-4">Sorry, the page you are looking for does not exist or has been moved.</p>
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="/jobs" class="btn btn-dark rounded-4 px-4">Browse jobs</a>
+            <a href="/" class="btn btn-outline-secondary rounded-4 px-4">Go home</a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,246 @@
+@page "/admin/jobs/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Security.Claims
+@using Aethon.Shared.Auth
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>@(_job?.Title ?? "Job") | Admin | Aethon</PageTitle>
+
+@if (!_isStaff)
+{
+    <div class="alert alert-danger rounded-4">Access denied.</div>
+}
+else if (!_ready)
+{
+    <div class="card border-0 shadow-sm rounded-4"><div class="card-body p-4">Loading…</div></div>
+}
+else if (_job is null)
+{
+    <div class="alert alert-danger rounded-4">Job not found.</div>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-start gap-3 flex-wrap">
+                    <div class="flex-grow-1">
+                        <a href="/admin/jobs" class="text-secondary small text-decoration-none">← All jobs</a>
+                        <h1 class="h3 fw-bold mb-1 mt-1">@_job.Title</h1>
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <span class="badge @JobStatusBadge(_job.Status) rounded-pill">@_job.Status</span>
+                            <span class="badge bg-secondary rounded-pill">@_job.Visibility</span>
+                            @if (!string.IsNullOrEmpty(_job.PostingTier))
+                            {
+                                <span class="badge bg-primary rounded-pill">@_job.PostingTier</span>
+                            }
+                            @if (_job.IsHighlighted)
+                            {
+                                <span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-star-fill me-1"></i>Highlighted</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="/jobs/@_job.Id" target="_blank" class="btn btn-sm btn-outline-success rounded-pill">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Public page
+                        </a>
+                        <a href="/admin/organisations/@_job.OrganisationId" class="btn btn-sm btn-outline-secondary rounded-pill">
+                            View organisation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Details</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">Organisation</dt>
+                            <dd class="col-7">
+                                <a href="/admin/organisations/@_job.OrganisationId" class="text-decoration-none">@_job.OrganisationName</a>
+                            </dd>
+                            <dt class="col-5 text-secondary">Category</dt>
+                            <dd class="col-7">@(_job.Category ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Department</dt>
+                            <dd class="col-7">@(_job.Department ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Reference</dt>
+                            <dd class="col-7">@(_job.ReferenceCode ?? "—")</dd>
+                            <dt class="col-5 text-secondary">External ref</dt>
+                            <dd class="col-7">@(_job.ExternalReference ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Location</dt>
+                            <dd class="col-7">@(_job.LocationText ?? "—")</dd>
+                            <dt class="col-5 text-secondary">City</dt>
+                            <dd class="col-7">@(_job.LocationCity ?? "—")</dd>
+                            <dt class="col-5 text-secondary">State</dt>
+                            <dd class="col-7">@(_job.LocationState ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Country</dt>
+                            <dd class="col-7">@(_job.LocationCountry ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Workplace type</dt>
+                            <dd class="col-7">@(_job.WorkplaceType ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Employment type</dt>
+                            <dd class="col-7">@(_job.EmploymentType ?? "—")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Compensation &amp; Applications</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">Salary from</dt>
+                            <dd class="col-7">@(_job.SalaryFrom.HasValue ? $"{_job.SalaryCurrency} {_job.SalaryFrom:N0}" : "—")</dd>
+                            <dt class="col-5 text-secondary">Salary to</dt>
+                            <dd class="col-7">@(_job.SalaryTo.HasValue ? $"{_job.SalaryCurrency} {_job.SalaryTo:N0}" : "—")</dd>
+                            <dt class="col-5 text-secondary">Apply by</dt>
+                            <dd class="col-7">@(_job.ApplyByUtc?.ToString("dd MMM yyyy") ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Expires</dt>
+                            <dd class="col-7">@(_job.PostingExpiresUtc?.ToString("dd MMM yyyy") ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Applications</dt>
+                            <dd class="col-7">@_job.ApplicationCount</dd>
+                            <dt class="col-5 text-secondary">External apply URL</dt>
+                            <dd class="col-7">
+                                @if (!string.IsNullOrEmpty(_job.ExternalApplicationUrl))
+                                {
+                                    <a href="@_job.ExternalApplicationUrl" target="_blank" class="text-decoration-none small">@_job.ExternalApplicationUrl</a>
+                                }
+                                else { <span>—</span> }
+                            </dd>
+                            <dt class="col-5 text-secondary">Application email</dt>
+                            <dd class="col-7">@(_job.ApplicationEmail ?? "—")</dd>
+                            <dt class="col-5 text-secondary">Include logo</dt>
+                            <dd class="col-7">@(_job.IncludeCompanyLogo ? "Yes" : "No")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card border-0 shadow-sm rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3">Dates</h2>
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-secondary">Created</dt>
+                            <dd class="col-7">@(_job.CreatedUtc?.ToString("dd MMM yyyy HH:mm") ?? "—") UTC</dd>
+                            <dt class="col-5 text-secondary">Published</dt>
+                            <dd class="col-7">@(_job.PublishedUtc?.ToString("dd MMM yyyy HH:mm") ?? "—") @(_job.PublishedUtc.HasValue ? "UTC" : "")</dd>
+                            <dt class="col-5 text-secondary">Closed</dt>
+                            <dd class="col-7">@(_job.ClosedUtc?.ToString("dd MMM yyyy HH:mm") ?? "—") @(_job.ClosedUtc.HasValue ? "UTC" : "")</dd>
+                            @if (!string.IsNullOrEmpty(_job.StatusReason))
+                            {
+                                <dt class="col-5 text-secondary">Status reason</dt>
+                                <dd class="col-7">@_job.StatusReason</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_job.Summary))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Summary</h2>
+                    <p class="small mb-0" style="white-space:pre-wrap;">@_job.Summary</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_job.Description))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Description</h2>
+                    <div class="small" style="white-space:pre-wrap;">@_job.Description</div>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_job.Requirements))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Requirements</h2>
+                    <div class="small" style="white-space:pre-wrap;">@_job.Requirements</div>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_job.Benefits))
+        {
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3">Benefits</h2>
+                    <div class="small" style="white-space:pre-wrap;">@_job.Benefits</div>
+                </div>
+            </div>
+        }
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _isStaff;
+    private bool _ready;
+    private JobDetail? _job;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var isSuperAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsSuperAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isAdmin = string.Equals(user.FindFirstValue(AppClaimTypes.IsAdmin), "true", StringComparison.OrdinalIgnoreCase);
+        var isSupport = string.Equals(user.FindFirstValue(AppClaimTypes.IsSupport), "true", StringComparison.OrdinalIgnoreCase);
+        _isStaff = isSuperAdmin || isAdmin || isSupport;
+
+        if (_isStaff)
+        {
+            try
+            {
+                var client = await Api.CreateAsync();
+                _job = await client.GetFromJsonAsync<JobDetail>($"/api/v1/admin/jobs/{Id}", AethonApiClient.JsonOptions);
+            }
+            catch { }
+        }
+
+        _ready = true;
+    }
+
+    private static string JobStatusBadge(string? s) => s switch
+    {
+        "Published" => "bg-success",
+        "Draft" => "bg-secondary",
+        "Closed" or "Cancelled" => "bg-danger",
+        "OnHold" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    private sealed record JobDetail(
+        Guid Id, string Title, string? Status, string? Visibility, string? Category,
+        string? Department, string? ReferenceCode, string? ExternalReference,
+        string? LocationText, string? LocationCity, string? LocationState, string? LocationCountry,
+        string? WorkplaceType, string? EmploymentType,
+        string? Description, string? Summary, string? Requirements, string? Benefits,
+        decimal? SalaryFrom, decimal? SalaryTo, string? SalaryCurrency,
+        string? ExternalApplicationUrl, string? ApplicationEmail,
+        string? PostingTier, DateTime? PostingExpiresUtc,
+        DateTime? ApplyByUtc, DateTime? PublishedUtc, DateTime? ClosedUtc, DateTime? CreatedUtc,
+        bool IsHighlighted, bool IncludeCompanyLogo, string? StatusReason,
+        Guid OrganisationId, string OrganisationName, string? OrganisationSlug,
+        int ApplicationCount);
+}

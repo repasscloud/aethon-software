@@ -1,0 +1,24 @@
+@page "/app/verification/cancelled"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Verification Cancelled | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4 align-items-center py-5" style="max-width:480px; margin:0 auto; text-align:center;">
+    <div class="card border-0 shadow-sm rounded-4 w-100">
+        <div class="card-body p-5">
+            <div class="mb-4" style="font-size:3.5rem;">
+                <i class="bi bi-x-circle text-secondary"></i>
+            </div>
+            <h1 class="h3 fw-bold mb-2">Payment cancelled</h1>
+            <p class="text-secondary mb-4">
+                No charge was made. You can return and complete verification at any time.
+            </p>
+            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                <a href="/app/organisation/verification" class="btn btn-primary rounded-4 px-4">Try again</a>
+                <a href="/app/employer" class="btn btn-outline-secondary rounded-4 px-4">Go to dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>

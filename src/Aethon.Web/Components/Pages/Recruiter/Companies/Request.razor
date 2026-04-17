@@ -1,0 +1,112 @@
+@page "/recruiter/companies/request"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Aethon.Shared.RecruiterCompanies
+@using Microsoft.AspNetCore.Authorization
+@using System.Net.Http.Json
+@inject AethonApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Request company access | Aethon</PageTitle>
+
+<div class="d-flex flex-column gap-4">
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold mb-1">Request company access</h1>
+            <p class="text-secondary mb-0">Send a request to partner with a client company for recruitment.</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger rounded-4 mb-0">@_error</div>
+    }
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-4">
+            <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-8">
+                        <label class="form-label fw-semibold">Company organisation ID</label>
+                        <input class="form-control rounded-4"
+                               @bind="_companyOrgIdText"
+                               placeholder="Paste the company's organisation GUID" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Message (optional)</label>
+                        <InputTextArea class="form-control rounded-4" @bind-Value="_model.Message" rows="3"
+                                       placeholder="Introduce your agency and describe your recruitment expertise…" />
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-dark rounded-4 px-4" disabled="@_saving">
+                        @(_saving ? "Sending…" : "Send request")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary rounded-4 px-4"
+                            @onclick='() => Nav.NavigateTo("/recruiter/companies")'>
+                        Cancel
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly CreateRecruiterCompanyRequestDto _model = new();
+    private string _companyOrgIdText = string.Empty;
+    private string? _error;
+    private bool _saving;
+
+    private async Task SaveAsync()
+    {
+        if (!Guid.TryParse(_companyOrgIdText, out var orgId))
+        {
+            _error = "Please enter a valid company organisation ID (GUID).";
+            return;
+        }
+
+        _model.CompanyOrganisationId = orgId;
+        _saving = true;
+        _error = null;
+
+        try
+        {
+            var client = await Api.CreateAsync();
+            var response = await client.PostAsJsonAsync("/api/v1/recruiter/companies/requests", _model);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await ReadErrorAsync(response) ?? "Could not send request.";
+                return;
+            }
+
+            Nav.NavigateTo("/recruiter/companies");
+        }
+        catch
+        {
+            _error = "Could not send request.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(AethonApiClient.JsonOptions);
+            if (!string.IsNullOrWhiteSpace(problem?.Detail)) return problem.Detail;
+        }
+        catch { }
+
+        var raw = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    private sealed class ProblemResponse { public string? Detail { get; set; } }
+}
