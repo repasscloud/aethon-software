@@ -1,4 +1,4 @@
-# .github/workflows/docker-publish.yml
+# .github/workflows/dev-docker-publish-deploy.yml
 name: Dev Docker Publish and Deploy
 
 on:
@@ -32,22 +32,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ ! -f VERSION_INFO ]]; then
-            echo "VERSION_INFO file not found" >&2
-            exit 1
+          if [[ -f VERSION_INFO ]]; then
+            VERSION="$(head -n 1 VERSION_INFO | tr -d '\r')"
+          else
+            VERSION="0.0.0"
           fi
 
-          VERSION="$(head -n 1 VERSION_INFO | tr -d '\r')"
-          COMMIT_SHORT="${GITHUB_SHA::7}"
-          BRANCH_NAME="${GITHUB_REF_NAME}"
-          PIPELINE_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "commit_short=$COMMIT_SHORT" >> "$GITHUB_OUTPUT"
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
-          echo "pipeline_url=$PIPELINE_URL" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "branch_name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "pipeline_url=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
 
   build-and-push-api:
+    needs: metadata
     runs-on: ubuntu-latest
     outputs:
       failed_stage: ${{ steps.capture.outputs.failed_stage }}
@@ -69,23 +66,23 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push API
-        id: api_build_push
+        id: build_push
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./src/Aethon.Api/Dockerfile
           push: true
-          tags: repasscloud/aethon-api:dev
+          tags: |
+            repasscloud/aethon-api:latest
+            repasscloud/aethon-api:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Capture failure metadata
         id: capture
-        if: always()
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-
           FAILED_STAGE=""
           FAILED_RESULT=""
 
@@ -98,7 +95,7 @@ jobs:
           elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
             FAILED_STAGE="API / Buildx"
             FAILED_RESULT="Failed to initialise Docker Buildx"
-          elif [[ "${{ steps.api_build_push.outcome }}" == "failure" ]]; then
+          elif [[ "${{ steps.build_push.outcome }}" == "failure" ]]; then
             FAILED_STAGE="API / Build and push"
             FAILED_RESULT="Failed building or pushing ./src/Aethon.Api/Dockerfile"
           fi
@@ -107,6 +104,7 @@ jobs:
           echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
 
   build-and-push-builder:
+    needs: metadata
     runs-on: ubuntu-latest
     outputs:
       failed_stage: ${{ steps.capture.outputs.failed_stage }}
@@ -127,24 +125,24 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Ensure builder image exists
-        id: ensure_builder
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if ! docker pull repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0; then
-            chmod +x .docker/build.sh
-            .docker/build.sh
-          fi
+      - name: Build and push Builder
+        id: build_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./.docker/Dockerfile.builder
+          push: true
+          tags: |
+            repasscloud/aethon-web-builder:latest
+            repasscloud/aethon-web-builder:${{ needs.metadata.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Capture failure metadata
         id: capture
-        if: always()
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-
           FAILED_STAGE=""
           FAILED_RESULT=""
 
@@ -157,16 +155,16 @@ jobs:
           elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Builder / Buildx"
             FAILED_RESULT="Failed to initialise Docker Buildx"
-          elif [[ "${{ steps.ensure_builder.outcome }}" == "failure" ]]; then
-            FAILED_STAGE="Builder / Ensure builder image exists"
-            FAILED_RESULT="Failed pulling or building repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0"
+          elif [[ "${{ steps.build_push.outcome }}" == "failure" ]]; then
+            FAILED_STAGE="Builder / Build and push"
+            FAILED_RESULT="Failed building or pushing ./.docker/Dockerfile.builder"
           fi
 
           echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
           echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
 
   build-and-push-web:
-    needs: build-and-push-builder
+    needs: [metadata, build-and-push-builder]
     runs-on: ubuntu-latest
     outputs:
       failed_stage: ${{ steps.capture.outputs.failed_stage }}
@@ -187,35 +185,24 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Ensure builder image exists
-        id: ensure_builder
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if ! docker pull repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0; then
-            chmod +x .docker/build.sh
-            .docker/build.sh
-          fi
-
       - name: Build and push Web
-        id: web_build_push
+        id: build_push
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./src/Aethon.Web/Dockerfile
           push: true
-          tags: repasscloud/aethon-web:dev
+          tags: |
+            repasscloud/aethon-web:latest
+            repasscloud/aethon-web:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Capture failure metadata
         id: capture
-        if: always()
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-
           FAILED_STAGE=""
           FAILED_RESULT=""
 
@@ -228,10 +215,7 @@ jobs:
           elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Web / Buildx"
             FAILED_RESULT="Failed to initialise Docker Buildx"
-          elif [[ "${{ steps.ensure_builder.outcome }}" == "failure" ]]; then
-            FAILED_STAGE="Web / Ensure builder image exists"
-            FAILED_RESULT="Failed pulling or building repasscloud/aethon-web-builder:mcr-dotnet-sdk-10.0"
-          elif [[ "${{ steps.web_build_push.outcome }}" == "failure" ]]; then
+          elif [[ "${{ steps.build_push.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Web / Build and push"
             FAILED_RESULT="Failed building or pushing ./src/Aethon.Web/Dockerfile"
           fi
@@ -240,6 +224,7 @@ jobs:
           echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
 
   build-and-push-maintenance:
+    needs: metadata
     runs-on: ubuntu-latest
     outputs:
       failed_stage: ${{ steps.capture.outputs.failed_stage }}
@@ -260,24 +245,24 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and push Dev Maintenance Page
-        id: dev_maintenance_build_push
+      - name: Build and push Web Maintenance
+        id: build_push
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./src/Maintenance/Dockerfile
           push: true
-          tags: repasscloud/aethon-web-maintenance:dev
+          tags: |
+            repasscloud/aethon-web-maintenance:latest
+            repasscloud/aethon-web-maintenance:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Capture failure metadata
         id: capture
-        if: always()
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-
           FAILED_STAGE=""
           FAILED_RESULT=""
 
@@ -290,7 +275,7 @@ jobs:
           elif [[ "${{ steps.buildx.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Maintenance / Buildx"
             FAILED_RESULT="Failed to initialise Docker Buildx"
-          elif [[ "${{ steps.dev_maintenance_build_push.outcome }}" == "failure" ]]; then
+          elif [[ "${{ steps.build_push.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Maintenance / Build and push"
             FAILED_RESULT="Failed building or pushing ./src/Maintenance/Dockerfile"
           fi
@@ -305,134 +290,31 @@ jobs:
       failed_stage: ${{ steps.capture.outputs.failed_stage }}
       failed_result: ${{ steps.capture.outputs.failed_result }}
     steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v6.0.2
-
-      - name: Deploy via SSHx
-        id: deploy_sshx
+      - name: Deploy via SSH
+        id: deploy
         shell: bash
         run: |
           set -euo pipefail
-
-          DEPLOY_ARG=""
-          if grep -qi "^refresh$" .deployment 2>/dev/null; then
-            DEPLOY_ARG="refresh"
-          fi
 
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > private_key
           chmod 600 private_key
-
           ssh -i private_key \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "bash ${{ secrets.DEPLOY_SCRIPT_PATH }} $DEPLOY_ARG"
-
-          rm -f private_key
-
-      - name: Deploy via SSH
-        id: deploy_ssh
-        shell: bash
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          DEPLOY_SCRIPT_PATH: ${{ secrets.DEPLOY_SCRIPT_PATH }}
-          SEED_LOGIN_USER: ${{ secrets.SEED_LOGIN_USER }}
-          SEED_LOGIN_PASSWORD: ${{ secrets.SEED_LOGIN_PASSWORD }}
-          SUPABASE_PGSQL_ADMIN_PASSWORD: ${{ secrets.SUPABASE_PGSQL_ADMIN_PASSWORD }}
-          SEED_REPO_DIR: ${{ secrets.SEED_REPO_DIR }}
-        run: |
-          set -euo pipefail
-
-          DEPLOY_MODE=""
-          if [[ -f .deployment ]]; then
-            DEPLOY_MODE="$(head -n 1 .deployment | tr -d '\r' | xargs)"
-          fi
-
-          echo "$SSH_PRIVATE_KEY" | tr -d '\r' > private_key
-          chmod 600 private_key
-
-          if [[ "${DEPLOY_MODE,,}" == "refresh" ]]; then
-            ssh -i private_key \
-              -o StrictHostKeyChecking=no \
-              "$SSH_USER@$SSH_HOST" \
-              "/bin/bash \"$DEPLOY_SCRIPT_PATH\" \
-                --refresh \
-                --branch dev \
-                --repo-dir \"$SEED_REPO_DIR\" \
-                --username \"$SEED_LOGIN_USER\" \
-                --password \"$SEED_LOGIN_PASSWORD\" \
-                --sql-password \"$SUPABASE_PGSQL_ADMIN_PASSWORD\" \
-                --api-base-url \"https://dev-api.aethonjobs.com/api/v1\" \
-                --stripe-api-base-url \"https://dev-api.aethonsoftware.com/api/v1\" \
-                --email-settings-file \"$SEED_REPO_DIR/email-settings.env\" \
-                --stripe-settings-file \"$SEED_REPO_DIR/stripe-settings.env\" \
-                --locations-file \"$SEED_REPO_DIR/src/Aethon.Web/wwwroot/_data/_geodata/AU.geoname.json\""
-          else
-            ssh -i private_key \
-              -o StrictHostKeyChecking=no \
-              "$SSH_USER@$SSH_HOST" \
-              "/bin/bash \"$DEPLOY_SCRIPT_PATH\" \
-                --branch dev \
-                --repo-dir \"$SEED_REPO_DIR\""
-          fi
-
+            "bash ${{ secrets.DEPLOY_SCRIPT_PATH }}"
           rm -f private_key
 
       - name: Capture failure metadata
         id: capture
-        if: always()
+        if: failure()
         shell: bash
         run: |
-          set -euo pipefail
-
           FAILED_STAGE=""
           FAILED_RESULT=""
 
-          if [[ "${{ steps.checkout.outcome }}" == "failure" ]]; then
-            FAILED_STAGE="Deploy / Checkout"
-            FAILED_RESULT="Repository checkout failed"
-          elif [[ "${{ steps.deploy_ssh.outcome }}" == "failure" ]]; then
+          if [[ "${{ steps.deploy.outcome }}" == "failure" ]]; then
             FAILED_STAGE="Deploy / SSH"
             FAILED_RESULT="Remote deployment script failed over SSH"
-          fi
-
-          echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
-          echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
-
-  trigger-remote-import:
-    needs: deploy-to-dev
-    runs-on: ubuntu-latest
-    outputs:
-      failed_stage: ${{ steps.capture.outputs.failed_stage }}
-      failed_result: ${{ steps.capture.outputs.failed_result }}
-    steps:
-      - name: Trigger remote import workflow
-        id: trigger_import
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          gh workflow run import.yml \
-            --repo repasscloud/aethon-software-import-data \
-            --ref main
-
-      - name: Capture failure metadata
-        id: capture
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          FAILED_STAGE=""
-          FAILED_RESULT=""
-
-          if [[ "${{ steps.trigger_import.outcome }}" == "failure" ]]; then
-            FAILED_STAGE="Remote Import / Trigger workflow"
-            FAILED_RESULT="Failed to trigger repasscloud/aethon-software-import-data import.yml"
           fi
 
           echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
@@ -446,10 +328,8 @@ jobs:
       - build-and-push-web
       - build-and-push-maintenance
       - deploy-to-dev
-      - trigger-remote-import
     if: always()
     runs-on: ubuntu-latest
-
     steps:
       - name: Evaluate pipeline result
         id: evaluate
@@ -463,7 +343,7 @@ jobs:
 
           if [[ "${{ needs.metadata.result }}" == "failure" ]]; then
             PIPELINE_STATUS="failure"
-            FAILED_STAGE="Metadata / Read VERSION_INFO"
+            FAILED_STAGE="Metadata"
             FAILED_RESULT="Failed reading VERSION_INFO or git metadata"
           elif [[ "${{ needs.build-and-push-api.result }}" == "failure" ]]; then
             PIPELINE_STATUS="failure"
@@ -485,17 +365,13 @@ jobs:
             PIPELINE_STATUS="failure"
             FAILED_STAGE="${{ needs.deploy-to-dev.outputs.failed_stage }}"
             FAILED_RESULT="${{ needs.deploy-to-dev.outputs.failed_result }}"
-          elif [[ "${{ needs.trigger-remote-import.result }}" == "failure" ]]; then
-            PIPELINE_STATUS="failure"
-            FAILED_STAGE="${{ needs.trigger-remote-import.outputs.failed_stage }}"
-            FAILED_RESULT="${{ needs.trigger-remote-import.outputs.failed_result }}"
           fi
 
           echo "pipeline_status=$PIPELINE_STATUS" >> "$GITHUB_OUTPUT"
           echo "failed_stage=$FAILED_STAGE" >> "$GITHUB_OUTPUT"
           echo "failed_result=$FAILED_RESULT" >> "$GITHUB_OUTPUT"
 
-      - name: Send success adaptive card to Power Automate webhook
+      - name: Send success notification
         if: steps.evaluate.outputs.pipeline_status == 'success'
         shell: bash
         env:
@@ -510,9 +386,7 @@ jobs:
             "type": "AdaptiveCard",
             "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
             "version": "1.4",
-            "msteams": {
-              "width": "Full"
-            },
+            "msteams": { "width": "Full" },
             "body": [
               {
                 "type": "Container",
@@ -525,43 +399,19 @@ jobs:
                       {
                         "type": "Column",
                         "width": "auto",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "↗",
-                            "weight": "Bolder",
-                            "size": "Large",
-                            "color": "Accent"
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "↗", "weight": "Bolder", "size": "Large", "color": "Accent" }],
                         "verticalContentAlignment": "Center"
                       },
                       {
                         "type": "Column",
                         "width": "stretch",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "Deployment Notification",
-                            "weight": "Bolder",
-                            "size": "Large",
-                            "wrap": true
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "Deployment Notification", "weight": "Bolder", "size": "Large", "wrap": true }],
                         "verticalContentAlignment": "Center"
                       },
                       {
                         "type": "Column",
                         "width": "auto",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "Completed",
-                            "color": "Accent",
-                            "weight": "Bolder",
-                            "horizontalAlignment": "Right"
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "Completed", "color": "Accent", "weight": "Bolder", "horizontalAlignment": "Right" }],
                         "verticalContentAlignment": "Center"
                       }
                     ]
@@ -587,16 +437,12 @@ jobs:
               }
             ],
             "actions": [
-              {
-                "type": "Action.OpenUrl",
-                "title": "Pipeline",
-                "url": "${{ needs.metadata.outputs.pipeline_url }}"
-              }
+              { "type": "Action.OpenUrl", "title": "Pipeline", "url": "${{ needs.metadata.outputs.pipeline_url }}" }
             ]
           }
           EOF
 
-      - name: Send failure adaptive card to Power Automate webhook
+      - name: Send failure notification
         if: steps.evaluate.outputs.pipeline_status == 'failure'
         shell: bash
         env:
@@ -611,9 +457,7 @@ jobs:
             "type": "AdaptiveCard",
             "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
             "version": "1.4",
-            "msteams": {
-              "width": "Full"
-            },
+            "msteams": { "width": "Full" },
             "body": [
               {
                 "type": "Container",
@@ -626,43 +470,19 @@ jobs:
                       {
                         "type": "Column",
                         "width": "auto",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "!",
-                            "weight": "Bolder",
-                            "size": "Large",
-                            "color": "Warning"
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "!", "weight": "Bolder", "size": "Large", "color": "Warning" }],
                         "verticalContentAlignment": "Center"
                       },
                       {
                         "type": "Column",
                         "width": "stretch",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "Deployment Failed",
-                            "weight": "Bolder",
-                            "size": "Large",
-                            "wrap": true
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "Deployment Failed", "weight": "Bolder", "size": "Large", "wrap": true }],
                         "verticalContentAlignment": "Center"
                       },
                       {
                         "type": "Column",
                         "width": "auto",
-                        "items": [
-                          {
-                            "type": "TextBlock",
-                            "text": "Action required",
-                            "color": "Warning",
-                            "weight": "Bolder",
-                            "horizontalAlignment": "Right"
-                          }
-                        ],
+                        "items": [{ "type": "TextBlock", "text": "Action required", "color": "Warning", "weight": "Bolder", "horizontalAlignment": "Right" }],
                         "verticalContentAlignment": "Center"
                       }
                     ]
@@ -694,11 +514,7 @@ jobs:
               }
             ],
             "actions": [
-              {
-                "type": "Action.OpenUrl",
-                "title": "View Pipeline",
-                "url": "${{ needs.metadata.outputs.pipeline_url }}"
-              }
+              { "type": "Action.OpenUrl", "title": "View Pipeline", "url": "${{ needs.metadata.outputs.pipeline_url }}" }
             ]
           }
           EOF
