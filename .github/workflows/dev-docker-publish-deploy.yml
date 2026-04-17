@@ -73,7 +73,7 @@ jobs:
           file: ./src/Aethon.Api/Dockerfile
           push: true
           tags: |
-            repasscloud/aethon-api:latest
+            repasscloud/aethon-api:dev
             repasscloud/aethon-api:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -133,7 +133,7 @@ jobs:
           file: ./.docker/Dockerfile.builder
           push: true
           tags: |
-            repasscloud/aethon-web-builder:latest
+            repasscloud/aethon-web-builder:dev
             repasscloud/aethon-web-builder:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -193,7 +193,7 @@ jobs:
           file: ./src/Aethon.Web/Dockerfile
           push: true
           tags: |
-            repasscloud/aethon-web:latest
+            repasscloud/aethon-web:dev
             repasscloud/aethon-web:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -253,7 +253,7 @@ jobs:
           file: ./src/Maintenance/Dockerfile
           push: true
           tags: |
-            repasscloud/aethon-web-maintenance:latest
+            repasscloud/aethon-web-maintenance:dev
             repasscloud/aethon-web-maintenance:${{ needs.metadata.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
