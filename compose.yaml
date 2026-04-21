@@ -35,6 +35,12 @@ services:
       - dp_keys:/keys
     networks:
       - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
 
   web:
     image: repasscloud/aethon-web:dev
@@ -58,13 +64,38 @@ services:
     volumes:
       - dp_keys:/keys
     networks:
-      - app_net
+      app_net:
+        aliases:
+          - app-active
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  maintenance-web:
+    image: repasscloud/aethon-web-maintenance:dev
+    build:
+      context: .
+      dockerfile: src/Maintenance/Dockerfile
+    restart: unless-stopped
+    profiles: ["maintenance"]
+    networks:
+      app_net:
+        aliases:
+          - app-active
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
-      - web
       - api
     ports:
       - "80:80"
@@ -74,16 +105,6 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    networks:
-      - app_net
-
-  maintenance-web:
-    image: repasscloud/aethon-web-maintenance:dev
-    build:
-      context: .
-      dockerfile: src/Maintenance/Dockerfile
-    restart: unless-stopped
-    profiles: ["maintenance"]
     networks:
       - app_net
 
